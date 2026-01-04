@@ -537,14 +537,6 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <h4 className="font-medium text-sm">Demo Mode</h4>
-            <p className="text-sm text-muted-foreground">
-              This system is currently running in demo mode with mock data for presentation purposes. 
-              The backend is disconnected, so data changes are not persisted.
-            </p>
-          </div>
-
-          <div className="space-y-2">
             <h4 className="font-medium text-sm">Currency</h4>
             <p className="text-sm text-muted-foreground">
               All financial records use Ghana Cedis (GHS) as the currency.

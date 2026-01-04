@@ -80,10 +80,44 @@ const defaultPermissions: RolePermissions = {
 };
 
 // Demo users for Church of Christ, Mataheko Congregation (CoC.M)
-const mockUsers: User[] = [];
+const mockUsers: User[] = [
+  { 
+    id: '1', 
+    name: 'Dev Administrator', 
+    email: 'dev@cocm.com', 
+    role: 'dev',
+    isActive: true
+  },
+  { 
+    id: '2', 
+    name: 'Kwame Asante', 
+    email: 'admin@cocm.com', 
+    role: 'admin',
+    isActive: true
+  },
+  { 
+    id: '3', 
+    name: 'Pastor Emmanuel Adjei', 
+    email: 'pastor@cocm.com', 
+    role: 'pastor',
+    isActive: true
+  },
+  { 
+    id: '4', 
+    name: 'Elder Ama Osei', 
+    email: 'elder@cocm.com', 
+    role: 'elder',
+    isActive: true
+  },
+];
 
-// Export empty demo credentials for compatibility (using real backend auth now)
-export const demoCredentials = {};
+// Demo passwords (in real app, these would be hashed)
+const demoCredentials = {
+  'dev@cocm.com': 'dev123',
+  'admin@cocm.com': 'admin123',
+  'pastor@cocm.com': 'pastor123',
+  'elder@cocm.com': 'elder123'
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null); // Start with no user logged in
@@ -106,26 +140,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    try {
-      // Use real API authentication
-      const { api } = await import('../services/api');
-      const response = await api.auth.signIn(email, password);
-
-      if (response && response.user) {
-        setUser({
-          id: response.user.id,
-          name: response.user.name,
-          email: response.user.email,
-          role: response.user.role,
-          isActive: response.user.isActive
-        });
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Login error:', error);
+    // Check credentials
+    if (demoCredentials[email as keyof typeof demoCredentials] !== password) {
       return false;
     }
+
+    const foundUser = users.find(u => u.email === email && u.isActive);
+    if (foundUser) {
+      setUser(foundUser);
+      return true;
+    }
+    return false;
   };
 
   const logout = () => {
@@ -317,3 +342,5 @@ export function useAuth() {
   return context;
 }
 
+// Export demo credentials for login component
+export { demoCredentials };

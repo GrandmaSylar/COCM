@@ -75,13 +75,14 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!formData.gender) return;
 
     setIsLoading(true);
-
-    try {
-      await onSave({
+    
+    // Mock save - in real app, this would call an API
+    setTimeout(() => {
+      onSave({
         ...formData,
         gender: formData.gender as 'male' | 'female',
         status: 'active' as MemberStatus, // Default status for new members
@@ -90,11 +91,8 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
         legalInfo,
         ministries: selectedMinistries
       });
-    } catch (error) {
-      console.error('Error saving member:', error);
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000);
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -172,7 +170,26 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     }
     
     // Mock data - in real app, this would be an API call
-    const mockMembers: Member[] = [];
+    const mockMembers: Member[] = [
+      {
+        id: '1',
+        firstName: 'John',
+        lastName: 'Mensah',
+        otherNames: 'Kwame',
+        phone: '+233 24 123 4567',
+        email: 'john.mensah@example.com',
+        secondPhone: '',
+        gender: 'male',
+        dateOfBirth: '1975-05-15',
+        residenceLocation: 'Mataheko',
+        zone: 'M',
+        zoneNumber: 'M01',
+        joinDate: '2020-01-15',
+        status: 'active',
+        notes: '',
+        photo: ''
+      }
+    ];
     
     const filtered = mockMembers.filter(m => 
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||

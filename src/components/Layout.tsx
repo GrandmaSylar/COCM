@@ -73,23 +73,6 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Demo Mode Banner */}
-      <div className="bg-accent text-accent-foreground px-4 py-2 text-center text-sm">
-        <div className="flex items-center justify-center gap-2">
-          <Play className="w-4 h-4" />
-          <span>Demo Mode - Explore all features freely!</span>
-          <Badge variant="outline" className="ml-2">
-            Current Role: {user?.role === 'dev' ? 'Developer' : user?.role === 'admin' ? 'Administrator' : user?.role === 'pastor' ? 'Pastor' : 'Elder'}
-          </Badge>
-          {user?.role === 'dev' && (
-            <Badge variant="outline" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-              <Shield className="w-3 h-3 mr-1" />
-              Supreme Access
-            </Badge>
-          )}
-        </div>
-      </div>
-
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-medium">CoC.M</h1>
@@ -168,7 +151,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 </div>
                 
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Switch Demo Role:</p>
+                  <p className="text-xs font-medium text-muted-foreground">Switch Role:</p>
                   <Select value={user?.role} onValueChange={(role: any) => switchRole(role)}>
                     <SelectTrigger className="text-xs">
                       <SelectValue />
@@ -184,7 +167,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 
                 <Button onClick={logout} variant="outline" size="sm" className="w-full">
                   <LogOut className="w-4 h-4 mr-2" />
-                  Reset Demo
+                  Logout
                 </Button>
               </div>
             </div>
@@ -237,7 +220,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                   </div>
                   
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Switch Demo Role:</p>
+                    <p className="text-xs font-medium text-muted-foreground">Switch Role:</p>
                     <Select value={user?.role} onValueChange={(role: any) => switchRole(role)}>
                       <SelectTrigger className="text-xs">
                         <SelectValue />
@@ -253,7 +236,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                   
                   <Button onClick={logout} variant="outline" size="sm" className="w-full">
                     <LogOut className="w-4 h-4 mr-2" />
-                    Reset Demo
+                    Logout
                   </Button>
                 </div>
               </div>

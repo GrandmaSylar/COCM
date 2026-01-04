@@ -3,6 +3,8 @@ import { Button } from './ui/button';
 import { Users, Calendar, DollarSign, Plus, TrendingUp } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
+import { useEffect, useState } from 'react';
+import { api } from '../services/api';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -11,14 +13,33 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   const { user, canAccess } = useAuth();
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    attendanceThisWeek: 0,
+    givingThisMonth: 0,
+    newMembersThisMonth: 0
+  });
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - in real app, this would come from API
-  const stats = {
-    totalMembers: 355,
-    attendanceThisWeek: 187,
-    givingThisMonth: 38500.00, // Ghana Cedis amount
-    newMembersThisMonth: 12
-  };
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await api.stats.getDashboard();
+        setStats({
+          totalMembers: data.totalMembers || 0,
+          attendanceThisWeek: data.attendanceThisWeek || 0,
+          givingThisMonth: data.givingThisMonth || 0,
+          newMembersThisMonth: data.newMembersThisMonth || 0
+        });
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   const quickActions = [
     {
@@ -62,14 +83,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
     canAccess(action.permission)
   );
 
-  const recentActivity = [
-    { id: 1, type: 'member', message: 'Akosua Adjei registered as new member', time: '2 hours ago' },
-    { id: 2, type: 'attendance', message: 'Sunday Service attendance recorded (187 present)', time: '1 day ago' },
-    { id: 3, type: 'giving', message: 'Sunday Morning Service giving recorded (GH₵ 11,000.00 total)', time: '1 day ago' },
-    { id: 4, type: 'member', message: 'Yaw Boateng updated contact information', time: '2 days ago' },
-    { id: 5, type: 'giving', message: 'Midweek Service giving recorded (GH₵ 3,800.00 total)', time: '3 days ago' },
-    { id: 6, type: 'attendance', message: 'Midweek Bible Study attendance recorded (95 present)', time: '4 days ago' },
-  ];
+  const recentActivity: any[] = [];
 
   return (
     <div className="space-y-6">
@@ -167,27 +181,29 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       </div>
 
       {/* Recent Activity */}
-      <div>
-        <h2 className="mb-4">Recent Activity</h2>
-        <Card>
-          <CardContent className="p-0">
-            {recentActivity.map((activity, index) => (
-              <div
-                key={activity.id}
-                className={`p-4 flex items-start gap-3 ${
-                  index !== recentActivity.length - 1 ? 'border-b' : ''
-                }`}
-              >
-                <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm">{activity.message}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
+      {recentActivity.length > 0 && (
+        <div>
+          <h2 className="mb-4">Recent Activity</h2>
+          <Card>
+            <CardContent className="p-0">
+              {recentActivity.map((activity, index) => (
+                <div
+                  key={activity.id}
+                  className={`p-4 flex items-start gap-3 ${
+                    index !== recentActivity.length - 1 ? 'border-b' : ''
+                  }`}
+                >
+                  <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm">{activity.message}</p>
+                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

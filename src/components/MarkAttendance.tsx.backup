@@ -30,7 +30,56 @@ interface MarkAttendanceProps {
 }
 
 // Mock members - in real app this would come from the main members database
-const mockMembers: Member[] = [];
+const mockMembers: Member[] = [
+  {
+    id: '1',
+    firstName: 'John',
+    lastName: 'Doe',
+    otherNames: 'Michael',
+    email: 'john.doe@example.com',
+    phone: '+233 24 123 4567',
+    gender: 'male',
+    dateOfBirth: '1990-01-15',
+    residenceLocation: 'East Legon',
+    zone: 'M',
+    zoneNumber: 'M15',
+    notes: '',
+    status: 'active',
+    joinDate: '2023-01-15'
+  },
+  {
+    id: '2',
+    firstName: 'Jane',
+    lastName: 'Smith',
+    otherNames: 'Grace',
+    email: 'jane.smith@example.com',
+    phone: '+233 20 987 6543',
+    gender: 'female',
+    dateOfBirth: '1985-03-22',
+    residenceLocation: 'Dansoman',
+    zone: 'B',
+    zoneNumber: 'B08',
+    notes: '',
+    status: 'active',
+    joinDate: '2023-02-01'
+  },
+  {
+    id: '3',
+    firstName: 'Emmanuel',
+    lastName: 'Asante',
+    otherNames: 'Kwame',
+    email: 'emmanuel.asante@example.com',
+    phone: '+233 54 234 5678',
+    gender: 'male',
+    dateOfBirth: '1992-07-10',
+    residenceLocation: 'Kasoa',
+    zone: 'K',
+    zoneNumber: 'K12',
+    notes: '',
+    status: 'semi-active',
+    joinDate: '2023-03-10'
+  }
+];
 
 const SUNDAY_MAIN_SERVICE = {
   name: 'Sunday Main Service',

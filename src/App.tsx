@@ -19,6 +19,7 @@ import { Settings, AddUser } from './components/Settings';
 import { Help } from './components/Help';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner@2.0.3';
+import { api } from './services/api';
 
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' | 
                'attendance' | 'record-attendance' | 'mark-attendance' | 'visitors' | 'add-visitor' | 'visitor-profile' |
@@ -89,10 +90,15 @@ function AppContent() {
     setCurrentPage('member-profile');
   };
 
-  const handleSaveMember = (memberData: Omit<Member, 'id' | 'joinDate'>) => {
-    // In real app, this would save to API/database
-    toast.success('Member added successfully!');
-    setCurrentPage('members');
+  const handleSaveMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
+    try {
+      await api.members.create(memberData);
+      toast.success('Member added successfully!');
+      setCurrentPage('members');
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      toast.error('Failed to add member. Please try again.');
+    }
   };
 
   const handleEditMember = (member: Member) => {
@@ -100,11 +106,16 @@ function AppContent() {
     setCurrentPage('edit-member');
   };
 
-  const handleUpdateMember = (memberData: Member) => {
-    // In real app, this would update the member in API/database
-    toast.success('Member updated successfully!');
-    setSelectedMember(memberData); // Update selected member with new data
-    setCurrentPage('member-profile'); // Navigate back to profile
+  const handleUpdateMember = async (memberData: Member) => {
+    try {
+      await api.members.update(memberData.id, memberData);
+      toast.success('Member updated successfully!');
+      setSelectedMember(memberData); // Update selected member with new data
+      setCurrentPage('member-profile'); // Navigate back to profile
+    } catch (error) {
+      console.error('Failed to update member:', error);
+      toast.error('Failed to update member. Please try again.');
+    }
   };
 
   const handleRecordAttendance = () => {

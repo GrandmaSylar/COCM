@@ -47,10 +47,99 @@ interface GivingProps {
 }
 
 // Mock giving records with service-based giving
-const mockGivingRecords: GivingRecord[] = [];
+const mockGivingRecords: GivingRecord[] = [
+  {
+    id: '1',
+    serviceName: 'Sunday Morning Service',
+    serviceDate: '2025-01-19',
+    serviceType: 'sunday_morning',
+    offerings: {
+      offering: 4500,
+      donation: 2000,
+      thanksgiving: 1500,
+      customTypes: {
+        'Building Fund': 3000
+      }
+    },
+    totalAmount: 11000,
+    paymentBreakdown: {
+      cash: 7000,
+      mobile_money: 3500,
+      card: 500,
+      bank_transfer: 0
+    },
+    notes: 'Good attendance and giving',
+    recordedBy: 'Admin User',
+    recordedDate: '2025-01-19'
+  },
+  {
+    id: '2',
+    serviceName: 'Midweek Bible Study',
+    serviceDate: '2025-01-15',
+    serviceType: 'midweek',
+    offerings: {
+      offering: 2500,
+      donation: 500,
+      thanksgiving: 800,
+      customTypes: {}
+    },
+    totalAmount: 3800,
+    paymentBreakdown: {
+      cash: 3200,
+      mobile_money: 600,
+      card: 0,
+      bank_transfer: 0
+    },
+    notes: '',
+    recordedBy: 'Admin User',
+    recordedDate: '2025-01-15'
+  },
+  {
+    id: '3',
+    serviceName: 'Sunday Morning Service',
+    serviceDate: '2025-01-12',
+    serviceType: 'sunday_morning',
+    offerings: {
+      offering: 5200,
+      donation: 1800,
+      thanksgiving: 2100,
+      customTypes: {
+        'Building Fund': 2500,
+        'Missions Support': 1000
+      }
+    },
+    totalAmount: 12600,
+    paymentBreakdown: {
+      cash: 8000,
+      mobile_money: 4100,
+      card: 500,
+      bank_transfer: 0
+    },
+    notes: 'Special missions emphasis',
+    recordedBy: 'Pastor User',
+    recordedDate: '2025-01-12'
+  }
+];
 
 // Mock custom giving types
-const mockCustomTypes: CustomGivingType[] = [];
+const mockCustomTypes: CustomGivingType[] = [
+  {
+    id: '1',
+    name: 'Building Fund',
+    description: 'For church building construction and renovation',
+    isActive: true,
+    createdBy: 'Admin User',
+    createdDate: '2024-01-01'
+  },
+  {
+    id: '2',
+    name: 'Missions Support',
+    description: 'Supporting missionary work',
+    isActive: true,
+    createdBy: 'Admin User',
+    createdDate: '2024-01-01'
+  }
+];
 
 const serviceTypeLabels = {
   sunday_morning: 'Sunday Morning',

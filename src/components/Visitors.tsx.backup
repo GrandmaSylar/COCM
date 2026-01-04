@@ -41,7 +41,57 @@ interface VisitorsProps {
 }
 
 // Mock visitors data - replace with real data in production
-const mockVisitors: Visitor[] = [];
+const mockVisitors: Visitor[] = [
+  {
+    id: '1',
+    firstName: 'Mary',
+    lastName: 'Johnson',
+    otherNames: 'Grace',
+    email: 'mary.johnson@example.com',
+    phone: '+233 24 555 0123',
+    gender: 'female',
+    dateOfBirth: '1988-05-15',
+    residenceLocation: 'Tema',
+    visitDate: '2024-01-07',
+    serviceType: 'Sunday Main Service',
+    referredBy: 'Emmanuel Asante',
+    interestedInMembership: true,
+    notes: 'New to the area, very interested in joining the church',
+    followUpStatus: 'contacted',
+    potentialZone: 'K'
+  },
+  {
+    id: '2',
+    firstName: 'Samuel',
+    lastName: 'Osei',
+    otherNames: 'Kwaku',
+    email: 'samuel.osei@example.com',
+    phone: '+233 20 444 5678',
+    gender: 'male',
+    residenceLocation: 'Spintex',
+    visitDate: '2024-01-14',
+    serviceType: 'Sunday Main Service',
+    interestedInMembership: false,
+    notes: 'Visiting from Kumasi, just wanted to attend service',
+    followUpStatus: 'completed',
+    potentialZone: 'M'
+  },
+  {
+    id: '3',
+    firstName: 'Abena',
+    lastName: 'Mensah',
+    otherNames: 'Akosua',
+    phone: '+233 54 333 7890',
+    gender: 'female',
+    residenceLocation: 'Weija',
+    visitDate: '2024-01-21',
+    serviceType: 'Sunday Main Service',
+    interestedInMembership: true,
+    notes: 'Friend brought her to church, very engaged during service',
+    followUpStatus: 'pending',
+    potentialZone: 'B'
+  }
+];
 
 export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: VisitorsProps) {
   const [visitors] = useState<Visitor[]>(mockVisitors);
