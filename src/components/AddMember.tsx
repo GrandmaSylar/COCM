@@ -26,6 +26,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     phone: visitorData?.phone || '',
     secondPhone: visitorData?.secondPhone || '',
     gender: visitorData?.gender || ('' as 'male' | 'female' | ''),
+    maritalStatus: '' as 'single' | 'married' | 'divorced' | 'widowed' | '',
     dateOfBirth: visitorData?.dateOfBirth || '',
     residenceLocation: visitorData?.residenceLocation || '',
     digitalAddress: '',
@@ -84,6 +85,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
       await onSave({
         ...formData,
         gender: formData.gender as 'male' | 'female',
+        maritalStatus: formData.maritalStatus || undefined,
         status: 'active' as MemberStatus, // Default status for new members
         baptismInfo,
         familyMembers,
@@ -314,7 +316,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender *</Label>
                 <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
@@ -324,6 +326,20 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maritalStatus">Marital Status</Label>
+                <Select value={formData.maritalStatus} onValueChange={(value) => handleInputChange('maritalStatus', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select marital status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="married">Married</SelectItem>
+                    <SelectItem value="divorced">Divorced</SelectItem>
+                    <SelectItem value="widowed">Widowed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

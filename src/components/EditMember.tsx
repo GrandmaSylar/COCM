@@ -25,6 +25,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     phone: member.phone || '',
     secondPhone: member.secondPhone || '',
     gender: member.gender || ('' as 'male' | 'female' | ''),
+    maritalStatus: member.maritalStatus || ('' as 'single' | 'married' | 'divorced' | 'widowed' | ''),
     dateOfBirth: member.dateOfBirth || '',
     residenceLocation: member.residenceLocation || '',
     digitalAddress: member.digitalAddress || '',
@@ -74,25 +75,27 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.gender) return;
 
     setIsLoading(true);
-    
-    // Mock save - in real app, this would call an API
-    setTimeout(() => {
+
+    try {
       onSave({
         ...member,
         ...formData,
         gender: formData.gender as 'male' | 'female',
+        maritalStatus: formData.maritalStatus || undefined,
         status: formData.status as MemberStatus,
         baptismInfo,
         familyMembers,
         legalInfo,
         ministries: selectedMinistries
       });
+    } catch (error) {
+      console.error('Error updating member:', error);
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -312,7 +315,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender *</Label>
                 <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
@@ -322,6 +325,20 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <SelectContent>
                     <SelectItem value="male">Male</SelectItem>
                     <SelectItem value="female">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maritalStatus">Marital Status</Label>
+                <Select value={formData.maritalStatus} onValueChange={(value) => handleInputChange('maritalStatus', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select marital status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="single">Single</SelectItem>
+                    <SelectItem value="married">Married</SelectItem>
+                    <SelectItem value="divorced">Divorced</SelectItem>
+                    <SelectItem value="widowed">Widowed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

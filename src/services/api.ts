@@ -90,7 +90,9 @@ export const api = {
     }),
     
     delete: (id: string) => fetchApi(`/members/${id}`, { method: 'DELETE' }),
-    
+
+    getAnalytics: (id: string) => fetchApi(`/members/${id}/analytics`),
+
     uploadPhoto: async (memberId: string, file: File) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${memberId}-${Date.now()}.${fileExt}`;
@@ -251,5 +253,36 @@ export const api = {
 
   reports: {
     getReports: (period?: string) => fetchApi(`/reports${period ? `?period=${period}` : ''}`),
+  },
+
+  // ============================================================================
+  // USER MANAGEMENT
+  // ============================================================================
+
+  users: {
+    getAll: () => fetchApi('/users'),
+
+    getPending: () => fetchApi('/users/pending'),
+
+    create: (data: { email: string; password: string; name: string; role: string; phone?: string }) =>
+      fetchApi('/users', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }),
+
+    approve: (userId: string) =>
+      fetchApi(`/users/${userId}/approve`, { method: 'POST' }),
+
+    reject: (userId: string) =>
+      fetchApi(`/users/${userId}/reject`, { method: 'POST' }),
+
+    delete: (userId: string) =>
+      fetchApi(`/users/${userId}`, { method: 'DELETE' }),
+
+    updateRole: (userId: string, role: string) =>
+      fetchApi(`/users/${userId}/role`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role })
+      }),
   },
 };

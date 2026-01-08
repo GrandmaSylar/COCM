@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
+import { api } from '../services/api';
 
 interface GivingRecord {
   id: string;
@@ -29,8 +30,9 @@ interface GivingRecord {
     bank_transfer: number;
   };
   notes?: string;
-  recordedBy: string;
-  recordedDate: string;
+  // Audit fields (renamed from recordedBy/recordedDate for consistency)
+  createdBy?: string;
+  createdAt?: string;
 }
 
 interface CustomGivingType {
@@ -38,19 +40,15 @@ interface CustomGivingType {
   name: string;
   description?: string;
   isActive: boolean;
-  createdBy: string;
-  createdDate: string;
+  // Audit fields
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface GivingProps {
   onRecordGiving: () => void;
 }
-
-// Mock giving records with service-based giving
-const mockGivingRecords: GivingRecord[] = [];
-
-// Mock custom giving types
-const mockCustomTypes: CustomGivingType[] = [];
 
 const serviceTypeLabels = {
   sunday_morning: 'Sunday Morning',
@@ -68,12 +66,32 @@ const paymentMethodLabels = {
 };
 
 export function Giving({ onRecordGiving }: GivingProps) {
-  const [records] = useState<GivingRecord[]>(mockGivingRecords);
-  const [customTypes, setCustomTypes] = useState<CustomGivingType[]>(mockCustomTypes);
+  const [records, setRecords] = useState<GivingRecord[]>([]);
+  const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [showCustomTypeManager, setShowCustomTypeManager] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [givingData, typesData] = await Promise.all([
+          api.giving.getAll(),
+          api.giving.types.getAll()
+        ]);
+        setRecords(givingData || []);
+        setCustomTypes(typesData || []);
+      } catch (error) {
+        console.error('Failed to fetch giving data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const canRecordGiving = canAccess('record_giving');
   const canManageCustomTypes = canAccess('manage_giving_types');
@@ -136,8 +154,22 @@ export function Giving({ onRecordGiving }: GivingProps) {
     ));
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1>Giving</h1>
+          <p className="text-muted-foreground">Loading giving data...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
   if (showCustomTypeManager && canManageCustomTypes) {
-    return <CustomTypeManager 
+    return <CustomTypeManager
       customTypes={customTypes}
       onBack={() => setShowCustomTypeManager(false)}
       onDelete={handleDeleteCustomType}
@@ -148,7 +180,7 @@ export function Giving({ onRecordGiving }: GivingProps) {
           ...newType,
           isActive: true,
           createdBy: user?.name || 'Unknown',
-          createdDate: new Date().toISOString().split('T')[0]
+          createdAt: new Date().toISOString().split('T')[0]
         };
         setCustomTypes(prev => [...prev, type]);
       }}
@@ -366,9 +398,11 @@ export function Giving({ onRecordGiving }: GivingProps) {
                   )}
 
                   {/* Footer */}
-                  <div className="text-xs text-muted-foreground border-t pt-2">
-                    Recorded by {record.recordedBy} on {formatDate(record.recordedDate)}
-                  </div>
+                  {record.createdBy && record.createdAt && (
+                    <div className="text-xs text-muted-foreground border-t pt-2">
+                      Recorded by {record.createdBy} on {formatDate(record.createdAt)}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -398,7 +432,7 @@ interface CustomTypeManagerProps {
   onBack: () => void;
   onDelete: (typeId: string) => void;
   onToggle: (typeId: string) => void;
-  onAdd: (type: Omit<CustomGivingType, 'id' | 'isActive' | 'createdBy' | 'createdDate'>) => void;
+  onAdd: (type: Omit<CustomGivingType, 'id' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>) => void;
 }
 
 function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: CustomTypeManagerProps) {
@@ -494,9 +528,11 @@ function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: C
                     {type.description && (
                       <p className="text-sm text-muted-foreground mt-1">{type.description}</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Created by {type.createdBy} on {new Date(type.createdDate).toLocaleDateString()}
-                    </p>
+                    {type.createdBy && type.createdAt && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Created by {type.createdBy} on {new Date(type.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -528,7 +564,7 @@ function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: C
 // Record Giving Component - Now records per service
 interface RecordGivingProps {
   onBack: () => void;
-  onSave: (record: Omit<GivingRecord, 'id' | 'totalAmount' | 'recordedBy' | 'recordedDate'>) => void;
+  onSave: (record: Omit<GivingRecord, 'id' | 'totalAmount' | 'createdBy' | 'createdAt'>) => void;
 }
 
 export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
@@ -552,17 +588,28 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
   
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
   const { user } = useAuth();
 
-  // Mock custom types (in real app, would fetch from state/API)
-  const customTypes = mockCustomTypes.filter(type => type.isActive);
+  useEffect(() => {
+    const fetchCustomTypes = async () => {
+      try {
+        const typesData = await api.giving.types.getAll();
+        setCustomTypes((typesData || []).filter(type => type.isActive));
+      } catch (error) {
+        console.error('Failed to fetch custom types:', error);
+      }
+    };
+
+    fetchCustomTypes();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
       const customTypesObj: { [key: string]: number } = {};
       Object.entries(customTypeAmounts).forEach(([key, value]) => {
         const amount = parseFloat(value);
@@ -571,7 +618,7 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
         }
       });
 
-      onSave({
+      const givingData = {
         serviceName,
         serviceDate,
         serviceType,
@@ -587,10 +634,16 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
           card: parseFloat(cardAmount) || 0,
           bank_transfer: parseFloat(bankTransferAmount) || 0
         },
+        totalAmount: calculateTotal(),
         notes: notes || undefined
-      });
+      };
+
+      await api.giving.create(givingData);
+      onSave(givingData);
+    } catch (error) {
+      console.error('Failed to record giving:', error);
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const calculateTotal = () => {

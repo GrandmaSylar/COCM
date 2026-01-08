@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Users, Calendar, DollarSign, Plus, TrendingUp } from 'lucide-react';
+import { Users, Calendar, DollarSign, Plus } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useEffect, useState } from 'react';
@@ -96,7 +96,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('members')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm text-muted-foreground">Total Members</CardTitle>
@@ -117,9 +117,6 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.attendanceThisWeek}</div>
-            <p className="text-xs text-muted-foreground">
-              54.7% of total members
-            </p>
           </CardContent>
         </Card>
 
@@ -130,23 +127,6 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatGhanaCedis(stats.givingThisMonth)}</div>
-            <p className="text-xs text-muted-foreground">
-              <TrendingUp className="w-3 h-3 inline mr-1" />
-              +12% from last month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('reports')}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Growth Rate</CardTitle>
-            <TrendingUp className="w-4 h-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">+2.3%</div>
-            <p className="text-xs text-muted-foreground">
-              Monthly growth
-            </p>
           </CardContent>
         </Card>
       </div>

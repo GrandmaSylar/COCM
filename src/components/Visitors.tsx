@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
-import { 
-  Search, Plus, Phone, Mail, MapPin, Eye, Users, UserPlus, 
-  ArrowLeft, Calendar, Clock, UserCheck 
+import {
+  Search, Plus, Phone, Mail, MapPin, Eye, Users, UserPlus,
+  ArrowLeft, Calendar, Clock, UserCheck
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
+import { api } from '../services/api';
 
 export interface Visitor {
   id: string;
@@ -32,6 +33,13 @@ export interface Visitor {
   notes: string;
   followUpStatus: 'pending' | 'contacted' | 'scheduled' | 'completed';
   potentialZone?: Zone;
+  // Conversion tracking
+  convertedToMember?: boolean;
+  convertedMemberId?: string;
+  // Audit fields
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
 }
 
 interface VisitorsProps {
@@ -40,17 +48,30 @@ interface VisitorsProps {
   onConvertToMember: (visitor: Visitor) => void;
 }
 
-// Mock visitors data - replace with real data in production
-const mockVisitors: Visitor[] = [];
-
 export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: VisitorsProps) {
-  const [visitors] = useState<Visitor[]>(mockVisitors);
+  const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedMembershipInterest, setSelectedMembershipInterest] = useState('all');
+  const [loading, setLoading] = useState(true);
 
   const { canAccess } = useAuth();
   const canManageVisitors = canAccess('manage_members'); // Same permission as managing members
+
+  useEffect(() => {
+    const fetchVisitors = async () => {
+      try {
+        const visitorsData = await api.visitors.getAll();
+        setVisitors(visitorsData || []);
+      } catch (error) {
+        console.error('Failed to fetch visitors:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVisitors();
+  }, []);
 
   const filteredVisitors = visitors.filter(visitor => {
     const matchesSearch = `${visitor.firstName} ${visitor.lastName} ${visitor.otherNames}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -93,6 +114,20 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
     const now = new Date();
     return visitDate.getMonth() === now.getMonth() && visitDate.getFullYear() === now.getFullYear();
   }).length;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1>Visitors</h1>
+          <p className="text-muted-foreground">Loading visitors data...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -359,14 +394,20 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     }
 
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
+      await api.visitors.create({
+        ...formData,
+        potentialZone: formData.potentialZone || undefined
+      });
       onSave({
         ...formData,
         potentialZone: formData.potentialZone || undefined
       });
+    } catch (error) {
+      console.error('Failed to create visitor:', error);
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const isValid = formData.firstName && formData.lastName && formData.phone && formData.residenceLocation;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
+import { api } from '../services/api';
 
 interface AttendanceRecord {
   id: string;
@@ -17,9 +18,13 @@ interface AttendanceRecord {
   serviceType: string;
   startTime?: string;
   endTime?: string;
-  attendees: string[]; // member ids
+  attendees: string[]; // member ids (computed from attendance_entries JOIN)
   totalCount: number;
   isCustomService?: boolean;
+  customServiceId?: string;
+  // Audit fields
+  createdAt?: string;
+  createdBy?: string;
 }
 
 interface CustomService {
@@ -32,20 +37,16 @@ interface CustomService {
   endTime: string;
   daysOfWeek: number[]; // 0=Sunday, 1=Monday, etc.
   isActive: boolean;
-  createdBy: string;
-  createdDate: string;
+  // Audit fields
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface AttendanceProps {
   onRecordAttendance: () => void;
   onMarkAttendance: () => void;
 }
-
-// Empty attendance records - add records through the interface
-const mockAttendanceRecords: AttendanceRecord[] = [];
-
-// Empty custom services - add custom services through the interface
-const mockCustomServices: CustomService[] = [];
 
 // Permanent service that cannot be modified
 const SUNDAY_MAIN_SERVICE = {
@@ -57,12 +58,32 @@ const SUNDAY_MAIN_SERVICE = {
 };
 
 export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceProps) {
-  const [records] = useState<AttendanceRecord[]>(mockAttendanceRecords);
-  const [customServices, setCustomServices] = useState<CustomService[]>(mockCustomServices);
+  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [customServices, setCustomServices] = useState<CustomService[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [showServiceManager, setShowServiceManager] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [attendanceData, servicesData] = await Promise.all([
+          api.attendance.getAll(),
+          api.services.getAll()
+        ]);
+        setRecords(attendanceData || []);
+        setCustomServices(servicesData || []);
+      } catch (error) {
+        console.error('Failed to fetch attendance data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const canRecordAttendance = canAccess('record_attendance');
   const canManageServices = canAccess('manage_services');
@@ -118,8 +139,22 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
     ));
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1>Attendance</h1>
+          <p className="text-muted-foreground">Loading attendance data...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
   if (showServiceManager && canManageServices) {
-    return <ServiceManager 
+    return <ServiceManager
       customServices={customServices}
       onBack={() => setShowServiceManager(false)}
       onDelete={handleDeleteService}
@@ -130,7 +165,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
           ...newService,
           isActive: true,
           createdBy: user?.name || 'Unknown',
-          createdDate: new Date().toISOString().split('T')[0]
+          createdAt: new Date().toISOString().split('T')[0]
         };
         setCustomServices(prev => [...prev, service]);
       }}
@@ -362,7 +397,7 @@ interface ServiceManagerProps {
   onBack: () => void;
   onDelete: (serviceId: string) => void;
   onToggle: (serviceId: string) => void;
-  onAdd: (service: Omit<CustomService, 'id' | 'isActive' | 'createdBy' | 'createdDate'>) => void;
+  onAdd: (service: Omit<CustomService, 'id' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>) => void;
 }
 
 function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: ServiceManagerProps) {
@@ -576,9 +611,11 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: S
                       <p>
                         <strong>Days:</strong> {service.daysOfWeek.map(d => dayNames[d]).join(', ')}
                       </p>
-                      <p className="text-xs">
-                        Created by {service.createdBy} on {new Date(service.createdDate).toLocaleDateString()}
-                      </p>
+                      {service.createdBy && service.createdAt && (
+                        <p className="text-xs">
+                          Created by {service.createdBy} on {new Date(service.createdAt).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -614,9 +651,6 @@ interface RecordAttendanceProps {
   onSave: (record: Omit<AttendanceRecord, 'id'>) => void;
 }
 
-// Empty members list - will be loaded from the main members database
-const mockMembers: Member[] = [];
-
 export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   const [serviceType, setServiceType] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -626,14 +660,33 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   const [totalCount, setTotalCount] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [customServices, setCustomServices] = useState<CustomService[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [membersData, servicesData] = await Promise.all([
+          api.members.getAll(),
+          api.services.getAll()
+        ]);
+        setMembers(membersData || []);
+        setCustomServices(servicesData || []);
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Get available service types
   const availableServices = [
     SUNDAY_MAIN_SERVICE.name,
-    ...mockCustomServices.filter(s => s.isActive).map(s => s.name)
+    ...customServices.filter(s => s.isActive).map(s => s.name)
   ];
 
-  const filteredMembers = mockMembers.filter(member =>
+  const filteredMembers = members.filter(member =>
     `${member.firstName} ${member.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -647,14 +700,14 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
 
   const handleServiceTypeChange = (value: string) => {
     setServiceType(value);
-    
+
     // Auto-fill times for Sunday Main Service
     if (value === SUNDAY_MAIN_SERVICE.name) {
       setStartTime(SUNDAY_MAIN_SERVICE.startTime);
       setEndTime(SUNDAY_MAIN_SERVICE.endTime);
     } else {
       // Try to find custom service and auto-fill times
-      const customService = mockCustomServices.find(s => s.name === value);
+      const customService = customServices.find(s => s.name === value);
       if (customService) {
         setStartTime(customService.startTime);
         setEndTime(customService.endTime);
@@ -670,8 +723,17 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
     if (!serviceType || !totalCount) return;
 
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
+      await api.attendance.create({
+        date,
+        serviceType,
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        attendees,
+        totalCount: parseInt(totalCount),
+        isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
+      });
       onSave({
         date,
         serviceType,
@@ -681,8 +743,10 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         totalCount: parseInt(totalCount),
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
       });
+    } catch (error) {
+      console.error('Failed to record attendance:', error);
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const isValid = serviceType && totalCount && parseInt(totalCount) > 0;

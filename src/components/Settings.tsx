@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settin
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
+import { api } from '../services/api';
 
 interface SystemUser {
   id: string;
@@ -27,9 +28,6 @@ interface SystemUser {
 interface SettingsProps {
   onAddUser: () => void;
 }
-
-// Empty system users list - add users through the interface
-const mockSystemUsers: SystemUser[] = [];
 
 const roleLabels = {
   dev: 'Developer',
@@ -54,13 +52,13 @@ const allPermissions = [
 ];
 
 export function Settings({ onAddUser }: SettingsProps) {
-  const { 
-    user, 
-    canAccess, 
-    isDev, 
+  const {
+    user,
+    canAccess,
+    isDev,
     isAdmin,
-    rolePermissions, 
-    updateRolePermissions, 
+    rolePermissions,
+    updateRolePermissions,
     toggleUserStatus,
     grantTemporaryPermission,
     revokeTemporaryPermission,
@@ -71,12 +69,15 @@ export function Settings({ onAddUser }: SettingsProps) {
     deleteCustomRole,
     allUsers
   } = useAuth();
-  
+
   const { customColors, setCustomColors, resetColors } = useTheme();
-  
+
   const [selectedUserForPermission, setSelectedUserForPermission] = useState<string | null>(null);
   const [permissionToGrant, setPermissionToGrant] = useState('');
   const [permissionDuration, setPermissionDuration] = useState('24');
+  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
+  const [allSystemUsers, setAllSystemUsers] = useState<any[]>([]);
   
   // Theme customization state
   const [themeColorInputs, setThemeColorInputs] = useState<ThemeColors>(
@@ -93,6 +94,28 @@ export function Settings({ onAddUser }: SettingsProps) {
   const canManageSettings = canAccess('manage_settings');
   const canGrantPermissions = canAccess('grant_permissions');
   const canManageTheme = canAccess('manage_theme');
+
+  // Fetch all users and pending users
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!canManageUsers) return;
+
+      try {
+        const [allUsersData, pendingUsersData] = await Promise.all([
+          api.users.getAll(),
+          api.users.getPending()
+        ]);
+        setAllSystemUsers(allUsersData);
+        setPendingUsers(pendingUsersData);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      } finally {
+        setLoadingPending(false);
+      }
+    };
+
+    fetchUsers();
+  }, [canManageUsers]);
 
   const formatLastLogin = (dateString?: string) => {
     if (!dateString) return 'Never';
@@ -121,10 +144,18 @@ export function Settings({ onAddUser }: SettingsProps) {
     }
   };
 
-  const handleDeleteUser = (userId: string) => {
-    if (confirm('Are you sure you want to delete this user?')) {
-      console.log('Deleting user:', userId);
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+
+    try {
+      await api.users.delete(userId);
       toast.success('User deleted successfully');
+      // Remove from both lists
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      setAllSystemUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      toast.error('Failed to delete user');
     }
   };
 
@@ -171,6 +202,60 @@ export function Settings({ onAddUser }: SettingsProps) {
       foreground: '#0f172a'
     });
     toast.success('Theme colors reset to default');
+  };
+
+  const handleApproveUser = async (userId: string) => {
+    try {
+      await api.users.approve(userId);
+      toast.success('User approved successfully');
+      // Remove from pending list
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      // Update the user in allSystemUsers
+      setAllSystemUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, isActive: true, approvalStatus: 'approved' }
+          : u
+      ));
+    } catch (error) {
+      console.error('Failed to approve user:', error);
+      toast.error('Failed to approve user');
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to reject this user account?')) return;
+
+    try {
+      await api.users.reject(userId);
+      toast.success('User rejected successfully');
+      // Remove from pending list
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      // Update the user in allSystemUsers
+      setAllSystemUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, isActive: false, approvalStatus: 'rejected' }
+          : u
+      ));
+    } catch (error) {
+      console.error('Failed to reject user:', error);
+      toast.error('Failed to reject user');
+    }
+  };
+
+  const handleChangeUserRole = async (userId: string, newRole: UserRole) => {
+    try {
+      await api.users.updateRole(userId, newRole);
+      toast.success('User role updated successfully');
+      // Update the user in allSystemUsers
+      setAllSystemUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, role: newRole }
+          : u
+      ));
+    } catch (error) {
+      console.error('Failed to update user role:', error);
+      toast.error('Failed to update user role');
+    }
   };
 
   if (!canManageUsers && !canManageSettings) {
@@ -254,17 +339,85 @@ export function Settings({ onAddUser }: SettingsProps) {
 
         {/* Users & Permissions Tab */}
         <TabsContent value="users" className="space-y-6">
+          {/* Pending Users Section */}
+          {pendingUsers.length > 0 && (
+            <div>
+              <h2 className="mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-500" />
+                Pending Account Approvals ({pendingUsers.length})
+              </h2>
+              <div className="space-y-3">
+                {pendingUsers.map((pendingUser) => (
+                  <Card key={pendingUser.id} className="border-orange-200 dark:border-orange-800">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-4 flex-1">
+                          <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                              {pendingUser.name.split(' ').map((n: string) => n[0]).join('')}
+                            </span>
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                              <h3 className="font-medium">{pendingUser.name}</h3>
+                              <Badge className={roleColors[pendingUser.role as UserRole]}>
+                                {roleLabels[pendingUser.role as UserRole]}
+                              </Badge>
+                              <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                                Pending Approval
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                              <Mail className="w-4 h-4" />
+                              {pendingUser.email}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Signed up {new Date(pendingUser.createdAt).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => handleApproveUser(pendingUser.id)}
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            onClick={() => handleRejectUser(pendingUser.id)}
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* System Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center text-center gap-2">
                   <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                     <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{allUsers.length}</p>
-                    <p className="text-sm text-muted-foreground">Total Users</p>
+                    <p className="text-2xl font-bold">{allSystemUsers.length}</p>
+                    <p className="text-xs text-muted-foreground">Total Users</p>
                   </div>
                 </div>
               </CardContent>
@@ -272,41 +425,55 @@ export function Settings({ onAddUser }: SettingsProps) {
 
             <Card>
               <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allUsers.filter(u => u.isActive).length}</p>
-                    <p className="text-sm text-muted-foreground">Active Users</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allUsers.filter(u => u.role === 'admin').length}</p>
-                    <p className="text-sm text-muted-foreground">Administrators</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center text-center gap-2">
                   <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
                     <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{allUsers.filter(u => u.role === 'dev').length}</p>
-                    <p className="text-sm text-muted-foreground">Developers</p>
+                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'dev').length}</p>
+                    <p className="text-xs text-muted-foreground">Developers</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'admin').length}</p>
+                    <p className="text-xs text-muted-foreground">Admins</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'pastor').length}</p>
+                    <p className="text-xs text-muted-foreground">Pastors</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col items-center text-center gap-2">
+                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                    <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'elder').length}</p>
+                    <p className="text-xs text-muted-foreground">Elders</p>
                   </div>
                 </div>
               </CardContent>
@@ -317,7 +484,7 @@ export function Settings({ onAddUser }: SettingsProps) {
           <div>
             <h2 className="mb-4">System Users</h2>
             <div className="space-y-4">
-              {allUsers.map((systemUser) => {
+              {allSystemUsers.map((systemUser) => {
                 const tempPerms = getUserTemporaryPermissions(systemUser.id);
                 
                 return (
@@ -336,10 +503,22 @@ export function Settings({ onAddUser }: SettingsProps) {
                               <Badge className={roleColors[systemUser.role]}>
                                 {roleLabels[systemUser.role]}
                               </Badge>
-                              <Badge variant={systemUser.isActive ? 'default' : 'secondary'}>
-                                {systemUser.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                              {isDev && (
+                              {systemUser.approvalStatus === 'pending' && (
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                                  Pending
+                                </Badge>
+                              )}
+                              {systemUser.approvalStatus === 'rejected' && (
+                                <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                                  Rejected
+                                </Badge>
+                              )}
+                              {systemUser.approvalStatus === 'approved' && (
+                                <Badge variant={systemUser.isActive ? 'default' : 'secondary'}>
+                                  {systemUser.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                              )}
+                              {isDev && systemUser.approvalStatus === 'approved' && (
                                 <Switch
                                   checked={systemUser.isActive}
                                   onCheckedChange={() => toggleUserStatus(systemUser.id)}
@@ -352,6 +531,27 @@ export function Settings({ onAddUser }: SettingsProps) {
                                 <Mail className="w-4 h-4" />
                                 {systemUser.email}
                               </div>
+                              {isDev && systemUser.approvalStatus === 'approved' && systemUser.id !== user?.id && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Shield className="w-4 h-4 text-muted-foreground" />
+                                  <span className="text-xs text-muted-foreground">Change Role:</span>
+                                  <Select
+                                    value={systemUser.role}
+                                    onValueChange={(newRole) => handleChangeUserRole(systemUser.id, newRole as UserRole)}
+                                  >
+                                    <SelectTrigger className="h-7 text-xs w-32">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Object.entries(roleLabels).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>
+                                          {label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              )}
                             </div>
 
                             {/* Temporary Permissions */}
@@ -711,15 +911,23 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
     if (!formData.role) return;
 
     setIsLoading(true);
-    
-    setTimeout(() => {
-      onSave({
-        ...formData,
-        role: formData.role as UserRole
+
+    try {
+      await api.users.create({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        phone: formData.phone
       });
-      setIsLoading(false);
+
       toast.success('User created successfully');
-    }, 1000);
+      onBack();
+    } catch (error: any) {
+      console.error('Failed to create user:', error);
+      toast.error(error.message || 'Failed to create user. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Alert, AlertDescription } from './ui/alert';
 import { useTheme } from './ThemeContext';
 import { ChurchIcon, ArrowLeft, Eye, EyeOff, Info } from 'lucide-react';
+import { api } from '../services/api';
 
 interface SignUpProps {
   onBackToLogin: () => void;
@@ -54,9 +55,15 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
       return;
     }
 
-    // Simulate API call
-    setTimeout(() => {
-      setSuccess('Account created successfully! Please wait for administrator approval.');
+    try {
+      await api.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        name: `${formData.firstName} ${formData.lastName}`,
+        role: formData.role
+      });
+
+      setSuccess('Account created successfully! Please wait for administrator approval before logging in.');
       setFormData({
         firstName: '',
         lastName: '',
@@ -66,8 +73,12 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
         role: '',
         department: ''
       });
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      setError(error.message || 'Failed to create account. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {

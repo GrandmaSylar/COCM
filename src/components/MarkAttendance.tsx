@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { ArrowLeft, Search, Users, Clock, Check, X, UserCheck, UserX, Filter } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member, ZONES } from './Members';
+import { api } from '../services/api';
 
 interface AttendanceRecord {
   id: string;
@@ -29,9 +30,6 @@ interface MarkAttendanceProps {
   onSave: (record: Omit<AttendanceRecord, 'id' | 'markedBy' | 'markedAt'>) => void;
 }
 
-// Mock members - in real app this would come from the main members database
-const mockMembers: Member[] = [];
-
 const SUNDAY_MAIN_SERVICE = {
   name: 'Sunday Main Service',
   description: 'Every Sunday of the week [8am - 1pm]',
@@ -45,14 +43,30 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('13:00');
-  const [members] = useState<Member[]>(mockMembers);
+  const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedZone, setSelectedZone] = useState('all');
   const [attendanceStatus, setAttendanceStatus] = useState<Record<string, 'present' | 'absent' | 'unmarked'>>({});
   const [showOnlyUnmarked, setShowOnlyUnmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [loading, setLoading] = useState(true);
+
   const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const membersData = await api.members.getAll();
+        setMembers(membersData || []);
+      } catch (error) {
+        console.error('Failed to fetch members:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, []);
 
   // Filter members based on search and zone
   const filteredMembers = members.filter(member => {

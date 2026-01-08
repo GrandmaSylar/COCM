@@ -58,6 +58,7 @@ export interface Member {
   phone: string;
   secondPhone?: string;
   gender: 'male' | 'female';
+  maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
   dateOfBirth: string;
   residenceLocation: string;
   digitalAddress?: string;
@@ -66,11 +67,15 @@ export interface Member {
   notes: string;
   status: MemberStatus;
   joinDate: string;
-  photo?: string; // Base64 encoded image or URL
+  photo?: string; // Base64 encoded image or URL (maps to photo_url in database)
   baptismInfo?: BaptismInfo;
-  familyMembers?: FamilyMember[];
+  familyMembers?: FamilyMember[]; // Computed from family_members table JOIN
   legalInfo?: LegalInfo;
   ministries?: string[]; // Member can be in multiple ministries
+  // Audit fields
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
 }
 
 export const ZONES = {
@@ -114,21 +119,21 @@ interface MembersProps {
   onViewMember: (member: Member) => void;
 }
 
-// Mock members with complete details and linked family relationships
-const mockMembers: Member[] = [];
-
 export function Members({ onAddMember, onViewMember }: MembersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchMembers = async () => {
       try {
+        setError(null);
         const data = await api.members.getAll();
         setMembers(data || []);
       } catch (error) {
         console.error('Failed to fetch members:', error);
+        setError('Failed to load members. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -166,6 +171,13 @@ export function Members({ onAddMember, onViewMember }: MembersProps) {
           </Button>
         )}
       </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       {/* Member Status Info */}
       <Alert>

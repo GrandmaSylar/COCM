@@ -1,12 +1,16 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { supabase } from '../utils/supabase/client';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
 export interface TemporaryPermission {
+  id?: string;
+  userId?: string;
   permission: string;
   expiresAt: Date;
   grantedBy: string;
   grantedAt: Date;
+  createdAt?: Date;
 }
 
 export interface User {
@@ -14,9 +18,15 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  permissions?: string[];
-  temporaryPermissions?: TemporaryPermission[];
+  permissions?: string[]; // Computed from role
+  temporaryPermissions?: TemporaryPermission[]; // Fetched from temporary_permissions table
   isActive: boolean;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+  // Audit fields
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface RolePermissions {
@@ -91,6 +101,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
+  // Initialize session from Supabase on mount
+  useEffect(() => {
+    const initSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile) {
+          setUser({
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            role: profile.role,
+            isActive: profile.is_active
+          });
+        }
+      }
+    };
+
+    initSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   // Clean up expired temporary permissions
   useEffect(() => {
     const interval = setInterval(() => {
@@ -111,7 +159,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { api } = await import('../services/api');
       const response = await api.auth.signIn(email, password);
 
-      if (response && response.user) {
+      if (response && response.user && response.session) {
+        // Store the session in Supabase client
+        await supabase.auth.setSession({
+          access_token: response.session.access_token,
+          refresh_token: response.session.refresh_token
+        });
+
         setUser({
           id: response.user.id,
           name: response.user.name,
@@ -128,7 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
   };
 

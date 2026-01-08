@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -5,6 +6,7 @@ import { Separator } from './ui/separator';
 import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
 import { Member, ZONES } from './Members';
 import { useAuth } from './AuthContext';
+import { api } from '../services/api';
 
 interface MemberProfileProps {
   member: Member;
@@ -15,6 +17,33 @@ interface MemberProfileProps {
 export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
   const { canAccess } = useAuth();
   const canEdit = canAccess('edit_members');
+  const [attendanceStats, setAttendanceStats] = useState({
+    thisMonth: 0,
+    totalServices: 0,
+    percentage: 0
+  });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const data = await api.members.getAnalytics(member.id);
+        setAttendanceStats(data.attendanceStats || {
+          thisMonth: 0,
+          totalServices: 0,
+          percentage: 0
+        });
+        setRecentActivity(data.recentActivity || []);
+      } catch (error) {
+        console.error('Failed to fetch member analytics:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [member.id]);
 
   // Calculate age
   const calculateAge = (dateOfBirth: string) => {
@@ -55,20 +84,6 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
     
     return 'Not recorded';
   };
-
-  // Mock attendance and giving data
-  const attendanceStats = {
-    thisMonth: 8,
-    totalServices: 12,
-    percentage: 67
-  };
-
-  const recentActivity = [
-    { date: '2024-01-07', type: 'attendance', description: 'Sunday Morning Service' },
-    { date: '2024-01-03', type: 'attendance', description: 'Midweek Service' },
-    { date: '2023-12-31', type: 'attendance', description: 'Watch Night Service' },
-    { date: '2023-12-24', type: 'attendance', description: 'Sunday Morning Service' },
-  ];
 
   return (
     <div className="space-y-6">

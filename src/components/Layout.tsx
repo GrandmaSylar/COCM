@@ -1,7 +1,5 @@
 import { ReactNode } from 'react';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from './AuthContext';
 import { useTheme } from './ThemeContext';
 import { 
@@ -31,7 +29,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
-  const { user, logout, switchRole, canAccess } = useAuth();
+  const { user, logout, canAccess } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -149,22 +147,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                   <p className="text-sm">{user?.name}</p>
                   <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                 </div>
-                
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Switch Role:</p>
-                  <Select value={user?.role} onValueChange={(role: any) => switchRole(role)}>
-                    <SelectTrigger className="text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dev">Developer</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                      <SelectItem value="pastor">Pastor</SelectItem>
-                      <SelectItem value="elder">Elder</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
+
                 <Button onClick={logout} variant="outline" size="sm" className="w-full">
                   <LogOut className="w-4 h-4 mr-2" />
                   Logout
@@ -218,22 +201,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                     <p className="text-sm">{user?.name}</p>
                     <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground">Switch Role:</p>
-                    <Select value={user?.role} onValueChange={(role: any) => switchRole(role)}>
-                      <SelectTrigger className="text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dev">Developer</SelectItem>
-                        <SelectItem value="admin">Administrator</SelectItem>
-                        <SelectItem value="pastor">Pastor</SelectItem>
-                        <SelectItem value="elder">Elder</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
+
                   <Button onClick={logout} variant="outline" size="sm" className="w-full">
                     <LogOut className="w-4 h-4 mr-2" />
                     Logout
