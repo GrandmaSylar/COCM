@@ -43,6 +43,47 @@ async function getUserFromToken(request) {
   }
   return user;
 }
+
+// Helper to check if user has a specific permission
+async function checkPermission(userId: string, permission: string): Promise<boolean> {
+  // Get user's profile to check role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+
+  if (!profile) {
+    return false;
+  }
+
+  // Dev role has all permissions
+  if (profile.role === 'dev') {
+    return true;
+  }
+
+  // Admin role has grant_permissions and manage_giving_types
+  if (profile.role === 'admin') {
+    if (['grant_permissions', 'manage_giving_types', 'manage_users', 'manage_settings'].includes(permission)) {
+      return true;
+    }
+  }
+
+  // Check for temporary permissions
+  const { data: tempPermissions } = await supabase
+    .from('temporary_permissions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('permission', permission)
+    .gt('expires_at', new Date().toISOString())
+    .single();
+
+  if (tempPermissions) {
+    return true;
+  }
+
+  return false;
+}
 // Helper to convert camelCase to snake_case
 function toSnakeCase(obj) {
   if (Array.isArray(obj)) {
@@ -521,7 +562,17 @@ app.put("/members/:id", async (c)=>{
     const id = c.req.param('id');
     const memberData = await c.req.json();
     const { familyMembers, ...memberInfo } = memberData;
-    const { data: member, error: memberError } = await supabase.from('members').update(memberInfo).eq('id', id).select().single();
+
+    // Convert camelCase to snake_case for database
+    const dbMemberData = toSnakeCase(memberInfo);
+
+    // Handle special field mappings (photo -> photo_url)
+    if (dbMemberData.photo !== undefined) {
+      dbMemberData.photo_url = dbMemberData.photo;
+      delete dbMemberData.photo;
+    }
+
+    const { data: member, error: memberError } = await supabase.from('members').update(dbMemberData).eq('id', id).select().single();
     if (memberError) {
       console.error('Error updating member:', memberError);
       return c.json({
@@ -531,11 +582,14 @@ app.put("/members/:id", async (c)=>{
     if (familyMembers) {
       await supabase.from('family_members').delete().eq('member_id', id);
       if (familyMembers.length > 0) {
-        const familyMembersData = familyMembers.map((fm)=>({
-            ...fm,
+        const familyMembersData = familyMembers.map((fm)=>{
+          const snakeFm = toSnakeCase(fm);
+          return {
+            ...snakeFm,
             member_id: id,
             id: undefined
-          }));
+          };
+        });
         await supabase.from('family_members').insert(familyMembersData);
       }
     }
@@ -543,7 +597,7 @@ app.put("/members/:id", async (c)=>{
         *,
         family_members (*)
       `).eq('id', id).single();
-    return c.json(completeMember || member);
+    return c.json(toCamelCase(completeMember || member));
   } catch (error) {
     console.error('Update member error:', error);
     return c.json({
@@ -599,10 +653,14 @@ app.get("/attendance", async (c)=>{
         error: 'Failed to fetch attendance records'
       }, 500);
     }
-    const transformed = records.map((record)=>({
-        ...toCamelCase(record),
-        attendees: record.attendance_entries.map((entry)=>entry.member_id)
-      }));
+    const transformed = records.map((record)=>{
+        const attendees = (record.attendance_entries || []).map((entry)=>entry.member_id);
+        const camelRecord = toCamelCase(record);
+        return {
+          ...camelRecord,
+          attendees
+        };
+      });
     return c.json(transformed);
   } catch (error) {
     console.error('Get attendance error:', error);
@@ -908,6 +966,120 @@ app.post("/giving/types", async (c)=>{
     }, 500);
   }
 });
+
+// Update giving type
+app.patch("/giving/types/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const hasPermission = await checkPermission(user.id, 'manage_giving_types');
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const typeId = c.req.param('id');
+    const typeData = await c.req.json();
+
+    const { data: type, error } = await supabase
+      .from('custom_giving_types')
+      .update(typeData)
+      .eq('id', typeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating giving type:', error);
+      return c.json({ error: 'Failed to update giving type' }, 500);
+    }
+
+    return c.json(type);
+  } catch (error) {
+    console.error('Update giving type error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Delete giving type
+app.delete("/giving/types/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const hasPermission = await checkPermission(user.id, 'manage_giving_types');
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const typeId = c.req.param('id');
+
+    const { error } = await supabase
+      .from('custom_giving_types')
+      .delete()
+      .eq('id', typeId);
+
+    if (error) {
+      console.error('Error deleting giving type:', error);
+      return c.json({ error: 'Failed to delete giving type' }, 500);
+    }
+
+    return c.json({ message: 'Giving type deleted successfully' });
+  } catch (error) {
+    console.error('Delete giving type error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Toggle giving type active status
+app.patch("/giving/types/:id/toggle", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const hasPermission = await checkPermission(user.id, 'manage_giving_types');
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const typeId = c.req.param('id');
+
+    // Get current status
+    const { data: currentType } = await supabase
+      .from('custom_giving_types')
+      .select('is_active')
+      .eq('id', typeId)
+      .single();
+
+    if (!currentType) {
+      return c.json({ error: 'Giving type not found' }, 404);
+    }
+
+    // Toggle the status
+    const { data: type, error } = await supabase
+      .from('custom_giving_types')
+      .update({ is_active: !currentType.is_active })
+      .eq('id', typeId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error toggling giving type:', error);
+      return c.json({ error: 'Failed to toggle giving type' }, 500);
+    }
+
+    return c.json(type);
+  } catch (error) {
+    console.error('Toggle giving type error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 app.get("/visitors", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -1645,6 +1817,123 @@ app.delete("/users/:id", async (c)=>{
     }, 500);
   }
 });
+
+// Grant temporary permission
+app.post("/users/:id/grant-permission", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Check if user has grant_permissions permission
+    const hasPermission = await checkPermission(user.id, 'grant_permissions');
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden: You do not have permission to grant permissions' }, 403);
+    }
+
+    const userId = c.req.param('id');
+    const { permission, durationHours } = await c.req.json();
+
+    if (!permission || !durationHours) {
+      return c.json({ error: 'Permission and durationHours are required' }, 400);
+    }
+
+    const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000).toISOString();
+
+    // Delete any existing temporary permission for the same user and permission
+    await supabase
+      .from('temporary_permissions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('permission', permission);
+
+    // Insert new temporary permission
+    const { error } = await supabase
+      .from('temporary_permissions')
+      .insert({
+        user_id: userId,
+        permission,
+        expires_at: expiresAt,
+        granted_by: user.id
+      });
+
+    if (error) {
+      console.error('Error granting permission:', error);
+      return c.json({ error: 'Failed to grant permission' }, 500);
+    }
+
+    return c.json({ message: 'Permission granted successfully' });
+  } catch (error) {
+    console.error('Grant permission error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Revoke temporary permission
+app.delete("/users/:id/revoke-permission/:permission", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Check if user has grant_permissions permission
+    const hasPermission = await checkPermission(user.id, 'grant_permissions');
+    if (!hasPermission) {
+      return c.json({ error: 'Forbidden: You do not have permission to revoke permissions' }, 403);
+    }
+
+    const userId = c.req.param('id');
+    const permission = c.req.param('permission');
+
+    const { error } = await supabase
+      .from('temporary_permissions')
+      .delete()
+      .eq('user_id', userId)
+      .eq('permission', permission);
+
+    if (error) {
+      console.error('Error revoking permission:', error);
+      return c.json({ error: 'Failed to revoke permission' }, 500);
+    }
+
+    return c.json({ message: 'Permission revoked successfully' });
+  } catch (error) {
+    console.error('Revoke permission error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get temporary permissions for a user
+app.get("/users/:id/temporary-permissions", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const userId = c.req.param('id');
+
+    const { data, error } = await supabase
+      .from('temporary_permissions')
+      .select('*')
+      .eq('user_id', userId)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching temporary permissions:', error);
+      return c.json({ error: 'Failed to fetch temporary permissions' }, 500);
+    }
+
+    return c.json(data || []);
+  } catch (error) {
+    console.error('Get temporary permissions error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // DEBUG: Global 404 Handler
 app.notFound((c)=>{
   return c.json({

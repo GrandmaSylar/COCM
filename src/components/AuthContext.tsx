@@ -185,6 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    // Force redirect to login page
+    window.location.href = '/';
   };
 
   const switchRole = (role: UserRole) => {

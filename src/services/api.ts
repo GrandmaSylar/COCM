@@ -179,18 +179,20 @@ export const api = {
     
     types: {
       getAll: () => fetchApi('/giving/types'),
-      
-      create: (data: any) => fetchApi('/giving/types', { 
-        method: 'POST', 
-        body: JSON.stringify(data) 
+
+      create: (data: any) => fetchApi('/giving/types', {
+        method: 'POST',
+        body: JSON.stringify(data)
       }),
-      
-      update: (id: string, data: any) => fetchApi(`/giving/types/${id}`, { 
-        method: 'PUT', 
-        body: JSON.stringify(data) 
+
+      update: (id: string, data: any) => fetchApi(`/giving/types/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data)
       }),
-      
+
       delete: (id: string) => fetchApi(`/giving/types/${id}`, { method: 'DELETE' }),
+
+      toggle: (id: string) => fetchApi(`/giving/types/${id}/toggle`, { method: 'PATCH' }),
     },
   },
 
@@ -284,5 +286,17 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ role })
       }),
+
+    grantPermission: (userId: string, permission: string, durationHours: number) =>
+      fetchApi(`/users/${userId}/grant-permission`, {
+        method: 'POST',
+        body: JSON.stringify({ permission, durationHours })
+      }),
+
+    revokePermission: (userId: string, permission: string) =>
+      fetchApi(`/users/${userId}/revoke-permission/${permission}`, { method: 'DELETE' }),
+
+    getTemporaryPermissions: (userId: string) =>
+      fetchApi(`/users/${userId}/temporary-permissions`),
   },
 };

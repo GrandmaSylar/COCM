@@ -142,16 +142,30 @@ export function Giving({ onRecordGiving }: GivingProps) {
     }
   };
 
-  const handleDeleteCustomType = (typeId: string) => {
+  const handleDeleteCustomType = async (typeId: string) => {
     if (confirm('Are you sure you want to delete this custom giving type?')) {
-      setCustomTypes(prev => prev.filter(type => type.id !== typeId));
+      try {
+        await api.giving.types.delete(typeId);
+        setCustomTypes(prev => prev.filter(type => type.id !== typeId));
+        toast.success('Giving type deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete giving type:', error);
+        toast.error('Failed to delete giving type');
+      }
     }
   };
 
-  const handleToggleCustomType = (typeId: string) => {
-    setCustomTypes(prev => prev.map(type => 
-      type.id === typeId ? { ...type, isActive: !type.isActive } : type
-    ));
+  const handleToggleCustomType = async (typeId: string) => {
+    try {
+      await api.giving.types.toggle(typeId);
+      setCustomTypes(prev => prev.map(type =>
+        type.id === typeId ? { ...type, isActive: !type.isActive } : type
+      ));
+      toast.success('Giving type updated');
+    } catch (error) {
+      console.error('Failed to toggle giving type:', error);
+      toast.error('Failed to update giving type');
+    }
   };
 
   if (loading) {
@@ -174,15 +188,18 @@ export function Giving({ onRecordGiving }: GivingProps) {
       onBack={() => setShowCustomTypeManager(false)}
       onDelete={handleDeleteCustomType}
       onToggle={handleToggleCustomType}
-      onAdd={(newType) => {
-        const type: CustomGivingType = {
-          id: (customTypes.length + 1).toString(),
-          ...newType,
-          isActive: true,
-          createdBy: user?.name || 'Unknown',
-          createdAt: new Date().toISOString().split('T')[0]
-        };
-        setCustomTypes(prev => [...prev, type]);
+      onAdd={async (newType) => {
+        try {
+          const createdType = await api.giving.types.create({
+            name: newType.name,
+            description: newType.description
+          });
+          setCustomTypes(prev => [...prev, createdType]);
+          toast.success('Giving type created successfully');
+        } catch (error) {
+          console.error('Failed to create giving type:', error);
+          toast.error('Failed to create giving type');
+        }
       }}
     />;
   }

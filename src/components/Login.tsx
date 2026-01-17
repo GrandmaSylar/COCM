@@ -3,11 +3,10 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { useAuth, demoCredentials } from './AuthContext';
+import { useAuth } from './AuthContext';
 import { useTheme } from './ThemeContext';
-import { ChurchIcon, Moon, Sun, Monitor, Info, Eye, EyeOff } from 'lucide-react';
+import { ChurchIcon, Moon, Sun, Monitor, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onForgotPassword: () => void;
@@ -20,7 +19,6 @@ export function Login({ onForgotPassword, onSignUp }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showDemoAccounts, setShowDemoAccounts] = useState(true);
   const { login } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
 
@@ -33,16 +31,10 @@ export function Login({ onForgotPassword, onSignUp }: LoginProps) {
     setTimeout(async () => {
       const success = await login(email, password);
       if (!success) {
-        setError('Invalid email or password. Please check your credentials or try a demo account.');
+        setError('Invalid email or password. Please check your credentials.');
       }
       setIsLoading(false);
     }, 800);
-  };
-
-  const handleDemoLogin = (demoEmail: string, demoPassword: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPassword);
-    setError('');
   };
 
   const themeOptions = [
@@ -88,60 +80,6 @@ export function Login({ onForgotPassword, onSignUp }: LoginProps) {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Demo Accounts Info */}
-            {showDemoAccounts && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Demo Accounts Available:</span>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => setShowDemoAccounts(false)}
-                        className="h-6 w-6 p-0"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 text-sm">
-                      {Object.entries(demoCredentials).map(([email, password]) => {
-                        const role = email.split('@')[0];
-                        const roleColors = {
-                          dev: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-                          admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-                          pastor: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-                          elder: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                        };
-                        return (
-                          <div key={email} className="flex items-center justify-between p-2 rounded bg-muted/50">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className={roleColors[role as keyof typeof roleColors]}>
-                                  {role.toUpperCase()}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">{email}</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground">Password: {password}</div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDemoLogin(email, password)}
-                              className="h-7 text-xs"
-                            >
-                              Use
-                            </Button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">

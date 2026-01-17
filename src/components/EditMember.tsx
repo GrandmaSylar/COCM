@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle } from 'l
 import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, MINISTRIES } from './Members';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { api } from '../services/api';
 
 interface EditMemberProps {
   member: Member;
@@ -81,7 +82,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     setIsLoading(true);
 
     try {
-      onSave({
+      await onSave({
         ...member,
         ...formData,
         gender: formData.gender as 'male' | 'female',
@@ -92,6 +93,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         legalInfo,
         ministries: selectedMinistries
       });
+      setIsLoading(false);
     } catch (error) {
       console.error('Error updating member:', error);
       setIsLoading(false);
@@ -166,21 +168,23 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   };
 
   // Mock search for existing members (in real app, this would query the database)
-  const searchExistingMembers = (query: string) => {
+  const searchExistingMembers = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    
-    // Mock data - in real app, this would be an API call
-    const mockMembers: Member[] = [];
-    
-    const filtered = mockMembers.filter(m => 
-      `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-      m.phone.includes(query)
-    );
-    
-    setSearchResults(filtered);
+
+    try {
+      const members = await api.members.getAll();
+      const filtered = members.filter((m: Member) =>
+        `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
+        m.phone.includes(query)
+      );
+      setSearchResults(filtered);
+    } catch (error) {
+      console.error('Failed to search members:', error);
+      setSearchResults([]);
+    }
   };
 
   const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {

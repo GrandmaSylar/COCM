@@ -10,6 +10,7 @@ import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo
 import { Visitor } from './Visitors';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { api } from '../services/api';
 
 interface AddMemberProps {
   onBack: () => void;
@@ -167,21 +168,23 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
   };
 
   // Mock search for existing members (in real app, this would query the database)
-  const searchExistingMembers = (query: string) => {
+  const searchExistingMembers = async (query: string) => {
     if (query.length < 2) {
       setSearchResults([]);
       return;
     }
-    
-    // Mock data - in real app, this would be an API call
-    const mockMembers: Member[] = [];
-    
-    const filtered = mockMembers.filter(m => 
-      `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-      m.phone.includes(query)
-    );
-    
-    setSearchResults(filtered);
+
+    try {
+      const members = await api.members.getAll();
+      const filtered = members.filter((m: Member) =>
+        `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
+        m.phone.includes(query)
+      );
+      setSearchResults(filtered);
+    } catch (error) {
+      console.error('Failed to search members:', error);
+      setSearchResults([]);
+    }
   };
 
   const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {

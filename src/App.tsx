@@ -31,6 +31,10 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<AppPage>('login');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+  const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
+  const [givingRefreshKey, setGivingRefreshKey] = useState(0);
+  const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
+  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
 
   // Show authentication pages when not authenticated
   if (!isAuthenticated) {
@@ -94,6 +98,7 @@ function AppContent() {
     try {
       await api.members.create(memberData);
       toast.success('Member added successfully!');
+      setMembersRefreshKey(prev => prev + 1);
       setCurrentPage('members');
     } catch (error) {
       console.error('Failed to add member:', error);
@@ -111,6 +116,7 @@ function AppContent() {
       await api.members.update(memberData.id, memberData);
       toast.success('Member updated successfully!');
       setSelectedMember(memberData); // Update selected member with new data
+      setMembersRefreshKey(prev => prev + 1);
       setCurrentPage('member-profile'); // Navigate back to profile
     } catch (error) {
       console.error('Failed to update member:', error);
@@ -127,14 +133,14 @@ function AppContent() {
   };
 
   const handleSaveAttendance = (attendanceData: any) => {
-    // In real app, this would save to API/database
     toast.success('Attendance recorded successfully!');
+    setAttendanceRefreshKey(prev => prev + 1);
     setCurrentPage('attendance');
   };
 
   const handleSaveMarkedAttendance = (attendanceData: any) => {
-    // In real app, this would save to API/database
     toast.success('Individual attendance marked successfully!');
+    setAttendanceRefreshKey(prev => prev + 1);
     setCurrentPage('attendance');
   };
 
@@ -143,8 +149,8 @@ function AppContent() {
   };
 
   const handleSaveGiving = (givingData: any) => {
-    // In real app, this would save to API/database
     toast.success('Giving record added successfully!');
+    setGivingRefreshKey(prev => prev + 1);
     setCurrentPage('giving');
   };
 
@@ -169,8 +175,8 @@ function AppContent() {
   };
 
   const handleSaveVisitor = (visitorData: Omit<Visitor, 'id'>) => {
-    // In real app, this would save to API/database
     toast.success('Visitor added successfully!');
+    setVisitorsRefreshKey(prev => prev + 1);
     setCurrentPage('visitors');
   };
 
@@ -191,7 +197,7 @@ function AppContent() {
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;
       
       case 'members':
-        return <Members onAddMember={handleAddMember} onViewMember={handleViewMember} />;
+        return <Members key={membersRefreshKey} onAddMember={handleAddMember} onViewMember={handleViewMember} />;
       
       case 'add-member':
         return (
@@ -220,7 +226,7 @@ function AppContent() {
         ) : null;
       
       case 'attendance':
-        return <Attendance onRecordAttendance={handleRecordAttendance} onMarkAttendance={handleMarkAttendance} />;
+        return <Attendance key={attendanceRefreshKey} onRecordAttendance={handleRecordAttendance} onMarkAttendance={handleMarkAttendance} />;
       
       case 'record-attendance':
         return (
@@ -240,7 +246,8 @@ function AppContent() {
       
       case 'visitors':
         return (
-          <Visitors 
+          <Visitors
+            key={visitorsRefreshKey}
             onAddVisitor={handleAddVisitor}
             onViewVisitor={handleViewVisitor}
             onConvertToMember={handleConvertVisitorToMember}
@@ -275,7 +282,7 @@ function AppContent() {
         ) : null;
 
       case 'giving':
-        return <Giving onRecordGiving={handleRecordGiving} />;
+        return <Giving key={givingRefreshKey} onRecordGiving={handleRecordGiving} />;
       
       case 'record-giving':
         return (

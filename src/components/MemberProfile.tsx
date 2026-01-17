@@ -139,6 +139,12 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
                   <label className="text-sm font-medium text-muted-foreground">Gender</label>
                   <p className="capitalize">{member.gender}</p>
                 </div>
+                {member.maritalStatus && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
+                    <p className="capitalize">{member.maritalStatus}</p>
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Age</label>
                   <p>{calculateAge(member.dateOfBirth)} years old</p>

@@ -78,6 +78,7 @@ export function Settings({ onAddUser }: SettingsProps) {
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
   const [allSystemUsers, setAllSystemUsers] = useState<any[]>([]);
+  const [userTempPermissions, setUserTempPermissions] = useState<{ [userId: string]: any[] }>({});
   
   // Theme customization state
   const [themeColorInputs, setThemeColorInputs] = useState<ThemeColors>(
@@ -107,6 +108,25 @@ export function Settings({ onAddUser }: SettingsProps) {
         ]);
         setAllSystemUsers(allUsersData);
         setPendingUsers(pendingUsersData);
+
+        // Fetch temporary permissions for all users
+        if (canGrantPermissions) {
+          const tempPermsPromises = allUsersData.map(async (u: any) => {
+            try {
+              const perms = await api.users.getTemporaryPermissions(u.id);
+              return { userId: u.id, perms };
+            } catch (error) {
+              console.error(`Failed to fetch temp permissions for user ${u.id}:`, error);
+              return { userId: u.id, perms: [] };
+            }
+          });
+          const tempPermsResults = await Promise.all(tempPermsPromises);
+          const tempPermsMap = tempPermsResults.reduce((acc, { userId, perms }) => {
+            acc[userId] = perms;
+            return acc;
+          }, {} as { [userId: string]: any[] });
+          setUserTempPermissions(tempPermsMap);
+        }
       } catch (error) {
         console.error('Failed to fetch users:', error);
       } finally {
@@ -115,7 +135,7 @@ export function Settings({ onAddUser }: SettingsProps) {
     };
 
     fetchUsers();
-  }, [canManageUsers]);
+  }, [canManageUsers, canGrantPermissions]);
 
   const formatLastLogin = (dateString?: string) => {
     if (!dateString) return 'Never';
@@ -171,20 +191,32 @@ export function Settings({ onAddUser }: SettingsProps) {
     toast.success('Role permissions updated');
   };
 
-  const handleGrantTemporaryPermission = () => {
-    if (!selectedUserForPermission || !permissionToGrant) return;
-    
-    const hours = parseInt(permissionDuration);
-    grantTemporaryPermission(selectedUserForPermission, permissionToGrant, hours);
-    
-    toast.success(`Permission granted for ${hours} hours`);
-    setSelectedUserForPermission(null);
-    setPermissionToGrant('');
+  const handleGrantTemporaryPermission = async (userId: string, permission: string, durationHours: number) => {
+    try {
+      await api.users.grantPermission(userId, permission, durationHours);
+      toast.success(`Permission granted for ${durationHours} hour${durationHours > 1 ? 's' : ''}`);
+
+      // Refresh temporary permissions for this user
+      const perms = await api.users.getTemporaryPermissions(userId);
+      setUserTempPermissions(prev => ({ ...prev, [userId]: perms }));
+    } catch (error) {
+      console.error('Failed to grant permission:', error);
+      toast.error('Failed to grant permission');
+    }
   };
 
-  const handleRevokePermission = (userId: string, permission: string) => {
-    revokeTemporaryPermission(userId, permission);
-    toast.success('Permission revoked');
+  const handleRevokePermission = async (userId: string, permission: string) => {
+    try {
+      await api.users.revokePermission(userId, permission);
+      toast.success('Permission revoked');
+
+      // Refresh temporary permissions for this user
+      const perms = await api.users.getTemporaryPermissions(userId);
+      setUserTempPermissions(prev => ({ ...prev, [userId]: perms }));
+    } catch (error) {
+      console.error('Failed to revoke permission:', error);
+      toast.error('Failed to revoke permission');
+    }
   };
 
   const handleApplyThemeColors = () => {
@@ -485,7 +517,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             <h2 className="mb-4">System Users</h2>
             <div className="space-y-4">
               {allSystemUsers.map((systemUser) => {
-                const tempPerms = getUserTemporaryPermissions(systemUser.id);
+                const tempPerms = userTempPermissions[systemUser.id] || [];
                 
                 return (
                   <Card key={systemUser.id} className="hover:shadow-md transition-shadow">
@@ -571,7 +603,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       </span>
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-muted-foreground">
-                                          Expires in {formatExpiration(tp.expiresAt)}
+                                          Expires in {formatExpiration(tp.expires_at || tp.expiresAt)}
                                         </span>
                                         {(isAdmin || isDev) && (
                                           <Button
@@ -647,14 +679,13 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   </div>
                                   <DialogFooter>
                                     <Button
-                                      onClick={() => {
+                                      onClick={async () => {
                                         if (permissionToGrant) {
-                                          grantTemporaryPermission(
+                                          await handleGrantTemporaryPermission(
                                             systemUser.id,
                                             permissionToGrant,
                                             parseInt(permissionDuration)
                                           );
-                                          toast.success('Permission granted');
                                           setPermissionToGrant('');
                                         }
                                       }}
