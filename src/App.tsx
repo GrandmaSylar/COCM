@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { AuthProvider, useAuth } from './components/AuthContext';
+import { AuthProvider, useAuth, TwoFAData } from './components/AuthContext';
 import { ThemeProvider } from './components/ThemeContext';
 import { Login } from './components/Login';
 import { SignUp } from './components/SignUp';
 import { ForgotPassword } from './components/ForgotPassword';
+import { OtpVerification } from './components/OtpVerification';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { Members, Member } from './components/Members';
@@ -21,12 +22,12 @@ import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner@2.0.3';
 import { api } from './services/api';
 
-type AppPage = 'login' | 'signup' | 'forgot-password' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' | 
+type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'visitors' | 'add-visitor' | 'visitor-profile' |
                'giving' | 'record-giving' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor';
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, completeLogin } = useAuth();
   // Start with login page - user must authenticate first
   const [currentPage, setCurrentPage] = useState<AppPage>('login');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
@@ -35,15 +36,37 @@ function AppContent() {
   const [givingRefreshKey, setGivingRefreshKey] = useState(0);
   const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
   const [membersRefreshKey, setMembersRefreshKey] = useState(0);
+  const [twoFAData, setTwoFAData] = useState<TwoFAData | null>(null);
 
   // Show authentication pages when not authenticated
   if (!isAuthenticated) {
     return (
       <>
         {currentPage === 'login' && (
-          <Login 
+          <Login
             onForgotPassword={() => setCurrentPage('forgot-password')}
             onSignUp={() => setCurrentPage('signup')}
+            onRequires2FA={(data) => {
+              setTwoFAData(data);
+              setCurrentPage('otp-verification');
+            }}
+          />
+        )}
+        {currentPage === 'otp-verification' && twoFAData && (
+          <OtpVerification
+            userId={twoFAData.userId}
+            tempToken={twoFAData.tempToken}
+            method={twoFAData.method}
+            destination={twoFAData.destination}
+            onVerified={async (session, user) => {
+              await completeLogin(session, user);
+              setTwoFAData(null);
+              setCurrentPage('dashboard');
+            }}
+            onCancel={() => {
+              setTwoFAData(null);
+              setCurrentPage('login');
+            }}
           />
         )}
         {currentPage === 'signup' && (
@@ -94,6 +117,21 @@ function AppContent() {
     setCurrentPage('member-profile');
   };
 
+  const handleViewMemberById = async (memberId: string) => {
+    try {
+      const member = await api.members.getById(memberId);
+      if (member) {
+        setSelectedMember(member);
+        setCurrentPage('member-profile');
+      } else {
+        toast.error('Member not found');
+      }
+    } catch (error) {
+      console.error('Failed to fetch member:', error);
+      toast.error('Failed to load member profile');
+    }
+  };
+
   const handleSaveMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
     try {
       await api.members.create(memberData);
@@ -121,6 +159,19 @@ function AppContent() {
     } catch (error) {
       console.error('Failed to update member:', error);
       toast.error('Failed to update member. Please try again.');
+    }
+  };
+
+  const handleDeleteMember = async (member: Member) => {
+    try {
+      await api.members.delete(member.id);
+      toast.success('Member deleted successfully!');
+      setSelectedMember(null);
+      setMembersRefreshKey(prev => prev + 1);
+      setCurrentPage('members');
+    } catch (error) {
+      console.error('Failed to delete member:', error);
+      toast.error('Failed to delete member. Please try again.');
     }
   };
 
@@ -185,10 +236,27 @@ function AppContent() {
     setCurrentPage('convert-visitor');
   };
 
-  const handleSaveConvertedMember = (memberData: Omit<Member, 'id' | 'joinDate'>) => {
-    // In real app, this would save to API/database and remove from visitors
-    toast.success('Visitor converted to member successfully!');
-    setCurrentPage('members');
+  const handleSaveConvertedMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
+    try {
+      // Create the member
+      await api.members.create(memberData);
+
+      // Mark visitor as converted if we have a selected visitor
+      if (selectedVisitor) {
+        await api.visitors.update(selectedVisitor.id, {
+          ...selectedVisitor,
+          convertedToMember: true
+        });
+      }
+
+      toast.success('Visitor converted to member successfully!');
+      setMembersRefreshKey(prev => prev + 1);
+      setSelectedVisitor(null);
+      setCurrentPage('members');
+    } catch (error) {
+      console.error('Failed to convert visitor:', error);
+      toast.error('Failed to convert visitor. Please try again.');
+    }
   };
 
   const renderCurrentPage = () => {
@@ -197,7 +265,14 @@ function AppContent() {
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;
       
       case 'members':
-        return <Members key={membersRefreshKey} onAddMember={handleAddMember} onViewMember={handleViewMember} />;
+        return (
+          <Members
+            key={membersRefreshKey}
+            onAddMember={handleAddMember}
+            onViewMember={handleViewMember}
+            onAddFromVisitor={() => setCurrentPage('visitors')}
+          />
+        );
       
       case 'add-member':
         return (
@@ -209,10 +284,12 @@ function AppContent() {
       
       case 'member-profile':
         return selectedMember ? (
-          <MemberProfile 
+          <MemberProfile
             member={selectedMember}
             onBack={() => setCurrentPage('members')}
             onEdit={handleEditMember}
+            onDelete={handleDeleteMember}
+            onViewMember={handleViewMemberById}
           />
         ) : null;
       

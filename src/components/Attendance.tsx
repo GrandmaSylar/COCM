@@ -11,6 +11,7 @@ import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Sett
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 
 interface AttendanceRecord {
   id: string;
@@ -720,12 +721,15 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serviceType || !totalCount) return;
+    if (!serviceType || !totalCount) {
+      toast.error('Please select a service type and enter the total attendance count.');
+      return;
+    }
 
     setIsLoading(true);
 
     try {
-      await api.attendance.create({
+      const result = await api.attendance.create({
         date,
         serviceType,
         startTime: startTime || undefined,
@@ -734,6 +738,10 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         totalCount: parseInt(totalCount),
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
       });
+
+      console.log('Attendance recorded successfully:', result);
+      toast.success(`Attendance recorded! Total: ${totalCount} attendees.`);
+
       onSave({
         date,
         serviceType,
@@ -743,8 +751,9 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         totalCount: parseInt(totalCount),
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to record attendance:', error);
+      toast.error(error?.message || 'Failed to record attendance. Please try again.');
       setIsLoading(false);
     }
   };

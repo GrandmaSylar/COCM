@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -29,6 +29,8 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     gender: visitorData?.gender || ('' as 'male' | 'female' | ''),
     maritalStatus: '' as 'single' | 'married' | 'divorced' | 'widowed' | '',
     dateOfBirth: visitorData?.dateOfBirth || '',
+    occupation: '',
+    hometown: '',
     residenceLocation: visitorData?.residenceLocation || '',
     digitalAddress: '',
     zone: visitorData?.potentialZone || ('' as Zone | ''),
@@ -52,8 +54,8 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
   // Family Info State
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Member[]>([]);
+  // Track search state per family member
+  const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
 
   // Legal Info State
   const [legalInfo, setLegalInfo] = useState<LegalInfo>({
@@ -66,11 +68,44 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
   // Ministries State
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
 
+  // State for existing zone numbers (for sequential numbering)
+  const [existingZoneNumbers, setExistingZoneNumbers] = useState<Record<Zone, number[]>>({
+    A: [], B: [], F: [], K: [], M: [], R: []
+  });
+
+  // Fetch existing members to get zone numbers
+  useEffect(() => {
+    const fetchZoneNumbers = async () => {
+      try {
+        const members = await api.members.getAll();
+        const zoneNums: Record<Zone, number[]> = { A: [], B: [], F: [], K: [], M: [], R: [] };
+
+        members.forEach((member: Member) => {
+          if (member.zone && member.zoneNumber) {
+            // Extract the number part from zone number (e.g., "A05" -> 5)
+            const numPart = parseInt(member.zoneNumber.replace(/[A-Z]/g, ''), 10);
+            if (!isNaN(numPart) && zoneNums[member.zone as Zone]) {
+              zoneNums[member.zone as Zone].push(numPart);
+            }
+          }
+        });
+
+        setExistingZoneNumbers(zoneNums);
+      } catch (error) {
+        console.error('Failed to fetch zone numbers:', error);
+      }
+    };
+
+    fetchZoneNumbers();
+  }, []);
+
   // Auto-generate zone number when zone is selected
   const generateZoneNumber = (zone: Zone) => {
-    // In real app, this would check existing numbers and generate the next available
-    const randomNum = Math.floor(Math.random() * 99) + 1;
-    return `${zone}${randomNum.toString().padStart(2, '0')}`;
+    const existingNums = existingZoneNumbers[zone] || [];
+    // Find the next available number (starts from 1)
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+    const nextNum = maxNum + 1;
+    return `${zone}${nextNum.toString().padStart(2, '0')}`;
   };
 
   const [isLoading, setIsLoading] = useState(false);
@@ -152,6 +187,8 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
       lastName: '',
       otherNames: '',
       phone: '',
+      occupation: '',
+      hometown: '',
       isLinked: false
     };
     setFamilyMembers([...familyMembers, newMember]);
@@ -167,10 +204,19 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     ));
   };
 
-  // Mock search for existing members (in real app, this would query the database)
-  const searchExistingMembers = async (query: string) => {
+  // Search for existing members (per family member)
+  const searchExistingMembers = async (familyMemberId: string, query: string) => {
+    // Update the query for this specific family member
+    setFamilySearchStates(prev => ({
+      ...prev,
+      [familyMemberId]: { ...prev[familyMemberId], query, results: prev[familyMemberId]?.results || [] }
+    }));
+
     if (query.length < 2) {
-      setSearchResults([]);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: [] }
+      }));
       return;
     }
 
@@ -180,32 +226,43 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
         m.phone.includes(query)
       );
-      setSearchResults(filtered);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: filtered }
+      }));
     } catch (error) {
       console.error('Failed to search members:', error);
-      setSearchResults([]);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: [] }
+      }));
     }
   };
 
   const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {
-    setFamilyMembers(familyMembers.map(m => 
+    setFamilyMembers(familyMembers.map(m =>
       m.id === familyMemberId ? {
         ...m,
         firstName: existingMember.firstName,
         lastName: existingMember.lastName,
         otherNames: existingMember.otherNames || '',
         phone: existingMember.phone,
+        occupation: existingMember.occupation || '',
+        hometown: existingMember.hometown || '',
         isLinked: true,
         linkedMemberId: existingMember.id
       } : m
     ));
-    setSearchQuery('');
-    setSearchResults([]);
+    // Clear search state for this family member
+    setFamilySearchStates(prev => ({
+      ...prev,
+      [familyMemberId]: { query: '', results: [] }
+    }));
   };
 
-  const isValid = formData.firstName && formData.lastName && formData.phone && 
-                  formData.gender && formData.dateOfBirth && formData.residenceLocation && 
-                  formData.zone && familyMembers.length >= 2;
+  const isValid = formData.firstName && formData.lastName && formData.phone &&
+                  formData.gender && formData.dateOfBirth && formData.residenceLocation &&
+                  formData.zone;
 
   return (
     <div className="space-y-6">
@@ -354,6 +411,27 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                   required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="occupation">Occupation</Label>
+                <Input
+                  id="occupation"
+                  value={formData.occupation}
+                  onChange={(e) => handleInputChange('occupation', e.target.value)}
+                  placeholder="e.g., Teacher, Engineer, Trader"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hometown">Hometown</Label>
+                <Input
+                  id="hometown"
+                  value={formData.hometown}
+                  onChange={(e) => handleInputChange('hometown', e.target.value)}
+                  placeholder="e.g., Kumasi, Cape Coast"
                 />
               </div>
             </div>
@@ -623,9 +701,9 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3>Family Information</h3>
+                  <h3>Family Information (Optional)</h3>
                   <p className="text-sm text-muted-foreground">
-                    Add at least 2 family members (mother, father, spouse, children, siblings)
+                    Add family members such as mother, father, spouse, children, or siblings
                   </p>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addFamilyMember}>
@@ -637,7 +715,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
               {familyMembers.length === 0 ? (
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center">
                   <p className="text-muted-foreground">
-                    No family members added yet. Click "Add Family Member" to begin.
+                    No family members added yet. Click "Add Family Member" to add family information.
                   </p>
                 </div>
               ) : (
@@ -691,21 +769,18 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                               <Label>Search Existing Member</Label>
                               <div className="flex gap-2">
                                 <Input
-                                  value={searchQuery}
-                                  onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    searchExistingMembers(e.target.value);
-                                  }}
+                                  value={familySearchStates[member.id]?.query || ''}
+                                  onChange={(e) => searchExistingMembers(member.id, e.target.value)}
                                   placeholder="Search by name or phone..."
                                 />
                                 <Button type="button" variant="outline" size="icon">
                                   <Search className="w-4 h-4" />
                                 </Button>
                               </div>
-                              {searchResults.length > 0 && (
+                              {(familySearchStates[member.id]?.results || []).length > 0 && (
                                 <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
-                                  {searchResults.map(result => (
-                                    <div 
+                                  {familySearchStates[member.id].results.map(result => (
+                                    <div
                                       key={result.id}
                                       className="p-2 hover:bg-muted rounded cursor-pointer"
                                       onClick={() => linkFamilyMemberToExisting(member.id, result)}
@@ -751,26 +826,40 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label>Phone Number</Label>
-                            <Input
-                              value={member.phone}
-                              onChange={(e) => updateFamilyMember(member.id, 'phone', e.target.value)}
-                              placeholder="+233 24 123 4567"
-                              disabled={member.isLinked}
-                            />
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Phone Number</Label>
+                              <Input
+                                value={member.phone}
+                                onChange={(e) => updateFamilyMember(member.id, 'phone', e.target.value)}
+                                placeholder="+233 24 123 4567"
+                                disabled={member.isLinked}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Occupation</Label>
+                              <Input
+                                value={member.occupation || ''}
+                                onChange={(e) => updateFamilyMember(member.id, 'occupation', e.target.value)}
+                                placeholder="e.g., Teacher"
+                                disabled={member.isLinked}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Hometown</Label>
+                              <Input
+                                value={member.hometown || ''}
+                                onChange={(e) => updateFamilyMember(member.id, 'hometown', e.target.value)}
+                                placeholder="e.g., Kumasi"
+                                disabled={member.isLinked}
+                              />
+                            </div>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
-              )}
-              
-              {familyMembers.length > 0 && familyMembers.length < 2 && (
-                <p className="text-sm text-amber-600">
-                  Please add at least one more family member (minimum 2 required)
-                </p>
               )}
             </div>
 

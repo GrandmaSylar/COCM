@@ -28,6 +28,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     gender: member.gender || ('' as 'male' | 'female' | ''),
     maritalStatus: member.maritalStatus || ('' as 'single' | 'married' | 'divorced' | 'widowed' | ''),
     dateOfBirth: member.dateOfBirth || '',
+    occupation: member.occupation || '',
+    hometown: member.hometown || '',
     residenceLocation: member.residenceLocation || '',
     digitalAddress: member.digitalAddress || '',
     zone: member.zone || ('' as Zone | ''),
@@ -51,8 +53,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
 
   // Family Info State
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(member.familyMembers || []);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Member[]>([]);
+  // Track search state per family member
+  const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
 
   // Legal Info State
   const [legalInfo, setLegalInfo] = useState<LegalInfo>(member.legalInfo || {
@@ -152,6 +154,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
       lastName: '',
       otherNames: '',
       phone: '',
+      occupation: '',
+      hometown: '',
       isLinked: false
     };
     setFamilyMembers([...familyMembers, newMember]);
@@ -167,10 +171,19 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     ));
   };
 
-  // Mock search for existing members (in real app, this would query the database)
-  const searchExistingMembers = async (query: string) => {
+  // Search for existing members (per family member)
+  const searchExistingMembers = async (familyMemberId: string, query: string) => {
+    // Update the query for this specific family member
+    setFamilySearchStates(prev => ({
+      ...prev,
+      [familyMemberId]: { ...prev[familyMemberId], query, results: prev[familyMemberId]?.results || [] }
+    }));
+
     if (query.length < 2) {
-      setSearchResults([]);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: [] }
+      }));
       return;
     }
 
@@ -180,32 +193,43 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
         m.phone.includes(query)
       );
-      setSearchResults(filtered);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: filtered }
+      }));
     } catch (error) {
       console.error('Failed to search members:', error);
-      setSearchResults([]);
+      setFamilySearchStates(prev => ({
+        ...prev,
+        [familyMemberId]: { query, results: [] }
+      }));
     }
   };
 
   const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {
-    setFamilyMembers(familyMembers.map(m => 
+    setFamilyMembers(familyMembers.map(m =>
       m.id === familyMemberId ? {
         ...m,
         firstName: existingMember.firstName,
         lastName: existingMember.lastName,
         otherNames: existingMember.otherNames || '',
         phone: existingMember.phone,
+        occupation: existingMember.occupation || '',
+        hometown: existingMember.hometown || '',
         isLinked: true,
         linkedMemberId: existingMember.id
       } : m
     ));
-    setSearchQuery('');
-    setSearchResults([]);
+    // Clear search state for this family member
+    setFamilySearchStates(prev => ({
+      ...prev,
+      [familyMemberId]: { query: '', results: [] }
+    }));
   };
 
-  const isValid = formData.firstName && formData.lastName && formData.phone && 
-                  formData.gender && formData.dateOfBirth && formData.residenceLocation && 
-                  formData.zone && familyMembers.length >= 2;
+  const isValid = formData.firstName && formData.lastName && formData.phone &&
+                  formData.gender && formData.dateOfBirth && formData.residenceLocation &&
+                  formData.zone;
 
   return (
     <div className="space-y-6">
@@ -354,6 +378,27 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   value={formData.dateOfBirth}
                   onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                   required
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="occupation">Occupation</Label>
+                <Input
+                  id="occupation"
+                  value={formData.occupation}
+                  onChange={(e) => handleInputChange('occupation', e.target.value)}
+                  placeholder="e.g., Teacher, Engineer, Trader"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hometown">Hometown</Label>
+                <Input
+                  id="hometown"
+                  value={formData.hometown}
+                  onChange={(e) => handleInputChange('hometown', e.target.value)}
+                  placeholder="e.g., Kumasi, Cape Coast"
                 />
               </div>
             </div>
@@ -713,21 +758,18 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                               <Label>Search Existing Member</Label>
                               <div className="flex gap-2">
                                 <Input
-                                  value={searchQuery}
-                                  onChange={(e) => {
-                                    setSearchQuery(e.target.value);
-                                    searchExistingMembers(e.target.value);
-                                  }}
+                                  value={familySearchStates[member.id]?.query || ''}
+                                  onChange={(e) => searchExistingMembers(member.id, e.target.value)}
                                   placeholder="Search by name or phone..."
                                 />
                                 <Button type="button" variant="outline" size="icon">
                                   <Search className="w-4 h-4" />
                                 </Button>
                               </div>
-                              {searchResults.length > 0 && (
+                              {(familySearchStates[member.id]?.results || []).length > 0 && (
                                 <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
-                                  {searchResults.map(result => (
-                                    <div 
+                                  {familySearchStates[member.id].results.map(result => (
+                                    <div
                                       key={result.id}
                                       className="p-2 hover:bg-muted rounded cursor-pointer"
                                       onClick={() => linkFamilyMemberToExisting(member.id, result)}
@@ -773,14 +815,34 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             </div>
                           </div>
 
-                          <div className="space-y-2">
-                            <Label>Phone Number</Label>
-                            <Input
-                              value={member.phone}
-                              onChange={(e) => updateFamilyMember(member.id, 'phone', e.target.value)}
-                              placeholder="+233 24 123 4567"
-                              disabled={member.isLinked}
-                            />
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Phone Number</Label>
+                              <Input
+                                value={member.phone}
+                                onChange={(e) => updateFamilyMember(member.id, 'phone', e.target.value)}
+                                placeholder="+233 24 123 4567"
+                                disabled={member.isLinked}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Occupation</Label>
+                              <Input
+                                value={member.occupation || ''}
+                                onChange={(e) => updateFamilyMember(member.id, 'occupation', e.target.value)}
+                                placeholder="e.g., Teacher"
+                                disabled={member.isLinked}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Hometown</Label>
+                              <Input
+                                value={member.hometown || ''}
+                                onChange={(e) => updateFamilyMember(member.id, 'hometown', e.target.value)}
+                                placeholder="e.g., Kumasi"
+                                disabled={member.isLinked}
+                              />
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -789,11 +851,6 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                 </div>
               )}
               
-              {familyMembers.length > 0 && familyMembers.length < 2 && (
-                <p className="text-sm text-amber-600">
-                  Please add at least one more family member (minimum 2 required)
-                </p>
-              )}
             </div>
 
             {/* Legal Information */}

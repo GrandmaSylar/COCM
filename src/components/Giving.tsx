@@ -6,10 +6,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { api } from '../services/api';
+import { toast } from 'sonner';
+import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport, formatCurrencyForExport } from '../utils/export';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 interface GivingRecord {
   id: string;
@@ -28,10 +36,16 @@ interface GivingRecord {
     mobile_money: number;
     card: number;
     bank_transfer: number;
+    foreign_currency?: {
+      currency: string;
+      amount: number;
+      ghs_equivalent: number;
+    };
   };
   notes?: string;
-  // Audit fields (renamed from recordedBy/recordedDate for consistency)
-  createdBy?: string;
+  // Audit fields
+  createdBy?: string; // User's name who recorded the giving
+  createdByEmail?: string; // User's email who recorded the giving
   createdAt?: string;
 }
 
@@ -41,7 +55,8 @@ interface CustomGivingType {
   description?: string;
   isActive: boolean;
   // Audit fields
-  createdBy?: string;
+  createdBy?: string; // User's name who created the type
+  createdByEmail?: string; // User's email who created the type
   createdAt?: string;
   updatedAt?: string;
 }
@@ -64,6 +79,20 @@ const paymentMethodLabels = {
   card: 'Card',
   bank_transfer: 'Bank Transfer'
 };
+
+// Common foreign currencies
+const CURRENCIES = [
+  { code: 'USD', name: 'US Dollar', symbol: '$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+  { code: 'GBP', name: 'British Pound', symbol: '£' },
+  { code: 'CAD', name: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'AUD', name: 'Australian Dollar', symbol: 'A$' },
+  { code: 'CHF', name: 'Swiss Franc', symbol: 'CHF' },
+  { code: 'NGN', name: 'Nigerian Naira', symbol: '₦' },
+  { code: 'ZAR', name: 'South African Rand', symbol: 'R' },
+  { code: 'CNY', name: 'Chinese Yuan', symbol: '¥' },
+  { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
+];
 
 export function Giving({ onRecordGiving }: GivingProps) {
   const [records, setRecords] = useState<GivingRecord[]>([]);
@@ -168,6 +197,57 @@ export function Giving({ onRecordGiving }: GivingProps) {
     }
   };
 
+  // Export columns configuration
+  const exportColumns = [
+    { key: 'serviceName', label: 'Service Name' },
+    { key: 'serviceDate', label: 'Date' },
+    { key: 'serviceType', label: 'Service Type' },
+    { key: 'offering', label: 'Offering' },
+    { key: 'donation', label: 'Donation' },
+    { key: 'thanksgiving', label: 'Thanksgiving' },
+    { key: 'totalAmount', label: 'Total Amount' },
+    { key: 'cash', label: 'Cash' },
+    { key: 'mobileMoney', label: 'Mobile Money' },
+    { key: 'card', label: 'Card' },
+    { key: 'bankTransfer', label: 'Bank Transfer' },
+    { key: 'notes', label: 'Notes' },
+    { key: 'recordedBy', label: 'Recorded By' },
+    { key: 'recordedByEmail', label: 'Recorder Email' },
+    { key: 'createdAt', label: 'Recorded On' },
+  ];
+
+  const prepareExportData = () => {
+    return filteredRecords.map(record => ({
+      serviceName: record.serviceName,
+      serviceDate: formatDateForExport(record.serviceDate),
+      serviceType: serviceTypeLabels[record.serviceType],
+      offering: formatCurrencyForExport(record.offerings.offering),
+      donation: formatCurrencyForExport(record.offerings.donation),
+      thanksgiving: formatCurrencyForExport(record.offerings.thanksgiving),
+      totalAmount: formatCurrencyForExport(record.totalAmount),
+      cash: formatCurrencyForExport(record.paymentBreakdown.cash),
+      mobileMoney: formatCurrencyForExport(record.paymentBreakdown.mobile_money),
+      card: formatCurrencyForExport(record.paymentBreakdown.card),
+      bankTransfer: formatCurrencyForExport(record.paymentBreakdown.bank_transfer),
+      notes: record.notes || '',
+      recordedBy: record.createdBy || '',
+      recordedByEmail: record.createdByEmail || '',
+      createdAt: formatDateForExport(record.createdAt),
+    }));
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(prepareExportData(), 'giving_records', exportColumns);
+  };
+
+  const handleExportPDF = () => {
+    exportToPDF(prepareExportData(), 'giving_records', 'Church Giving Records', exportColumns);
+  };
+
+  const handleExportXLSX = () => {
+    exportToXLSX(prepareExportData(), 'giving_records', exportColumns);
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -214,7 +294,29 @@ export function Giving({ onRecordGiving }: GivingProps) {
             Track offerings, donations, and thanksgiving per service
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Export Button */}
+          {records.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           {canManageCustomTypes && (
             <Button variant="outline" onClick={() => setShowCustomTypeManager(true)}>
               <Settings className="w-4 h-4 mr-2" />
@@ -399,12 +501,19 @@ export function Giving({ onRecordGiving }: GivingProps) {
                   {/* Payment Breakdown */}
                   <div className="flex flex-wrap gap-2">
                     {Object.entries(record.paymentBreakdown)
-                      .filter(([_, amount]) => amount > 0)
+                      .filter(([key, value]) => key !== 'foreign_currency' && (value as number) > 0)
                       .map(([method, amount]) => (
                         <Badge key={method} variant="outline">
-                          {paymentMethodLabels[method as keyof typeof paymentMethodLabels]}: {formatAmount(amount)}
+                          {paymentMethodLabels[method as keyof typeof paymentMethodLabels]}: {formatAmount(amount as number)}
                         </Badge>
                       ))}
+                    {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
+                      <Badge variant="outline" className="bg-yellow-50">
+                        Foreign ({record.paymentBreakdown.foreign_currency.currency}): {
+                          CURRENCIES.find(c => c.code === record.paymentBreakdown.foreign_currency?.currency)?.symbol || ''
+                        }{record.paymentBreakdown.foreign_currency.amount.toFixed(2)} (GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)})
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Notes */}
@@ -417,7 +526,7 @@ export function Giving({ onRecordGiving }: GivingProps) {
                   {/* Footer */}
                   {record.createdBy && record.createdAt && (
                     <div className="text-xs text-muted-foreground border-t pt-2">
-                      Recorded by {record.createdBy} on {formatDate(record.createdAt)}
+                      Recorded by {record.createdBy}{record.createdByEmail && ` (${record.createdByEmail})`} on {formatDate(record.createdAt)}
                     </div>
                   )}
                 </div>
@@ -547,7 +656,7 @@ function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: C
                     )}
                     {type.createdBy && type.createdAt && (
                       <p className="text-xs text-muted-foreground mt-2">
-                        Created by {type.createdBy} on {new Date(type.createdAt).toLocaleDateString()}
+                        Created by {type.createdBy}{type.createdByEmail && ` (${type.createdByEmail})`} on {new Date(type.createdAt).toLocaleDateString()}
                       </p>
                     )}
                   </div>
@@ -585,24 +694,28 @@ interface RecordGivingProps {
 }
 
 export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
-  const [serviceName, setServiceName] = useState('');
+  // Service type is fixed to Sunday Main Service for now
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [serviceType, setServiceType] = useState<'sunday_morning' | 'sunday_evening' | 'midweek' | 'special' | 'other'>('sunday_morning');
-  
+
   // Offering amounts
   const [offeringAmount, setOfferingAmount] = useState('');
   const [donationAmount, setDonationAmount] = useState('');
   const [thanksgivingAmount, setThanksgivingAmount] = useState('');
-  
+
   // Custom types
   const [customTypeAmounts, setCustomTypeAmounts] = useState<{ [key: string]: string }>({});
-  
+
   // Payment breakdown
   const [cashAmount, setCashAmount] = useState('');
   const [mobileMoneyAmount, setMobileMoneyAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
   const [bankTransferAmount, setBankTransferAmount] = useState('');
-  
+
+  // Foreign currency
+  const [foreignCurrency, setForeignCurrency] = useState('');
+  const [foreignAmount, setForeignAmount] = useState('');
+  const [foreignGhsEquivalent, setForeignGhsEquivalent] = useState('');
+
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
@@ -635,22 +748,34 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
         }
       });
 
+      // Build payment breakdown with optional foreign currency
+      const paymentBreakdown: any = {
+        cash: parseFloat(cashAmount) || 0,
+        mobile_money: parseFloat(mobileMoneyAmount) || 0,
+        card: parseFloat(cardAmount) || 0,
+        bank_transfer: parseFloat(bankTransferAmount) || 0
+      };
+
+      // Add foreign currency if provided
+      if (foreignCurrency && (parseFloat(foreignAmount) || 0) > 0) {
+        paymentBreakdown.foreign_currency = {
+          currency: foreignCurrency,
+          amount: parseFloat(foreignAmount) || 0,
+          ghs_equivalent: parseFloat(foreignGhsEquivalent) || 0
+        };
+      }
+
       const givingData = {
-        serviceName,
+        serviceName: 'Sunday Main Service',
         serviceDate,
-        serviceType,
+        serviceType: 'sunday_morning' as const,
         offerings: {
           offering: parseFloat(offeringAmount) || 0,
           donation: parseFloat(donationAmount) || 0,
           thanksgiving: parseFloat(thanksgivingAmount) || 0,
           customTypes: customTypesObj
         },
-        paymentBreakdown: {
-          cash: parseFloat(cashAmount) || 0,
-          mobile_money: parseFloat(mobileMoneyAmount) || 0,
-          card: parseFloat(cardAmount) || 0,
-          bank_transfer: parseFloat(bankTransferAmount) || 0
-        },
+        paymentBreakdown,
         totalAmount: calculateTotal(),
         notes: notes || undefined
       };
@@ -676,14 +801,15 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
     const mobileMoney = parseFloat(mobileMoneyAmount) || 0;
     const card = parseFloat(cardAmount) || 0;
     const bankTransfer = parseFloat(bankTransferAmount) || 0;
-    return cash + mobileMoney + card + bankTransfer;
+    const foreignGhs = parseFloat(foreignGhsEquivalent) || 0;
+    return cash + mobileMoney + card + bankTransfer + foreignGhs;
   };
 
   const total = calculateTotal();
   const paymentTotal = calculatePaymentTotal();
   const isBalanced = Math.abs(total - paymentTotal) < 0.01;
 
-  const isValid = serviceName && serviceDate && total > 0 && isBalanced;
+  const isValid = serviceDate && total > 0 && isBalanced;
 
   return (
     <div className="space-y-6">
@@ -709,16 +835,12 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
             {/* Service Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="serviceName">Service Name *</Label>
-                <Input
-                  id="serviceName"
-                  value={serviceName}
-                  onChange={(e) => setServiceName(e.target.value)}
-                  placeholder="e.g., Sunday Morning Service"
-                  required
-                />
+                <Label>Service Type</Label>
+                <div className="p-3 bg-muted rounded-md">
+                  <span className="font-medium">Sunday Main Service</span>
+                </div>
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="serviceDate">Service Date *</Label>
                 <Input
@@ -729,20 +851,6 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
                   required
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Service Type</Label>
-              <Select value={serviceType} onValueChange={(value: any) => setServiceType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(serviceTypeLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Giving Amounts */}
@@ -882,6 +990,60 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
                     onChange={(e) => setBankTransferAmount(e.target.value)}
                     placeholder="0.00"
                   />
+                </div>
+              </div>
+
+              {/* Foreign Currency Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <h4 className="text-sm font-medium">Foreign Currency (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="foreignCurrency">Currency</Label>
+                    <Select value={foreignCurrency || 'none'} onValueChange={(val) => setForeignCurrency(val === 'none' ? '' : val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select currency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {CURRENCIES.map((curr) => (
+                          <SelectItem key={curr.code} value={curr.code}>
+                            {curr.symbol} {curr.code} - {curr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="foreignAmount">
+                      Amount {foreignCurrency && `(${CURRENCIES.find(c => c.code === foreignCurrency)?.symbol || foreignCurrency})`}
+                    </Label>
+                    <Input
+                      id="foreignAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={foreignAmount}
+                      onChange={(e) => setForeignAmount(e.target.value)}
+                      placeholder="0.00"
+                      disabled={!foreignCurrency}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="foreignGhsEquivalent">GH₵ Equivalent</Label>
+                    <Input
+                      id="foreignGhsEquivalent"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={foreignGhsEquivalent}
+                      onChange={(e) => setForeignGhsEquivalent(e.target.value)}
+                      placeholder="0.00"
+                      disabled={!foreignCurrency}
+                    />
+                    <p className="text-xs text-muted-foreground">Enter the converted amount in GH₵</p>
+                  </div>
                 </div>
               </div>
 

@@ -3,7 +3,8 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { ArrowLeft, Edit, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
 import { Member, ZONES } from './Members';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -12,11 +13,17 @@ interface MemberProfileProps {
   member: Member;
   onBack: () => void;
   onEdit: (member: Member) => void;
+  onDelete?: (member: Member) => void;
+  onViewMember?: (memberId: string) => void;
 }
 
-export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
+export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember }: MemberProfileProps) {
   const { canAccess } = useAuth();
   const canEdit = canAccess('edit_members');
+  const canDelete = canAccess('delete_members');
+
+  // State for complete member data (including family members)
+  const [member, setMember] = useState<Member>(initialMember);
   const [attendanceStats, setAttendanceStats] = useState({
     thisMonth: 0,
     totalServices: 0,
@@ -26,9 +33,16 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
+    const fetchMemberData = async () => {
       try {
-        const data = await api.members.getAnalytics(member.id);
+        // Fetch complete member data including family members
+        const fullMember = await api.members.getById(initialMember.id);
+        if (fullMember) {
+          setMember(fullMember);
+        }
+
+        // Also fetch analytics
+        const data = await api.members.getAnalytics(initialMember.id);
         setAttendanceStats(data.attendanceStats || {
           thisMonth: 0,
           totalServices: 0,
@@ -36,14 +50,14 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
         });
         setRecentActivity(data.recentActivity || []);
       } catch (error) {
-        console.error('Failed to fetch member analytics:', error);
+        console.error('Failed to fetch member data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAnalytics();
-  }, [member.id]);
+    fetchMemberData();
+  }, [initialMember.id]);
 
   // Calculate age
   const calculateAge = (dateOfBirth: string) => {
@@ -85,6 +99,82 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
     return 'Not recorded';
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-8 h-8 rounded" />
+            <div>
+              <Skeleton className="h-8 w-48 mb-2" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-20" />
+            <Skeleton className="h-10 w-20" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            {/* Personal Info Skeleton */}
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-center lg:justify-start mb-6">
+                  <Skeleton className="w-20 h-20 rounded-full" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i}>
+                      <Skeleton className="h-4 w-20 mb-1" />
+                      <Skeleton className="h-5 w-32" />
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Info Skeleton */}
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="w-5 h-5" />
+                    <div>
+                      <Skeleton className="h-5 w-32 mb-1" />
+                      <Skeleton className="h-4 w-24" />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar Skeleton */}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-24" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -98,12 +188,27 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
             <p className="text-muted-foreground">Member Profile</p>
           </div>
         </div>
-        {canEdit && (
-          <Button onClick={() => onEdit(member)}>
-            <Edit className="w-4 h-4 mr-2" />
-            Edit
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button onClick={() => onEdit(member)}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+          )}
+          {canDelete && onDelete && (
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
+                  onDelete(member);
+                }
+              }}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -168,6 +273,18 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
                   <label className="text-sm font-medium text-muted-foreground">Join Date</label>
                   <p>{formatDate(member.joinDate)}</p>
                 </div>
+                {member.occupation && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Occupation</label>
+                    <p>{member.occupation}</p>
+                  </div>
+                )}
+                {member.hometown && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Hometown</label>
+                    <p>{member.hometown}</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -285,19 +402,187 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
             </Card>
           )}
 
-          {/* Family Information */}
+          {/* Family Tree */}
           {member.familyMembers && member.familyMembers.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Family Members
+                  Family Tree
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Visual Family Tree */}
+                <div className="relative py-6">
+                  {/* Parents Row */}
+                  {member.familyMembers.filter(f => f.relationship === 'father' || f.relationship === 'mother').length > 0 && (
+                    <div className="flex justify-center gap-8 mb-4">
+                      {member.familyMembers
+                        .filter(f => f.relationship === 'father' || f.relationship === 'mother')
+                        .map((parent) => (
+                          <div
+                            key={parent.id}
+                            className={`text-center ${parent.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            onClick={() => parent.isLinked && parent.linkedMemberId && onViewMember?.(parent.linkedMemberId)}
+                          >
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                              parent.relationship === 'father' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-pink-100 dark:bg-pink-900'
+                            } ${parent.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+                              <span className={`text-lg font-medium ${
+                                parent.relationship === 'father' ? 'text-blue-600 dark:text-blue-400' : 'text-pink-600 dark:text-pink-400'
+                              }`}>
+                                {parent.firstName[0]}{parent.lastName[0]}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium">{parent.firstName} {parent.lastName}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{parent.relationship}</p>
+                            {parent.isLinked && (
+                              <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
+                                <CheckCircle className="w-2 h-2" />
+                                View Profile
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* Connector line from parents to member */}
+                  {member.familyMembers.filter(f => f.relationship === 'father' || f.relationship === 'mother').length > 0 && (
+                    <div className="flex justify-center mb-4">
+                      <div className="w-0.5 h-8 bg-border"></div>
+                    </div>
+                  )}
+
+                  {/* Member Row (with spouse and siblings) */}
+                  <div className="flex justify-center items-center gap-4 mb-4">
+                    {/* Siblings on the left */}
+                    {member.familyMembers.filter(f => f.relationship === 'sibling').map((sibling) => (
+                      <div
+                        key={sibling.id}
+                        className={`text-center ${sibling.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                        onClick={() => sibling.isLinked && sibling.linkedMemberId && onViewMember?.(sibling.linkedMemberId)}
+                      >
+                        <div className={`w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-1 ${sibling.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                            {sibling.firstName[0]}{sibling.lastName[0]}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium">{sibling.firstName}</p>
+                        <p className="text-xs text-muted-foreground">Sibling</p>
+                        {sibling.isLinked && (
+                          <Badge variant="secondary" className="gap-1 mt-1 text-xs">
+                            <CheckCircle className="w-2 h-2" />
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Connector line to sibling */}
+                    {member.familyMembers.filter(f => f.relationship === 'sibling').length > 0 && (
+                      <div className="h-0.5 w-4 bg-border"></div>
+                    )}
+
+                    {/* The Member */}
+                    <div className="text-center">
+                      <div className="w-20 h-20 rounded-full bg-primary/20 border-4 border-primary flex items-center justify-center mx-auto mb-2">
+                        {member.photo ? (
+                          <img src={member.photo} alt={member.firstName} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <span className="text-xl font-bold text-primary">
+                            {member.firstName[0]}{member.lastName[0]}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-medium">{member.firstName} {member.lastName}</p>
+                      <Badge className="mt-1">This Member</Badge>
+                    </div>
+
+                    {/* Connector line to spouse */}
+                    {member.familyMembers.filter(f => f.relationship === 'spouse').length > 0 && (
+                      <>
+                        <div className="h-0.5 w-8 bg-red-400"></div>
+                        <span className="text-red-400 text-xs">married</span>
+                        <div className="h-0.5 w-8 bg-red-400"></div>
+                      </>
+                    )}
+
+                    {/* Spouse */}
+                    {member.familyMembers
+                      .filter(f => f.relationship === 'spouse')
+                      .map((spouse) => (
+                        <div
+                          key={spouse.id}
+                          className={`text-center ${spouse.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                          onClick={() => spouse.isLinked && spouse.linkedMemberId && onViewMember?.(spouse.linkedMemberId)}
+                        >
+                          <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                            member.gender === 'male' ? 'bg-pink-100 dark:bg-pink-900' : 'bg-blue-100 dark:bg-blue-900'
+                          } ${spouse.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
+                            <span className={`text-lg font-medium ${
+                              member.gender === 'male' ? 'text-pink-600 dark:text-pink-400' : 'text-blue-600 dark:text-blue-400'
+                            }`}>
+                              {spouse.firstName[0]}{spouse.lastName[0]}
+                            </span>
+                          </div>
+                          <p className="text-sm font-medium">{spouse.firstName} {spouse.lastName}</p>
+                          <p className="text-xs text-muted-foreground">Spouse</p>
+                          {spouse.isLinked && (
+                            <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
+                              <CheckCircle className="w-2 h-2" />
+                              View Profile
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Connector line to children */}
+                  {member.familyMembers.filter(f => f.relationship === 'child').length > 0 && (
+                    <div className="flex justify-center mb-4">
+                      <div className="w-0.5 h-8 bg-border"></div>
+                    </div>
+                  )}
+
+                  {/* Children Row */}
+                  {member.familyMembers.filter(f => f.relationship === 'child').length > 0 && (
+                    <div className="flex justify-center gap-6">
+                      {member.familyMembers
+                        .filter(f => f.relationship === 'child')
+                        .map((child) => (
+                          <div
+                            key={child.id}
+                            className={`text-center ${child.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            onClick={() => child.isLinked && child.linkedMemberId && onViewMember?.(child.linkedMemberId)}
+                          >
+                            <div className={`w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-1 ${child.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+                              <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                                {child.firstName[0]}{child.lastName[0]}
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium">{child.firstName}</p>
+                            <p className="text-xs text-muted-foreground">Child</p>
+                            {child.isLinked && (
+                              <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
+                                <CheckCircle className="w-2 h-2" />
+                                View
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Detailed Family Members List */}
+                <Separator className="my-6" />
+                <h4 className="text-sm font-medium mb-3">Family Details</h4>
                 <div className="space-y-3">
                   {member.familyMembers.map((familyMember) => (
-                    <div key={familyMember.id} className="flex items-start justify-between p-3 border rounded-lg">
+                    <div
+                      key={familyMember.id}
+                      className={`flex items-start justify-between p-3 border rounded-lg ${familyMember.isLinked && onViewMember ? 'hover:bg-muted/50 transition-colors' : ''}`}
+                    >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-medium">
@@ -306,7 +591,7 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
                           {familyMember.isLinked && (
                             <Badge variant="secondary" className="gap-1">
                               <CheckCircle className="w-3 h-3" />
-                              Linked
+                              Church Member
                             </Badge>
                           )}
                         </div>
@@ -314,10 +599,21 @@ export function MemberProfile({ member, onBack, onEdit }: MemberProfileProps) {
                         {familyMember.phone && (
                           <p className="text-sm text-muted-foreground">{familyMember.phone}</p>
                         )}
+                        {familyMember.occupation && (
+                          <p className="text-sm text-muted-foreground">Occupation: {familyMember.occupation}</p>
+                        )}
+                        {familyMember.hometown && (
+                          <p className="text-sm text-muted-foreground">Hometown: {familyMember.hometown}</p>
+                        )}
                       </div>
-                      {familyMember.isLinked && (
-                        <Button variant="ghost" size="sm">
-                          <ExternalLink className="w-4 h-4" />
+                      {familyMember.isLinked && familyMember.linkedMemberId && onViewMember && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onViewMember(familyMember.linkedMemberId!)}
+                        >
+                          <ExternalLink className="w-4 h-4 mr-1" />
+                          View Profile
                         </Button>
                       )}
                     </div>

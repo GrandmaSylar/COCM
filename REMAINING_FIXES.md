@@ -2,12 +2,12 @@
 
 ## Phase 1 - Still Not Working (0 items) ✅ COMPLETED
 
-### ~~2. Fix Update User Role Functionality~~ ✅
+### 2. Fix Update User Role Functionality ✅
 **Issue:** User role updates are not working properly
 **Location:** Settings component
 **Status:** ✅ FIXED - Endpoint was working, added missing `checkPermission` helper function
 
-### ~~3. Fix Member Details Update~~ ✅
+### 3. Fix Member Details Update ✅
 **Issue:** Member details updates are not saving correctly
 **Location:** EditMember component
 **Status:** ✅ FIXED - Added camelCase to snake_case conversion in PUT /members/:id endpoint

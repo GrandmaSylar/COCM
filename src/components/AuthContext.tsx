@@ -41,9 +41,23 @@ export interface CustomRole {
   createdAt: Date;
 }
 
+export interface TwoFAData {
+  requires2FA: true;
+  method: 'email' | 'phone';
+  userId: string;
+  tempToken: string;
+  destination: string;
+}
+
+export type LoginResult =
+  | { success: true; requires2FA?: false }
+  | { success: true; requires2FA: true; twoFAData: TwoFAData }
+  | { success: false; error: string };
+
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeLogin: (session: any, userData: any) => Promise<void>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   isAuthenticated: boolean;
@@ -101,26 +115,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
+  // Helper function to fetch user with temporary permissions
+  const fetchUserWithPermissions = async (userId: string) => {
+    // Fetch user profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) return null;
+
+    // Fetch temporary permissions via API (uses service role, bypasses RLS)
+    let temporaryPermissions: TemporaryPermission[] = [];
+    try {
+      const { api } = await import('../services/api');
+      const tempPerms = await api.users.getTemporaryPermissions(userId);
+
+      // Convert to TemporaryPermission format
+      temporaryPermissions = (tempPerms || []).map((tp: any) => ({
+        id: tp.id,
+        userId: tp.user_id,
+        permission: tp.permission,
+        expiresAt: new Date(tp.expires_at),
+        grantedBy: tp.granted_by,
+        grantedAt: new Date(tp.created_at),
+        createdAt: new Date(tp.created_at)
+      }));
+    } catch (error) {
+      console.error('Failed to fetch temporary permissions:', error);
+    }
+
+    return {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      isActive: profile.is_active,
+      temporaryPermissions
+    };
+  };
+
   // Initialize session from Supabase on mount
   useEffect(() => {
     const initSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        // Fetch user profile
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-
-        if (profile) {
-          setUser({
-            id: profile.id,
-            name: profile.name,
-            email: profile.email,
-            role: profile.role,
-            isActive: profile.is_active
-          });
+        const userData = await fetchUserWithPermissions(session.user.id);
+        if (userData) {
+          setUser(userData);
         }
       }
     };
@@ -139,7 +182,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Clean up expired temporary permissions
+  // Refresh current user's temporary permissions periodically
+  // This allows users to get newly granted permissions without re-logging
+  useEffect(() => {
+    const refreshUserPermissions = async () => {
+      if (!user) return;
+
+      try {
+        // Fetch current temporary permissions via API (uses service role, bypasses RLS)
+        const { api } = await import('../services/api');
+        const tempPerms = await api.users.getTemporaryPermissions(user.id);
+
+        // Convert to TemporaryPermission format
+        const temporaryPermissions: TemporaryPermission[] = (tempPerms || []).map((tp: any) => ({
+          id: tp.id,
+          userId: tp.user_id,
+          permission: tp.permission,
+          expiresAt: new Date(tp.expires_at),
+          grantedBy: tp.granted_by,
+          grantedAt: new Date(tp.created_at),
+          createdAt: new Date(tp.created_at)
+        }));
+
+        // Only update if permissions have changed
+        const currentPerms = user.temporaryPermissions || [];
+        const currentPermStrings = currentPerms.map(p => p.permission).sort().join(',');
+        const newPermStrings = temporaryPermissions.map(p => p.permission).sort().join(',');
+
+        if (currentPermStrings !== newPermStrings) {
+          setUser(prev => prev ? { ...prev, temporaryPermissions } : null);
+        }
+      } catch (error) {
+        console.error('Failed to refresh temporary permissions:', error);
+      }
+    };
+
+    // Refresh every 30 seconds
+    const interval = setInterval(refreshUserPermissions, 30000);
+
+    // Also refresh immediately when user changes
+    if (user) {
+      refreshUserPermissions();
+    }
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  // Clean up expired temporary permissions from local users list
   useEffect(() => {
     const interval = setInterval(() => {
       setUsers(prevUsers => prevUsers.map(u => ({
@@ -153,11 +242,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (identifier: string, password: string): Promise<LoginResult> => {
     try {
       // Use real API authentication
       const { api } = await import('../services/api');
-      const response = await api.auth.signIn(email, password);
+      const response = await api.auth.signIn(identifier, password);
+
+      // Check if 2FA is required
+      if (response && response.requires2FA) {
+        return {
+          success: true,
+          requires2FA: true,
+          twoFAData: {
+            requires2FA: true,
+            method: response.method,
+            userId: response.userId,
+            tempToken: response.tempToken,
+            destination: response.destination,
+          }
+        };
+      }
 
       if (response && response.user && response.session) {
         // Store the session in Supabase client
@@ -166,19 +270,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           refresh_token: response.session.refresh_token
         });
 
-        setUser({
-          id: response.user.id,
-          name: response.user.name,
-          email: response.user.email,
-          role: response.user.role,
-          isActive: response.user.isActive
-        });
-        return true;
+        // Fetch user with their temporary permissions from database
+        const userData = await fetchUserWithPermissions(response.user.id);
+        if (userData) {
+          setUser(userData);
+        } else {
+          // Fallback to basic user data if fetch fails
+          setUser({
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+            role: response.user.role,
+            isActive: response.user.isActive
+          });
+        }
+        return { success: true };
       }
-      return false;
-    } catch (error) {
+      return { success: false, error: 'Login failed. Please try again.' };
+    } catch (error: any) {
       console.error('Login error:', error);
-      return false;
+      // Extract error message from API response
+      const errorMessage = error?.message || 'An unexpected error occurred. Please try again.';
+      return { success: false, error: errorMessage };
+    }
+  };
+
+  const completeLogin = async (session: any, userData: any) => {
+    // Set the Supabase session after OTP verification
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+
+    // Fetch user with their temporary permissions
+    const fullUser = await fetchUserWithPermissions(userData.id);
+    if (fullUser) {
+      setUser(fullUser);
+    } else {
+      setUser({
+        id: userData.id,
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        isActive: userData.isActive,
+      });
     }
   };
 
@@ -222,14 +357,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canAccess = (permission: string): boolean => {
     if (!user || !user.isActive) return false;
-    
+
     // Dev role can access everything
     if (user.role === 'dev') return true;
-    
+
     // Check role-based permissions
     const userPermissions = rolePermissions[user.role] || [];
     if (userPermissions.includes(permission)) return true;
-    
+
     // Check temporary permissions
     const tempPerms = user.temporaryPermissions || [];
     const validTempPerms = tempPerms.filter(tp => new Date(tp.expiresAt) > new Date());
@@ -344,6 +479,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     login,
+    completeLogin,
     logout,
     switchRole,
     isAuthenticated: !!user,

@@ -2,11 +2,20 @@ import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download } from 'lucide-react';
+import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
+import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport } from '../utils/export';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from './ui/dropdown-menu';
 
 export type Zone = 'A' | 'B' | 'F' | 'K' | 'M' | 'R';
 export type MemberStatus = 'active' | 'semi-active' | 'inactive' | 'sabbatical' | 'blacklisted';
@@ -38,6 +47,8 @@ export interface FamilyMember {
   lastName: string;
   otherNames?: string;
   phone?: string;
+  occupation?: string;
+  hometown?: string;
   isLinked?: boolean;
   linkedMemberId?: string;
 }
@@ -60,6 +71,8 @@ export interface Member {
   gender: 'male' | 'female';
   maritalStatus?: 'single' | 'married' | 'divorced' | 'widowed';
   dateOfBirth: string;
+  occupation?: string;
+  hometown?: string;
   residenceLocation: string;
   digitalAddress?: string;
   zone: Zone;
@@ -117,13 +130,21 @@ export const MINISTRIES = [
 interface MembersProps {
   onAddMember: () => void;
   onViewMember: (member: Member) => void;
+  onAddFromVisitor?: () => void;
 }
 
-export function Members({ onAddMember, onViewMember }: MembersProps) {
+export function Members({ onAddMember, onViewMember, onAddFromVisitor }: MembersProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Filter and sort state
+  const [zoneFilter, setZoneFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [genderFilter, setGenderFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'name' | 'zone' | 'status' | 'joinDate'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -142,17 +163,159 @@ export function Members({ onAddMember, onViewMember }: MembersProps) {
     fetchMembers();
   }, []);
 
-  const filteredMembers = members.filter(member =>
-    `${member.firstName} ${member.lastName} ${member.otherNames}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.phone.includes(searchTerm) ||
-    member.zoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    ZONES[member.zone].toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Apply filters
+  let filteredMembers = members.filter(member => {
+    // Text search
+    const matchesSearch = searchTerm === '' ||
+      `${member.firstName} ${member.lastName} ${member.otherNames}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      member.phone.includes(searchTerm) ||
+      member.zoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ZONES[member.zone].toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Zone filter
+    const matchesZone = zoneFilter === 'all' || member.zone === zoneFilter;
+
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
+
+    // Gender filter
+    const matchesGender = genderFilter === 'all' || member.gender === genderFilter;
+
+    return matchesSearch && matchesZone && matchesStatus && matchesGender;
+  });
+
+  // Apply sorting
+  filteredMembers = [...filteredMembers].sort((a, b) => {
+    let comparison = 0;
+    switch (sortBy) {
+      case 'name':
+        comparison = `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+        break;
+      case 'zone':
+        comparison = a.zoneNumber.localeCompare(b.zoneNumber);
+        break;
+      case 'status':
+        const statusOrder = { active: 0, 'semi-active': 1, inactive: 2, sabbatical: 3, blacklisted: 4 };
+        comparison = statusOrder[a.status] - statusOrder[b.status];
+        break;
+      case 'joinDate':
+        comparison = new Date(b.joinDate).getTime() - new Date(a.joinDate).getTime();
+        break;
+    }
+    return sortOrder === 'asc' ? comparison : -comparison;
+  });
 
   const { user, canAccess } = useAuth();
-  
+
   const canAddMembers = canAccess('manage_members');
+
+  // Loading skeleton
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {/* Header Skeleton */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-32 mb-2" />
+            <Skeleton className="h-4 w-48" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-36" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+        </div>
+
+        {/* Search Skeleton */}
+        <Skeleton className="h-10 w-full" />
+
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="text-center space-y-2">
+                  <Skeleton className="h-8 w-16 mx-auto" />
+                  <Skeleton className="h-4 w-20 mx-auto" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Member Cards Skeleton */}
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-40" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-5 w-24" />
+                        <Skeleton className="h-5 w-16" />
+                      </div>
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-9 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Export columns configuration
+  const exportColumns = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'otherNames', label: 'Other Names' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'secondPhone', label: 'Second Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'dateOfBirth', label: 'Date of Birth' },
+    { key: 'residenceLocation', label: 'Residence' },
+    { key: 'digitalAddress', label: 'Digital Address' },
+    { key: 'zone', label: 'Zone' },
+    { key: 'zoneNumber', label: 'Zone Number' },
+    { key: 'status', label: 'Status' },
+    { key: 'joinDate', label: 'Join Date' },
+    { key: 'maritalStatus', label: 'Marital Status' },
+  ];
+
+  const handleExportCSV = () => {
+    const exportData = filteredMembers.map(m => ({
+      ...m,
+      dateOfBirth: formatDateForExport(m.dateOfBirth),
+      joinDate: formatDateForExport(m.joinDate),
+    }));
+    exportToCSV(exportData, 'church_members', exportColumns);
+  };
+
+  const handleExportPDF = () => {
+    const exportData = filteredMembers.map(m => ({
+      ...m,
+      dateOfBirth: formatDateForExport(m.dateOfBirth),
+      joinDate: formatDateForExport(m.joinDate),
+    }));
+    exportToPDF(exportData, 'church_members', 'Church Members List', exportColumns);
+  };
+
+  const handleExportXLSX = () => {
+    const exportData = filteredMembers.map(m => ({
+      ...m,
+      dateOfBirth: formatDateForExport(m.dateOfBirth),
+      joinDate: formatDateForExport(m.joinDate),
+    }));
+    exportToXLSX(exportData, 'church_members', exportColumns);
+  };
 
   return (
     <div className="space-y-6">
@@ -164,12 +327,44 @@ export function Members({ onAddMember, onViewMember }: MembersProps) {
             Manage your church members
           </p>
         </div>
-        {canAddMembers && (
-          <Button onClick={onAddMember}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Member
-          </Button>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {/* Export Button */}
+          {members.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canAddMembers && (
+            <>
+              {onAddFromVisitor && (
+                <Button variant="outline" onClick={onAddFromVisitor}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Add from Visitor
+                </Button>
+              )}
+              <Button onClick={onAddMember}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add New Member
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Error Alert */}
@@ -192,15 +387,97 @@ export function Members({ onAddMember, onViewMember }: MembersProps) {
         </AlertDescription>
       </Alert>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search members by name, zone, email, or phone..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search members by name, zone, email, or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <Select value={zoneFilter} onValueChange={setZoneFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Filter by zone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Zones</SelectItem>
+              {Object.entries(ZONES).map(([code, name]) => (
+                <SelectItem key={code} value={code}>Zone {code} - {name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="semi-active">Semi-Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="sabbatical">Sabbatical</SelectItem>
+              <SelectItem value="blacklisted">Blacklisted</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={genderFilter} onValueChange={setGenderFilter}>
+            <SelectTrigger className="w-full sm:w-32">
+              <SelectValue placeholder="Gender" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="male">Male</SelectItem>
+              <SelectItem value="female">Female</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={`${sortBy}-${sortOrder}`} onValueChange={(value) => {
+            const [sort, order] = value.split('-') as [typeof sortBy, typeof sortOrder];
+            setSortBy(sort);
+            setSortOrder(order);
+          }}>
+            <SelectTrigger className="w-full sm:w-48">
+              <ArrowUpDown className="w-4 h-4 mr-2" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+              <SelectItem value="zone-asc">Zone (A-Z)</SelectItem>
+              <SelectItem value="zone-desc">Zone (Z-A)</SelectItem>
+              <SelectItem value="status-asc">Status (Active first)</SelectItem>
+              <SelectItem value="status-desc">Status (Inactive first)</SelectItem>
+              <SelectItem value="joinDate-desc">Join Date (Newest)</SelectItem>
+              <SelectItem value="joinDate-asc">Join Date (Oldest)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Active filters summary */}
+        {(zoneFilter !== 'all' || statusFilter !== 'all' || genderFilter !== 'all' || searchTerm) && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>Showing {filteredMembers.length} of {members.length} members</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setZoneFilter('all');
+                setStatusFilter('all');
+                setGenderFilter('all');
+              }}
+              className="h-6 text-xs"
+            >
+              Clear filters
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}

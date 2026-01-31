@@ -9,7 +9,7 @@ import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
@@ -79,6 +79,19 @@ export function Settings({ onAddUser }: SettingsProps) {
   const [loadingPending, setLoadingPending] = useState(true);
   const [allSystemUsers, setAllSystemUsers] = useState<any[]>([]);
   const [userTempPermissions, setUserTempPermissions] = useState<{ [userId: string]: any[] }>({});
+
+  // Edit contact state
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+
+  // Search, filter, and sort state for users list
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
+  const [userStatusFilter, setUserStatusFilter] = useState<string>('all');
+  const [userSortBy, setUserSortBy] = useState<'name' | 'role' | 'status' | 'lastLogin'>('name');
+  const [userSortOrder, setUserSortOrder] = useState<'asc' | 'desc'>('asc');
   
   // Theme customization state
   const [themeColorInputs, setThemeColorInputs] = useState<ThemeColors>(
@@ -173,9 +186,32 @@ export function Settings({ onAddUser }: SettingsProps) {
       // Remove from both lists
       setPendingUsers(prev => prev.filter(u => u.id !== userId));
       setAllSystemUsers(prev => prev.filter(u => u.id !== userId));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to delete user:', error);
-      toast.error('Failed to delete user');
+      toast.error(error?.message || 'Failed to delete user. Please try again.');
+    }
+  };
+
+  const handleEditContact = (systemUser: any) => {
+    setEditingUserId(systemUser.id);
+    setEditEmail(systemUser.email || '');
+    setEditPhone(systemUser.phone || '');
+  };
+
+  const handleSaveContact = async (userId: string) => {
+    setIsSavingContact(true);
+    try {
+      await api.users.updateContact(userId, { email: editEmail, phone: editPhone });
+      toast.success('Contact info updated successfully');
+      // Update local state
+      setAllSystemUsers(prev => prev.map(u =>
+        u.id === userId ? { ...u, email: editEmail, phone: editPhone } : u
+      ));
+      setEditingUserId(null);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update contact info');
+    } finally {
+      setIsSavingContact(false);
     }
   };
 
@@ -276,40 +312,22 @@ export function Settings({ onAddUser }: SettingsProps) {
 
   const handleChangeUserRole = async (userId: string, newRole: UserRole) => {
     try {
-      await api.users.updateRole(userId, newRole);
-      toast.success('User role updated successfully');
+      const result = await api.users.updateRole(userId, newRole);
+      console.log('Role update result:', result);
+      toast.success(`User role updated to ${roleLabels[newRole]}`);
       // Update the user in allSystemUsers
       setAllSystemUsers(prev => prev.map(u =>
         u.id === userId
           ? { ...u, role: newRole }
           : u
       ));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update user role:', error);
-      toast.error('Failed to update user role');
+      toast.error(error?.message || 'Failed to update user role. Please try again.');
     }
   };
 
-  if (!canManageUsers && !canManageSettings) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1>Settings</h1>
-          <p className="text-muted-foreground">System settings and user management</p>
-        </div>
-        
-        <Card>
-          <CardContent className="p-8 text-center">
-            <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="font-medium mb-2">Access Restricted</h3>
-            <p className="text-muted-foreground">
-              You don't have permission to access system settings and user management.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const hasAdminAccess = canManageUsers || canManageSettings;
 
   return (
     <div className="space-y-6">
@@ -332,7 +350,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             )}
           </h1>
           <p className="text-muted-foreground">
-            System settings, user management, and permissions
+            {hasAdminAccess ? 'System settings, user management, and permissions' : 'Account security settings'}
           </p>
         </div>
         {canManageUsers && (
@@ -361,12 +379,13 @@ export function Settings({ onAddUser }: SettingsProps) {
         </Alert>
       )}
 
-      <Tabs defaultValue="users" className="space-y-6">
+      <Tabs defaultValue={hasAdminAccess ? "users" : "security"} className="space-y-6">
         <TabsList>
-          <TabsTrigger value="users">Users & Permissions</TabsTrigger>
-          <TabsTrigger value="roles">Role Permissions</TabsTrigger>
+          {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
+          {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
           {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
           {canManageTheme && <TabsTrigger value="theme">Theme</TabsTrigger>}
+          <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
         {/* Users & Permissions Tab */}
@@ -515,8 +534,122 @@ export function Settings({ onAddUser }: SettingsProps) {
           {/* User List */}
           <div>
             <h2 className="mb-4">System Users</h2>
+
+            {/* Search, Filter, Sort Controls */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or email..."
+                  value={userSearchTerm}
+                  onChange={(e) => setUserSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {Object.entries(roleLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={`${userSortBy}-${userSortOrder}`} onValueChange={(value) => {
+                const [sortBy, sortOrder] = value.split('-') as [typeof userSortBy, typeof userSortOrder];
+                setUserSortBy(sortBy);
+                setUserSortOrder(sortOrder);
+              }}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                  <SelectItem value="role-asc">Role (A-Z)</SelectItem>
+                  <SelectItem value="role-desc">Role (Z-A)</SelectItem>
+                  <SelectItem value="status-asc">Status (Active first)</SelectItem>
+                  <SelectItem value="status-desc">Status (Inactive first)</SelectItem>
+                  <SelectItem value="lastLogin-desc">Last Login (Recent)</SelectItem>
+                  <SelectItem value="lastLogin-asc">Last Login (Oldest)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-4">
-              {allSystemUsers.map((systemUser) => {
+              {(() => {
+                // Apply filters and sorting
+                let filteredUsers = allSystemUsers.filter(u => {
+                  const matchesSearch = userSearchTerm === '' ||
+                    u.name.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+                    u.email.toLowerCase().includes(userSearchTerm.toLowerCase());
+
+                  const matchesRole = userRoleFilter === 'all' || u.role === userRoleFilter;
+
+                  let matchesStatus = true;
+                  if (userStatusFilter === 'active') {
+                    matchesStatus = u.isActive && u.approvalStatus === 'approved';
+                  } else if (userStatusFilter === 'inactive') {
+                    matchesStatus = !u.isActive && u.approvalStatus === 'approved';
+                  } else if (userStatusFilter === 'pending') {
+                    matchesStatus = u.approvalStatus === 'pending';
+                  }
+
+                  return matchesSearch && matchesRole && matchesStatus;
+                });
+
+                // Apply sorting
+                filteredUsers.sort((a, b) => {
+                  let comparison = 0;
+                  switch (userSortBy) {
+                    case 'name':
+                      comparison = a.name.localeCompare(b.name);
+                      break;
+                    case 'role':
+                      comparison = a.role.localeCompare(b.role);
+                      break;
+                    case 'status':
+                      const aStatus = a.isActive ? 1 : 0;
+                      const bStatus = b.isActive ? 1 : 0;
+                      comparison = bStatus - aStatus;
+                      break;
+                    case 'lastLogin':
+                      const aDate = a.lastLogin ? new Date(a.lastLogin).getTime() : 0;
+                      const bDate = b.lastLogin ? new Date(b.lastLogin).getTime() : 0;
+                      comparison = bDate - aDate;
+                      break;
+                  }
+                  return userSortOrder === 'asc' ? comparison : -comparison;
+                });
+
+                if (filteredUsers.length === 0) {
+                  return (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <p className="text-muted-foreground">No users found matching your filters.</p>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+
+                return filteredUsers.map((systemUser) => {
                 const tempPerms = userTempPermissions[systemUser.id] || [];
                 
                 return (
@@ -559,10 +692,56 @@ export function Settings({ onAddUser }: SettingsProps) {
                             </div>
                             
                             <div className="space-y-1 mb-3">
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Mail className="w-4 h-4" />
-                                {systemUser.email}
-                              </div>
+                              {editingUserId === systemUser.id ? (
+                                <div className="space-y-2 p-2 bg-muted/50 rounded-lg">
+                                  <div className="flex items-center gap-2">
+                                    <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                    <Input
+                                      value={editEmail}
+                                      onChange={(e) => setEditEmail(e.target.value)}
+                                      placeholder="Email"
+                                      className="h-7 text-sm"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                    <Input
+                                      value={editPhone}
+                                      onChange={(e) => setEditPhone(e.target.value)}
+                                      placeholder="Phone (e.g. +233...)"
+                                      className="h-7 text-sm"
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button size="sm" className="h-7 text-xs" onClick={() => handleSaveContact(systemUser.id)} disabled={isSavingContact}>
+                                      <Save className="w-3 h-3 mr-1" />
+                                      {isSavingContact ? 'Saving...' : 'Save'}
+                                    </Button>
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingUserId(null)}>
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Mail className="w-4 h-4" />
+                                    {systemUser.email}
+                                  </div>
+                                  {systemUser.phone && (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                      <Phone className="w-4 h-4" />
+                                      {systemUser.phone}
+                                    </div>
+                                  )}
+                                  {isDev && systemUser.id !== user?.id && (
+                                    <Button size="sm" variant="ghost" className="h-6 text-xs mt-1 px-2" onClick={() => handleEditContact(systemUser)}>
+                                      <Edit className="w-3 h-3 mr-1" />
+                                      Edit contact
+                                    </Button>
+                                  )}
+                                </>
+                              )}
                               {isDev && systemUser.approvalStatus === 'approved' && systemUser.id !== user?.id && (
                                 <div className="flex items-center gap-2 mt-2">
                                   <Shield className="w-4 h-4 text-muted-foreground" />
@@ -716,7 +895,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                     </CardContent>
                   </Card>
                 );
-              })}
+              });
+              })()}
             </div>
           </div>
         </TabsContent>
@@ -914,8 +1094,152 @@ export function Settings({ onAddUser }: SettingsProps) {
             </Card>
           </TabsContent>
         )}
+        <TabsContent value="security" className="space-y-6">
+          <SecuritySettings />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+// Security / 2FA Settings Component
+function SecuritySettings() {
+  const { user } = useAuth();
+  const [twoFAMethod, setTwoFAMethod] = useState<'none' | 'email' | 'phone'>('none');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load current 2FA preference from profile
+  useEffect(() => {
+    const loadPreference = async () => {
+      if (!user) return;
+      try {
+        const { supabase } = await import('../utils/supabase/client');
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('two_fa_method, phone')
+          .eq('id', user.id)
+          .single();
+        if (profile?.two_fa_method) {
+          setTwoFAMethod(profile.two_fa_method);
+        }
+      } catch (err) {
+        console.error('Failed to load 2FA preference:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadPreference();
+  }, [user]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await api.auth.update2FAPreference(twoFAMethod);
+      toast.success(
+        twoFAMethod === 'none'
+          ? 'Two-factor authentication disabled'
+          : `Two-factor authentication enabled via ${twoFAMethod === 'email' ? 'Email' : 'Phone SMS'}`
+      );
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update 2FA preference');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground">
+          Loading security settings...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Two-Factor Authentication (2FA)
+        </CardTitle>
+        <CardDescription>
+          Add an extra layer of security to your account. After entering your password, you'll be asked for a verification code.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-3">
+          <div
+            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              twoFAMethod === 'none' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+            }`}
+            onClick={() => setTwoFAMethod('none')}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+              twoFAMethod === 'none' ? 'border-primary' : 'border-muted-foreground'
+            }`}>
+              {twoFAMethod === 'none' && <div className="w-2 h-2 rounded-full bg-primary" />}
+            </div>
+            <div>
+              <p className="font-medium">Off</p>
+              <p className="text-sm text-muted-foreground">Password only (less secure)</p>
+            </div>
+          </div>
+
+          <div
+            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              twoFAMethod === 'email' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+            }`}
+            onClick={() => setTwoFAMethod('email')}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+              twoFAMethod === 'email' ? 'border-primary' : 'border-muted-foreground'
+            }`}>
+              {twoFAMethod === 'email' && <div className="w-2 h-2 rounded-full bg-primary" />}
+            </div>
+            <Mail className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-medium">Email OTP</p>
+              <p className="text-sm text-muted-foreground">Receive a 6-digit code via email ({user?.email})</p>
+            </div>
+          </div>
+
+          <div
+            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+              twoFAMethod === 'phone' ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50 opacity-60'
+            }`}
+            onClick={() => setTwoFAMethod('phone')}
+          >
+            <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+              twoFAMethod === 'phone' ? 'border-primary' : 'border-muted-foreground'
+            }`}>
+              {twoFAMethod === 'phone' && <div className="w-2 h-2 rounded-full bg-primary" />}
+            </div>
+            <Phone className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <p className="font-medium">Phone SMS OTP</p>
+              <p className="text-sm text-muted-foreground">Receive a 6-digit code via SMS</p>
+            </div>
+          </div>
+        </div>
+
+        {twoFAMethod === 'phone' && (
+          <Alert>
+            <Phone className="h-4 w-4" />
+            <AlertDescription>
+              Make sure your phone number is set in your profile. SMS charges may apply.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+          <Save className="h-4 w-4" />
+          {isSaving ? 'Saving...' : 'Save 2FA Preference'}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -932,7 +1256,8 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
     phone: '',
     role: '' as UserRole | '',
     password: '',
-    status: 'active' as 'active' | 'inactive'
+    status: 'active' as 'active' | 'inactive',
+    twoFaMethod: 'none' as 'none' | 'email' | 'phone'
   });
   const [isLoading, setIsLoading] = useState(false);
   const { isDev } = useAuth();
@@ -949,7 +1274,8 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
         email: formData.email,
         password: formData.password,
         role: formData.role,
-        phone: formData.phone
+        phone: formData.phone,
+        twoFaMethod: formData.twoFaMethod
       });
 
       toast.success('User created successfully');
@@ -1066,6 +1392,51 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                 placeholder="Enter secure password"
                 required
               />
+            </div>
+
+            <div className="space-y-3">
+              <Label>Two-Factor Authentication</Label>
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Enable 2FA</p>
+                    <p className="text-xs text-muted-foreground">Require verification code on login</p>
+                  </div>
+                </div>
+                <Switch
+                  checked={formData.twoFaMethod !== 'none'}
+                  onCheckedChange={(checked) => handleInputChange('twoFaMethod', checked ? 'email' : 'none')}
+                />
+              </div>
+              {formData.twoFaMethod !== 'none' && (
+                <div className="flex gap-2 ml-6">
+                  <Button
+                    type="button"
+                    variant={formData.twoFaMethod === 'email' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputChange('twoFaMethod', 'email')}
+                    className="gap-1"
+                  >
+                    <Mail className="w-3 h-3" />
+                    Email
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={formData.twoFaMethod === 'phone' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => handleInputChange('twoFaMethod', 'phone')}
+                    disabled={!formData.phone}
+                    className="gap-1"
+                  >
+                    <Phone className="w-3 h-3" />
+                    Phone SMS
+                  </Button>
+                  {!formData.phone && formData.twoFaMethod === 'phone' && (
+                    <p className="text-xs text-destructive self-center">Phone number required</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-6">

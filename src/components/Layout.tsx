@@ -63,7 +63,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
       case 'reports':
         return canAccess('view_reports');
       case 'settings':
-        return canAccess('manage_settings') || canAccess('manage_users');
+        return true; // All roles can access settings (at minimum for 2FA preferences)
       default:
         return true;
     }

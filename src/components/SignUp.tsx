@@ -17,11 +17,13 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    otherNames: '',
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     role: '',
-    department: ''
+    ministry: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +39,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
     setSuccess('');
 
     // Basic validation
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.role) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.role) {
       setError('Please fill in all required fields.');
       setIsLoading(false);
       return;
@@ -59,19 +61,24 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
       await api.auth.signUp({
         email: formData.email,
         password: formData.password,
-        name: `${formData.firstName} ${formData.lastName}`,
-        role: formData.role
+        name: formData.otherNames
+          ? `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
+          : `${formData.firstName} ${formData.lastName}`,
+        role: formData.role,
+        phone: formData.phone
       });
 
       setSuccess('Account created successfully! Please wait for administrator approval before logging in.');
       setFormData({
         firstName: '',
         lastName: '',
+        otherNames: '',
         email: '',
+        phone: '',
         password: '',
         confirmPassword: '',
         role: '',
-        department: ''
+        ministry: ''
       });
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -142,7 +149,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Label htmlFor="lastName">Surname *</Label>
                   <Input
                     id="lastName"
                     value={formData.lastName}
@@ -153,46 +160,67 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Other Names */}
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="otherNames">Other Names</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="john.doe@example.com"
-                  required
+                  id="otherNames"
+                  value={formData.otherNames}
+                  onChange={(e) => handleInputChange('otherNames', e.target.value)}
+                  placeholder="Middle name(s)"
                 />
               </div>
 
-              {/* Role */}
-              <div className="space-y-2">
-                <Label>Requested Role *</Label>
-                <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="elder">Elder</SelectItem>
-                    <SelectItem value="pastor">Pastor</SelectItem>
-                    <SelectItem value="admin">Administrator</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Note: Admin roles require special approval and may take longer to process.
-                </p>
+              {/* Email and Phone */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="john@example.com"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    placeholder="0XX XXX XXXX"
+                    required
+                  />
+                </div>
               </div>
 
-              {/* Department */}
-              <div className="space-y-2">
-                <Label htmlFor="department">Department/Ministry</Label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) => handleInputChange('department', e.target.value)}
-                  placeholder="e.g., Youth Ministry, Worship Team"
-                />
+              {/* Role and Ministry */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Role *</Label>
+                  <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="elder">Elder</SelectItem>
+                      <SelectItem value="pastor">Pastor</SelectItem>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ministry">Ministry</Label>
+                  <Input
+                    id="ministry"
+                    value={formData.ministry}
+                    onChange={(e) => handleInputChange('ministry', e.target.value)}
+                    placeholder="e.g., Youth, Worship"
+                  />
+                </div>
               </div>
 
               {/* Password */}

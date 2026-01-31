@@ -31,7 +31,6 @@ export interface Visitor {
   referredBy?: string;
   interestedInMembership: boolean;
   notes: string;
-  followUpStatus: 'pending' | 'contacted' | 'scheduled' | 'completed';
   potentialZone?: Zone;
   // Conversion tracking
   convertedToMember?: boolean;
@@ -51,7 +50,6 @@ interface VisitorsProps {
 export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: VisitorsProps) {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedMembershipInterest, setSelectedMembershipInterest] = useState('all');
   const [loading, setLoading] = useState(true);
 
@@ -78,24 +76,14 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                          visitor.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          visitor.phone.includes(searchTerm) ||
                          visitor.residenceLocation.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = selectedStatus === 'all' || visitor.followUpStatus === selectedStatus;
-    const matchesMembershipInterest = selectedMembershipInterest === 'all' || 
+
+    const matchesMembershipInterest = selectedMembershipInterest === 'all' ||
                                      (selectedMembershipInterest === 'interested' && visitor.interestedInMembership) ||
                                      (selectedMembershipInterest === 'not-interested' && !visitor.interestedInMembership);
-    
-    return matchesSearch && matchesStatus && matchesMembershipInterest;
+
+    return matchesSearch && matchesMembershipInterest;
   });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'contacted': return 'bg-blue-100 text-blue-800';
-      case 'scheduled': return 'bg-purple-100 text-purple-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -108,7 +96,6 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
   // Calculate statistics
   const totalVisitors = visitors.length;
   const interestedInMembership = visitors.filter(v => v.interestedInMembership).length;
-  const pendingFollowUp = visitors.filter(v => v.followUpStatus === 'pending').length;
   const thisMonthVisitors = visitors.filter(visitor => {
     const visitDate = new Date(visitor.visitDate);
     const now = new Date();
@@ -168,14 +155,6 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
         <Card>
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{pendingFollowUp}</div>
-              <p className="text-sm text-muted-foreground">Pending Follow-up</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{thisMonthVisitors}</div>
               <p className="text-sm text-muted-foreground">This Month</p>
             </div>
@@ -194,18 +173,6 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
             className="pl-10"
           />
         </div>
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-full lg:w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={selectedMembershipInterest} onValueChange={setSelectedMembershipInterest}>
           <SelectTrigger className="w-full lg:w-48">
             <SelectValue placeholder="Membership interest" />
@@ -229,7 +196,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
               <div>
                 <h3 className="font-medium mb-2">No Visitors Yet</h3>
                 <p className="text-muted-foreground mb-4">
-                  Start tracking church visitors and follow up with potential members.
+                  Start tracking church visitors and potential members.
                 </p>
                 {canManageVisitors && (
                   <Button onClick={onAddVisitor}>
@@ -263,9 +230,6 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                           {visitor.firstName} {visitor.otherNames} {visitor.lastName}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          <Badge className={getStatusColor(visitor.followUpStatus)}>
-                            {visitor.followUpStatus}
-                          </Badge>
                           {visitor.interestedInMembership && (
                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                               <UserPlus className="w-3 h-3 mr-1" />
@@ -382,10 +346,28 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     referredBy: '',
     interestedInMembership: false,
     notes: '',
-    followUpStatus: 'pending' as const,
     potentialZone: '' as Zone | ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [referrerSearchQuery, setReferrerSearchQuery] = useState('');
+  const [showReferrerSuggestions, setShowReferrerSuggestions] = useState(false);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const data = await api.members.getAll();
+        setMembers(data || []);
+      } catch (error) {
+        console.error('Failed to fetch members:', error);
+      }
+    };
+    fetchMembers();
+  }, []);
+
+  const filteredMembers = members.filter(member =>
+    `${member.firstName} ${member.lastName}`.toLowerCase().includes(referrerSearchQuery.toLowerCase())
+  ).slice(0, 5);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,8 +380,9 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     try {
       await api.visitors.create({
         ...formData,
-        potentialZone: formData.potentialZone || undefined
-      });
+        potentialZone: formData.potentialZone || undefined,
+        followUpStatus: 'pending' // Default value for database constraint
+      } as any);
       onSave({
         ...formData,
         potentialZone: formData.potentialZone || undefined
@@ -562,14 +545,40 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="referredBy">Referred By</Label>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="referredBy">Referred By (Member)</Label>
                   <Input
                     id="referredBy"
-                    value={formData.referredBy}
-                    onChange={(e) => setFormData(prev => ({ ...prev, referredBy: e.target.value }))}
-                    placeholder="Name of member who referred them"
+                    value={referrerSearchQuery || formData.referredBy}
+                    onChange={(e) => {
+                      setReferrerSearchQuery(e.target.value);
+                      setFormData(prev => ({ ...prev, referredBy: e.target.value }));
+                      setShowReferrerSuggestions(true);
+                    }}
+                    onFocus={() => setShowReferrerSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowReferrerSuggestions(false), 200)}
+                    placeholder="Search member name..."
                   />
+                  {showReferrerSuggestions && referrerSearchQuery && filteredMembers.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {filteredMembers.map(member => (
+                        <div
+                          key={member.id}
+                          className="p-2 hover:bg-muted cursor-pointer"
+                          onMouseDown={(e) => {
+                            e.preventDefault(); // Prevent blur from firing
+                            const fullName = `${member.firstName} ${member.lastName}`;
+                            setFormData(prev => ({ ...prev, referredBy: fullName }));
+                            setReferrerSearchQuery(fullName);
+                            setShowReferrerSuggestions(false);
+                          }}
+                        >
+                          <div className="font-medium">{member.firstName} {member.lastName}</div>
+                          <div className="text-xs text-muted-foreground">{member.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -649,15 +658,6 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
     });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'contacted': return 'bg-blue-100 text-blue-800';
-      case 'scheduled': return 'bg-purple-100 text-purple-800';
-      case 'completed': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -700,17 +700,14 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
               <div className="text-xl font-medium">
                 {visitor.firstName} {visitor.otherNames} {visitor.lastName}
               </div>
-              <div className="flex gap-2 mt-1">
-                <Badge className={getStatusColor(visitor.followUpStatus)}>
-                  {visitor.followUpStatus}
-                </Badge>
-                {visitor.interestedInMembership && (
+              {visitor.interestedInMembership && (
+                <div className="flex gap-2 mt-1">
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                     <UserPlus className="w-3 h-3 mr-1" />
                     Interested in Membership
                   </Badge>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </CardTitle>
         </CardHeader>

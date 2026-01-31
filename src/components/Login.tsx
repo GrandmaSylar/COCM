@@ -4,17 +4,18 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
-import { useAuth } from './AuthContext';
+import { useAuth, TwoFAData } from './AuthContext';
 import { useTheme } from './ThemeContext';
 import { ChurchIcon, Moon, Sun, Monitor, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onForgotPassword: () => void;
   onSignUp: () => void;
+  onRequires2FA?: (data: TwoFAData) => void;
 }
 
-export function Login({ onForgotPassword, onSignUp }: LoginProps) {
-  const [email, setEmail] = useState('');
+export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps) {
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,14 +28,21 @@ export function Login({ onForgotPassword, onSignUp }: LoginProps) {
     setIsLoading(true);
     setError('');
 
-    // Add slight delay to show loading state
-    setTimeout(async () => {
-      const success = await login(email, password);
-      if (!success) {
-        setError('Invalid email or password. Please check your credentials.');
+    try {
+      const result = await login(identifier, password);
+      if (result.success && result.requires2FA && result.twoFAData) {
+        // 2FA required - hand off to OTP verification screen
+        if (onRequires2FA) {
+          onRequires2FA(result.twoFAData);
+        }
+      } else if (!result.success) {
+        setError(result.error || 'Invalid email/phone or password. Please check your credentials.');
       }
+    } catch (err: any) {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   const themeOptions = [
@@ -83,13 +91,13 @@ export function Login({ onForgotPassword, onSignUp }: LoginProps) {
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="identifier">Email or Phone Number</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="Enter your email or phone number"
                   required
                   autoComplete="email"
                 />

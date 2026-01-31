@@ -57,17 +57,35 @@ export const api = {
   // ============================================================================
   
   auth: {
-    signUp: (data: { email: string; password: string; name: string; role: string }) =>
+    signUp: (data: { email: string; password: string; name: string; role: string; phone?: string }) =>
       fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
     
-    signIn: (email: string, password: string) =>
-      fetchApi('/auth/signin', { method: 'POST', body: JSON.stringify({ email, password }) }),
+    signIn: (identifier: string, password: string) =>
+      fetchApi('/auth/signin', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
     
     signOut: () =>
       fetchApi('/auth/signout', { method: 'POST' }),
-    
+
     getSession: () =>
       fetchApi('/auth/session'),
+
+    verifyOtp: (data: { userId: string; tempToken: string; code: string }) =>
+      fetchApi('/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
+
+    resendOtp: (data: { userId: string; tempToken: string }) =>
+      fetchApi('/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
+
+    update2FAPreference: (method: 'none' | 'email' | 'phone') =>
+      fetchApi('/auth/2fa-preference', { method: 'PATCH', body: JSON.stringify({ method }) }),
+
+    forgotPassword: (identifier: string, method: 'email' | 'phone') =>
+      fetchApi('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier, method }) }),
+
+    verifyResetOtp: (data: { userId: string; tempToken: string; code: string }) =>
+      fetchApi('/auth/verify-reset-otp', { method: 'POST', body: JSON.stringify(data) }),
+
+    resetPassword: (data: { userId: string; resetToken: string; newPassword: string }) =>
+      fetchApi('/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
   },
 
   // ============================================================================
@@ -266,7 +284,7 @@ export const api = {
 
     getPending: () => fetchApi('/users/pending'),
 
-    create: (data: { email: string; password: string; name: string; role: string; phone?: string }) =>
+    create: (data: { email: string; password: string; name: string; role: string; phone?: string; twoFaMethod?: string }) =>
       fetchApi('/users', {
         method: 'POST',
         body: JSON.stringify(data)
@@ -298,5 +316,8 @@ export const api = {
 
     getTemporaryPermissions: (userId: string) =>
       fetchApi(`/users/${userId}/temporary-permissions`),
+
+    updateContact: (userId: string, data: { email?: string; phone?: string }) =>
+      fetchApi(`/users/${userId}/contact`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
 };

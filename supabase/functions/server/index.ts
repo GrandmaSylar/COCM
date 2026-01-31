@@ -118,6 +118,97 @@ function toCamelCase(obj) {
   }
   return obj;
 }
+// ============================================================================
+// 2FA HELPER FUNCTIONS
+// ============================================================================
+
+function generateOtp(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function maskEmail(email: string): string {
+  const [user, domain] = email.split('@');
+  if (user.length <= 2) return user[0] + '***@' + domain;
+  return user[0] + '***' + user[user.length - 1] + '@' + domain;
+}
+
+function maskPhone(phone: string): string {
+  if (phone.length <= 4) return '***' + phone;
+  return '***' + phone.slice(-4);
+}
+
+async function sendOtpEmail(email: string, code: string, name: string) {
+  const resendKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendKey) {
+    console.error('RESEND_API_KEY not set — OTP email not sent. Code:', code);
+    return;
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: Deno.env.get('OTP_FROM_EMAIL') || 'CoC.M <onboarding@resend.dev>',
+        to: [email],
+        subject: 'Your CoC.M verification code',
+        html: `<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:20px;">
+          <h2 style="color:#333;">Verification Code</h2>
+          <p>Hello ${name},</p>
+          <p>Your verification code is:</p>
+          <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;padding:16px;background:#f4f4f5;border-radius:8px;margin:16px 0;">${code}</div>
+          <p style="color:#666;font-size:14px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
+          <p style="color:#999;font-size:12px;">Church of Christ, Mataheko Congregation</p>
+        </div>`,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Resend API error:', err);
+    }
+  } catch (err) {
+    console.error('Failed to send OTP email:', err);
+  }
+}
+
+async function sendOtpSms(phone: string, code: string) {
+  const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+  const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+  const fromNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error('Twilio credentials not set — OTP SMS not sent. Code:', code);
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + btoa(`${accountSid}:${authToken}`),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          To: phone,
+          From: fromNumber,
+          Body: `Your CoC.M verification code is: ${code}. This code expires in 5 minutes.`,
+        }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('Twilio API error:', err);
+    }
+  } catch (err) {
+    console.error('Failed to send OTP SMS:', err);
+  }
+}
+
 // Middleware
 app.use('*', logger(console.log));
 app.use("/*", cors({
@@ -130,6 +221,7 @@ app.use("/*", cors({
     "GET",
     "POST",
     "PUT",
+    "PATCH",
     "DELETE",
     "OPTIONS"
   ],
@@ -172,7 +264,7 @@ app.post("/auth/signup", async (c)=>{
         error: 'Invalid JSON body'
       }, 400);
     }
-    const { email, password, name, role } = body;
+    const { email, password, name, role, phone } = body;
     if (!email || !password || !name || !role) {
       return c.json({
         error: 'Missing required fields'
@@ -194,7 +286,8 @@ app.post("/auth/signup", async (c)=>{
       email_confirm: true,
       user_metadata: {
         name,
-        role
+        role,
+        phone
       }
     });
     if (authError) {
@@ -212,6 +305,7 @@ app.post("/auth/signup", async (c)=>{
       id: authData.user.id,
       name,
       email,
+      phone: phone || null,
       role,
       is_active: false,
       approval_status: 'pending'
@@ -242,14 +336,55 @@ app.post("/auth/signup", async (c)=>{
 // (Copying remaining routes to ensure file is complete and runnable)
 app.post("/auth/signin", async (c)=>{
   try {
-    const { email, password } = await c.req.json();
-    if (!email || !password) {
+    const body = await c.req.json();
+    const { email, phone, identifier, password } = body;
+
+    // Support both legacy email field and new identifier field
+    let loginEmail = email;
+
+    // If identifier is provided, detect if it's email or phone
+    if (identifier) {
+      const isEmail = identifier.includes('@');
+      if (isEmail) {
+        loginEmail = identifier;
+      } else {
+        // It's a phone number, look up the email
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('phone', identifier)
+          .single();
+
+        if (profileError || !profile) {
+          return c.json({
+            error: 'No account found with this phone number'
+          }, 404);
+        }
+        loginEmail = profile.email;
+      }
+    } else if (phone && !email) {
+      // Legacy phone field support
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', phone)
+        .single();
+
+      if (profileError || !profile) {
+        return c.json({
+          error: 'No account found with this phone number'
+        }, 404);
+      }
+      loginEmail = profile.email;
+    }
+
+    if (!loginEmail || !password) {
       return c.json({
-        error: 'Email and password required'
+        error: 'Email/phone and password required'
       }, 400);
     }
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password
     });
     if (error) {
@@ -280,6 +415,53 @@ app.post("/auth/signin", async (c)=>{
         error: message
       }, 403);
     }
+
+    // Check if 2FA is enabled for this user
+    if (profile.two_fa_method && profile.two_fa_method !== 'none') {
+      const otp = generateOtp();
+      const tempToken = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+      // Delete any existing unused OTPs for this user
+      await supabase.from('otp_codes').delete().eq('user_id', profile.id).eq('used', false);
+
+      // Store OTP with the session data
+      const { error: otpError } = await supabase.from('otp_codes').insert({
+        user_id: profile.id,
+        code: otp,
+        method: profile.two_fa_method,
+        temp_token: tempToken,
+        session_data: { session: data.session },
+        expires_at: expiresAt.toISOString(),
+      });
+
+      if (otpError) {
+        console.error('Error storing OTP:', otpError);
+        return c.json({ error: 'Failed to initiate 2FA verification: ' + otpError.message }, 500);
+      }
+
+      // Send OTP via the user's preferred method
+      if (profile.two_fa_method === 'email') {
+        await sendOtpEmail(profile.email, otp, profile.name);
+      } else if (profile.two_fa_method === 'phone') {
+        if (!profile.phone) {
+          return c.json({ error: 'No phone number on file. Please contact an administrator.' }, 400);
+        }
+        await sendOtpSms(profile.phone, otp);
+      }
+
+      // Return 2FA required response (NO session returned)
+      return c.json({
+        requires2FA: true,
+        method: profile.two_fa_method,
+        userId: profile.id,
+        tempToken: tempToken,
+        destination: profile.two_fa_method === 'email'
+          ? maskEmail(profile.email)
+          : maskPhone(profile.phone || ''),
+      });
+    }
+
     return c.json({
       session: data.session,
       user: {
@@ -355,6 +537,411 @@ app.get("/auth/session", async (c)=>{
     }, 500);
   }
 });
+// ============================================================================
+// 2FA ROUTES
+// ============================================================================
+
+// Verify OTP code after login
+app.post("/auth/verify-otp", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, tempToken, code } = body;
+
+    if (!userId || !tempToken || !code) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Find the OTP record
+    const { data: otpRecord, error: otpError } = await supabase
+      .from('otp_codes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('temp_token', tempToken)
+      .eq('used', false)
+      .single();
+
+    if (otpError || !otpRecord) {
+      return c.json({ error: 'Invalid or expired verification code. Please sign in again.' }, 400);
+    }
+
+    // Check expiry
+    if (new Date(otpRecord.expires_at) < new Date()) {
+      await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+      return c.json({ error: 'Verification code has expired. Please sign in again.' }, 400);
+    }
+
+    // Check max attempts (5)
+    if (otpRecord.attempts >= 5) {
+      await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+      return c.json({ error: 'Too many incorrect attempts. Please sign in again.' }, 429);
+    }
+
+    // Increment attempts
+    await supabase.from('otp_codes')
+      .update({ attempts: otpRecord.attempts + 1 })
+      .eq('id', otpRecord.id);
+
+    // Verify code
+    if (String(otpRecord.code).trim() !== String(code).trim()) {
+      const remaining = 4 - otpRecord.attempts;
+      return c.json({
+        error: `Incorrect verification code. ${remaining > 0 ? remaining + ' attempt(s) remaining.' : 'Please sign in again.'}`
+      }, 400);
+    }
+
+    // Mark as used
+    await supabase.from('otp_codes').update({ used: true }).eq('id', otpRecord.id);
+
+    // Return the stored session
+    const sessionData = otpRecord.session_data;
+    if (!sessionData || !sessionData.session) {
+      return c.json({ error: 'Session data not found. Please sign in again.' }, 500);
+    }
+
+    // Fetch user profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return c.json({ error: 'User profile not found' }, 404);
+    }
+
+    return c.json({
+      session: sessionData.session,
+      user: {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        role: profile.role,
+        isActive: profile.is_active,
+        createdAt: profile.created_at,
+        updatedAt: profile.updated_at
+      }
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return c.json({ error: 'Internal server error during verification' }, 500);
+  }
+});
+
+// Resend OTP code
+app.post("/auth/resend-otp", async (c) => {
+  try {
+    const { userId, tempToken } = await c.req.json();
+
+    if (!userId || !tempToken) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    // Verify there's an existing OTP request
+    const { data: existing, error: existError } = await supabase
+      .from('otp_codes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('temp_token', tempToken)
+      .eq('used', false)
+      .single();
+
+    if (existError || !existing) {
+      return c.json({ error: 'Session expired. Please sign in again.' }, 400);
+    }
+
+    if (new Date(existing.expires_at) < new Date()) {
+      await supabase.from('otp_codes').delete().eq('id', existing.id);
+      return c.json({ error: 'Session expired. Please sign in again.' }, 400);
+    }
+
+    // Generate new code, update the record
+    const newCode = generateOtp();
+    const newExpiry = new Date(Date.now() + 5 * 60 * 1000);
+
+    await supabase.from('otp_codes').update({
+      code: newCode,
+      expires_at: newExpiry.toISOString(),
+      attempts: 0,
+    }).eq('id', existing.id);
+
+    // Fetch profile to get contact info
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email, phone, name, two_fa_method')
+      .eq('id', userId)
+      .single();
+
+    if (!profile) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Send the new code
+    if (existing.method === 'email') {
+      await sendOtpEmail(profile.email, newCode, profile.name);
+    } else if (existing.method === 'phone') {
+      await sendOtpSms(profile.phone, newCode);
+    }
+
+    return c.json({ message: 'Verification code resent successfully' });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Update 2FA preference (authenticated)
+app.patch("/auth/2fa-preference", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { method } = await c.req.json();
+
+    if (!method || !['none', 'email', 'phone'].includes(method)) {
+      return c.json({ error: 'Invalid 2FA method. Must be none, email, or phone.' }, 400);
+    }
+
+    // If choosing phone, verify user has a phone number
+    if (method === 'phone') {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile?.phone) {
+        return c.json({ error: 'No phone number on file. Please add a phone number to your profile first.' }, 400);
+      }
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ two_fa_method: method })
+      .eq('id', user.id);
+
+    if (error) {
+      console.error('Error updating 2FA preference:', error);
+      return c.json({ error: 'Failed to update 2FA preference' }, 500);
+    }
+
+    return c.json({ message: '2FA preference updated successfully', method });
+  } catch (error) {
+    console.error('Update 2FA preference error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// FORGOT PASSWORD ROUTES
+// ============================================================================
+
+// Step 1: Request password reset OTP
+app.post("/auth/forgot-password", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { identifier, method } = body; // method = 'email' or 'phone'
+
+    if (!identifier) {
+      return c.json({ error: 'Email or phone number is required' }, 400);
+    }
+
+    if (!method || !['email', 'phone'].includes(method)) {
+      return c.json({ error: 'Delivery method must be email or phone' }, 400);
+    }
+
+    // Look up user by email or phone
+    const isEmail = identifier.includes('@');
+    let profile;
+
+    if (isEmail) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, phone, name')
+        .eq('email', identifier)
+        .single();
+      profile = data;
+    } else {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email, phone, name')
+        .eq('phone', identifier)
+        .single();
+      profile = data;
+    }
+
+    if (!profile) {
+      return c.json({ error: 'No account found with this identifier' }, 404);
+    }
+
+    // If method is phone, ensure user has a phone number
+    if (method === 'phone' && !profile.phone) {
+      return c.json({ error: 'No phone number on file for this account' }, 400);
+    }
+
+    // Generate OTP
+    const otp = generateOtp();
+    const tempToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    // Delete any existing reset OTPs for this user
+    await supabase.from('otp_codes').delete().eq('user_id', profile.id).eq('method', 'password_reset');
+
+    // Store OTP
+    const { error: otpError } = await supabase.from('otp_codes').insert({
+      user_id: profile.id,
+      code: otp,
+      method: 'password_reset',
+      temp_token: tempToken,
+      session_data: { deliveryMethod: method },
+      expires_at: expiresAt.toISOString(),
+    });
+
+    if (otpError) {
+      console.error('Error storing reset OTP:', otpError);
+      return c.json({ error: 'Failed to initiate password reset: ' + otpError.message }, 500);
+    }
+
+    // Send OTP
+    if (method === 'email') {
+      await sendOtpEmail(profile.email, otp, profile.name);
+    } else {
+      await sendOtpSms(profile.phone, otp);
+    }
+
+    return c.json({
+      userId: profile.id,
+      tempToken,
+      method,
+      destination: method === 'email' ? maskEmail(profile.email) : maskPhone(profile.phone),
+      hasPhone: !!profile.phone,
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Step 2: Verify reset OTP
+app.post("/auth/verify-reset-otp", async (c) => {
+  try {
+    const { userId, tempToken, code } = await c.req.json();
+
+    if (!userId || !tempToken || !code) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const { data: otpRecord, error: otpError } = await supabase
+      .from('otp_codes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('temp_token', tempToken)
+      .eq('method', 'password_reset')
+      .eq('used', false)
+      .single();
+
+    if (otpError || !otpRecord) {
+      return c.json({ error: 'Invalid or expired code. Please try again.' }, 400);
+    }
+
+    if (new Date(otpRecord.expires_at) < new Date()) {
+      await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+      return c.json({ error: 'Code has expired. Please request a new one.' }, 400);
+    }
+
+    if (otpRecord.attempts >= 5) {
+      await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+      return c.json({ error: 'Too many incorrect attempts. Please request a new code.' }, 429);
+    }
+
+    // Increment attempts
+    await supabase.from('otp_codes')
+      .update({ attempts: otpRecord.attempts + 1 })
+      .eq('id', otpRecord.id);
+
+    if (String(otpRecord.code).trim() !== String(code).trim()) {
+      const remaining = 4 - otpRecord.attempts;
+      return c.json({
+        error: `Incorrect code. ${remaining > 0 ? remaining + ' attempt(s) remaining.' : 'Please request a new code.'}`
+      }, 400);
+    }
+
+    // Mark as used and generate a reset token
+    const resetToken = crypto.randomUUID();
+    await supabase.from('otp_codes').update({
+      used: true,
+      session_data: { resetToken },
+    }).eq('id', otpRecord.id);
+
+    return c.json({ resetToken });
+  } catch (error) {
+    console.error('Verify reset OTP error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Step 3: Reset password
+app.post("/auth/reset-password", async (c) => {
+  try {
+    const { userId, resetToken, newPassword } = await c.req.json();
+
+    if (!userId || !resetToken || !newPassword) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    if (newPassword.length < 6) {
+      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    }
+
+    // Verify the reset token exists
+    const { data: otpRecord, error: otpError } = await supabase
+      .from('otp_codes')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('method', 'password_reset')
+      .eq('used', true)
+      .single();
+
+    if (otpError || !otpRecord) {
+      return c.json({ error: 'Invalid reset session. Please start over.' }, 400);
+    }
+
+    // Verify the reset token matches
+    if (!otpRecord.session_data || otpRecord.session_data.resetToken !== resetToken) {
+      return c.json({ error: 'Invalid reset token. Please start over.' }, 400);
+    }
+
+    // Check if the OTP was verified within the last 10 minutes
+    const otpAge = Date.now() - new Date(otpRecord.created_at).getTime();
+    if (otpAge > 10 * 60 * 1000) {
+      await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+      return c.json({ error: 'Reset session expired. Please start over.' }, 400);
+    }
+
+    // Update the password
+    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+      password: newPassword,
+    });
+
+    if (authError) {
+      console.error('Error resetting password:', authError);
+      return c.json({ error: 'Failed to reset password: ' + authError.message }, 500);
+    }
+
+    // Clean up the OTP record
+    await supabase.from('otp_codes').delete().eq('id', otpRecord.id);
+
+    return c.json({ message: 'Password reset successfully. You can now sign in with your new password.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// MEMBER ROUTES
+// ============================================================================
 app.get("/members", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -363,20 +950,46 @@ app.get("/members", async (c)=>{
         error: 'Unauthorized'
       }, 401);
     }
-    const { data: members, error } = await supabase.from('members').select('*').order('created_at', {
-      ascending: false
-    });
+    // Fetch members
+    const { data: members, error } = await supabase
+      .from('members')
+      .select('*')
+      .order('created_at', { ascending: false });
+
     if (error) {
       console.error('Error fetching members:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      return c.json({
-        error: 'Failed to fetch members',
-        details: error.message || error.toString()
-      }, 500);
+      return c.json({ error: 'Failed to fetch members' }, 500);
     }
 
-    // Transform to camelCase - without family members for now
-    const transformedMembers = toCamelCase(members);
+    // Fetch family members for all members in a separate query
+    const memberIds = members?.map(m => m.id) || [];
+    let familyMembersMap: Record<string, any[]> = {};
+
+    if (memberIds.length > 0) {
+      const { data: allFamilyMembers } = await supabase
+        .from('family_members')
+        .select('*')
+        .in('member_id', memberIds);
+
+      // Group family members by member_id
+      if (allFamilyMembers) {
+        for (const fm of allFamilyMembers) {
+          if (!familyMembersMap[fm.member_id]) {
+            familyMembersMap[fm.member_id] = [];
+          }
+          familyMembersMap[fm.member_id].push(fm);
+        }
+      }
+    }
+
+    // Attach family members to each member
+    const membersWithFamily = members?.map(member => ({
+      ...member,
+      family_members: familyMembersMap[member.id] || []
+    })) || [];
+
+    // Transform to camelCase
+    const transformedMembers = toCamelCase(membersWithFamily);
 
     return c.json(transformedMembers);
   } catch (error) {
@@ -528,15 +1141,20 @@ app.post("/members", async (c)=>{
     }
     if (familyMembers && familyMembers.length > 0) {
       // Convert family members to snake_case
-      const familyMembersData = familyMembers.map((fm)=>{
+      const familyMembersData = familyMembers.map((fm: any) => {
         const snakeFm = toSnakeCase(fm);
+        // Remove the temp id and ensure member_id is set
+        const { id: _tempId, ...rest } = snakeFm;
         return {
-          ...snakeFm,
-          member_id: member.id,
-          id: undefined
+          ...rest,
+          member_id: member.id
         };
       });
-      await supabase.from('family_members').insert(familyMembersData);
+      console.log('Inserting family members:', JSON.stringify(familyMembersData));
+      const { error: fmError } = await supabase.from('family_members').insert(familyMembersData);
+      if (fmError) {
+        console.error('Error inserting family members:', fmError);
+      }
     }
     const { data: completeMember } = await supabase.from('members').select(`
         *,
@@ -582,15 +1200,20 @@ app.put("/members/:id", async (c)=>{
     if (familyMembers) {
       await supabase.from('family_members').delete().eq('member_id', id);
       if (familyMembers.length > 0) {
-        const familyMembersData = familyMembers.map((fm)=>{
+        const familyMembersData = familyMembers.map((fm: any) => {
           const snakeFm = toSnakeCase(fm);
+          // Remove the temp/old id and ensure member_id is set
+          const { id: _tempId, ...rest } = snakeFm;
           return {
-            ...snakeFm,
-            member_id: id,
-            id: undefined
+            ...rest,
+            member_id: id
           };
         });
-        await supabase.from('family_members').insert(familyMembersData);
+        console.log('Updating family members:', JSON.stringify(familyMembersData));
+        const { error: fmError } = await supabase.from('family_members').insert(familyMembersData);
+        if (fmError) {
+          console.error('Error inserting family members:', fmError);
+        }
       }
     }
     const { data: completeMember } = await supabase.from('members').select(`
@@ -678,11 +1301,16 @@ app.post("/attendance", async (c)=>{
       }, 401);
     }
     const data = await c.req.json();
-    const { attendees, ...recordInfo } = data;
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, ...rest } = data;
     const { data: record, error: recordError } = await supabase.from('attendance_records').insert({
-      ...recordInfo,
+      ...rest,
+      service_type: serviceType,
+      start_time: startTime || null,
+      end_time: endTime || null,
+      is_custom_service: isCustomService || false,
+      custom_service_id: customServiceId || null,
       created_by: user.id,
-      total_count: attendees?.length || 0
+      total_count: totalCount || attendees?.length || 0
     }).select().single();
     if (recordError) {
       console.error('Error creating attendance record:', recordError);
@@ -718,10 +1346,15 @@ app.put("/attendance/:id", async (c)=>{
     }
     const id = c.req.param('id');
     const data = await c.req.json();
-    const { attendees, ...recordInfo } = data;
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, ...rest } = data;
     const { data: record, error: recordError } = await supabase.from('attendance_records').update({
-      ...recordInfo,
-      total_count: attendees?.length || 0
+      ...rest,
+      service_type: serviceType,
+      start_time: startTime || null,
+      end_time: endTime || null,
+      is_custom_service: isCustomService || false,
+      custom_service_id: customServiceId || null,
+      total_count: totalCount || attendees?.length || 0
     }).eq('id', id).select().single();
     if (recordError) {
       console.error('Error updating attendance:', recordError);
@@ -845,28 +1478,50 @@ app.get("/giving", async (c)=>{
         error: 'Failed to fetch giving records'
       }, 500);
     }
-    const transformed = records.map((record)=>({
-        id: record.id,
-        serviceName: record.service_name,
-        serviceDate: record.service_date,
-        serviceType: record.service_type,
-        offerings: {
-          offering: parseFloat(record.offering_amount),
-          donation: parseFloat(record.donation_amount),
-          thanksgiving: parseFloat(record.thanksgiving_amount),
-          customTypes: record.custom_types
-        },
-        totalAmount: parseFloat(record.total_amount),
-        paymentBreakdown: {
-          cash: parseFloat(record.cash_amount),
-          mobile_money: parseFloat(record.mobile_money_amount),
-          card: parseFloat(record.card_amount),
-          bank_transfer: parseFloat(record.bank_transfer_amount)
-        },
-        notes: record.notes,
-        createdBy: record.created_by,
-        createdAt: record.created_at
-      }));
+
+    // Fetch profile info for all creators
+    const creatorIds = [...new Set(records.filter(r => r.created_by).map(r => r.created_by))];
+    let profilesMap: Record<string, { name: string; email: string }> = {};
+
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', creatorIds);
+
+      if (profiles) {
+        for (const profile of profiles) {
+          profilesMap[profile.id] = { name: profile.name, email: profile.email };
+        }
+      }
+    }
+
+    const transformed = records.map((record)=>{
+        const creator = record.created_by ? profilesMap[record.created_by] : null;
+        return {
+          id: record.id,
+          serviceName: record.service_name,
+          serviceDate: record.service_date,
+          serviceType: record.service_type,
+          offerings: {
+            offering: parseFloat(record.offering_amount),
+            donation: parseFloat(record.donation_amount),
+            thanksgiving: parseFloat(record.thanksgiving_amount),
+            customTypes: record.custom_types
+          },
+          totalAmount: parseFloat(record.total_amount),
+          paymentBreakdown: {
+            cash: parseFloat(record.cash_amount),
+            mobile_money: parseFloat(record.mobile_money_amount),
+            card: parseFloat(record.card_amount),
+            bank_transfer: parseFloat(record.bank_transfer_amount)
+          },
+          notes: record.notes,
+          createdBy: creator ? creator.name : null,
+          createdByEmail: creator ? creator.email : null,
+          createdAt: record.created_at
+        };
+      });
     return c.json(transformed);
   } catch (error) {
     console.error('Get giving error:', error);
@@ -931,7 +1586,35 @@ app.get("/giving/types", async (c)=>{
         error: 'Failed to fetch giving types'
       }, 500);
     }
-    return c.json(toCamelCase(types));
+
+    // Fetch profile info for all creators
+    const creatorIds = [...new Set(types.filter(t => t.created_by).map(t => t.created_by))];
+    let profilesMap: Record<string, { name: string; email: string }> = {};
+
+    if (creatorIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', creatorIds);
+
+      if (profiles) {
+        for (const profile of profiles) {
+          profilesMap[profile.id] = { name: profile.name, email: profile.email };
+        }
+      }
+    }
+
+    // Transform with creator name
+    const transformed = types.map(type => {
+      const creator = type.created_by ? profilesMap[type.created_by] : null;
+      return {
+        ...toCamelCase(type),
+        createdBy: creator ? creator.name : null,
+        createdByEmail: creator ? creator.email : null
+      };
+    });
+
+    return c.json(transformed);
   } catch (error) {
     console.error('Get giving types error:', error);
     return c.json({
@@ -1580,7 +2263,7 @@ app.post("/users", async (c)=>{
       }, 403);
     }
     const body = await c.req.json();
-    const { email, password, name, role } = body;
+    const { email, password, name, role, phone, twoFaMethod } = body;
     if (!email || !password || !name || !role) {
       return c.json({
         error: 'Missing required fields'
@@ -1625,11 +2308,13 @@ app.post("/users", async (c)=>{
       id: authData.user.id,
       name,
       email,
+      phone: phone || null,
       role,
       is_active: true,
       approval_status: 'approved',
       approved_by: user.id,
-      approved_at: new Date().toISOString()
+      approved_at: new Date().toISOString(),
+      two_fa_method: twoFaMethod || 'none'
     });
     if (profileError) {
       console.error('Profile creation error:', profileError);
@@ -1729,6 +2414,64 @@ app.post("/users/:id/reject", async (c)=>{
     }, 500);
   }
 });
+// Update user contact info (email/phone) - dev only
+app.patch("/users/:id/contact", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (!profile || profile.role !== 'dev') {
+      return c.json({ error: 'Forbidden: Only developers can update user contact info' }, 403);
+    }
+
+    const userId = c.req.param('id');
+    const body = await c.req.json();
+    const { email, phone } = body;
+
+    if (!email && phone === undefined) {
+      return c.json({ error: 'At least one of email or phone is required' }, 400);
+    }
+
+    const profileUpdate: any = {};
+    if (email) profileUpdate.email = email;
+    if (phone !== undefined) profileUpdate.phone = phone || null;
+
+    // Update profiles table
+    const { data: updatedProfile, error: profileError } = await supabase
+      .from('profiles')
+      .update(profileUpdate)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (profileError) {
+      console.error('Error updating user contact:', profileError);
+      return c.json({ error: 'Failed to update contact info: ' + profileError.message }, 500);
+    }
+
+    // If email changed, also update in auth.users
+    if (email) {
+      const { error: authError } = await supabase.auth.admin.updateUserById(userId, { email });
+      if (authError) {
+        console.error('Error updating auth email:', authError);
+        // Revert profile email change
+        return c.json({ error: 'Failed to update auth email: ' + authError.message }, 500);
+      }
+    }
+
+    return c.json({
+      message: 'Contact info updated successfully',
+      user: toCamelCase(updatedProfile)
+    });
+  } catch (error) {
+    console.error('Update user contact error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Update user role (by dev only)
 app.patch("/users/:id/role", async (c)=>{
   try {
@@ -1754,17 +2497,24 @@ app.patch("/users/:id/role", async (c)=>{
         error: 'Invalid role'
       }, 400);
     }
-    const { error } = await supabase.from('profiles').update({
-      role
-    }).eq('id', userId);
+    const { data: updatedProfile, error } = await supabase.from('profiles').update({
+      role,
+      updated_at: new Date().toISOString()
+    }).eq('id', userId).select().single();
     if (error) {
       console.error('Error updating user role:', error);
       return c.json({
-        error: 'Failed to update user role'
+        error: 'Failed to update user role: ' + error.message
       }, 500);
     }
+    if (!updatedProfile) {
+      return c.json({
+        error: 'User not found'
+      }, 404);
+    }
     return c.json({
-      message: 'User role updated successfully'
+      message: 'User role updated successfully',
+      user: toCamelCase(updatedProfile)
     });
   } catch (error) {
     console.error('Update user role error:', error);
@@ -1796,11 +2546,30 @@ app.delete("/users/:id", async (c)=>{
         error: 'Cannot delete your own account'
       }, 400);
     }
+
+    // First, nullify all references to avoid foreign key constraint violations
+    // These tables have FK constraints that reference profiles(id)
+    await Promise.all([
+      supabase.from('members').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('attendance_records').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('giving_records').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('visitors').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('custom_services').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('custom_giving_types').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('custom_roles').update({ created_by: null }).eq('created_by', userId),
+      supabase.from('temporary_permissions').update({ granted_by: null }).eq('granted_by', userId),
+      // Also handle approved_by references in profiles table
+      supabase.from('profiles').update({ approved_by: null }).eq('approved_by', userId),
+    ]);
+
+    // Delete temporary permissions for this user (has ON DELETE CASCADE but doing explicitly)
+    await supabase.from('temporary_permissions').delete().eq('user_id', userId);
+
     const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
     if (profileError) {
       console.error('Error deleting profile:', profileError);
       return c.json({
-        error: 'Failed to delete user profile'
+        error: 'Failed to delete user profile: ' + profileError.message
       }, 500);
     }
     const { error: authError } = await supabase.auth.admin.deleteUser(userId);

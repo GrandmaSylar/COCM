@@ -11,6 +11,7 @@ import { ArrowLeft, Search, Users, Clock, Check, X, UserCheck, UserX, Filter } f
 import { useAuth } from './AuthContext';
 import { Member, ZONES } from './Members';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 
 interface AttendanceRecord {
   id: string;
@@ -120,18 +121,37 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const presentMembers = Object.entries(attendanceStatus)
       .filter(([_, status]) => status === 'present')
       .map(([memberId]) => memberId);
-    
+
     const absentMembers = Object.entries(attendanceStatus)
       .filter(([_, status]) => status === 'absent')
       .map(([memberId]) => memberId);
 
+    // Validate that at least some attendance is marked
+    if (presentMembers.length === 0 && absentMembers.length === 0) {
+      toast.error('Please mark at least one member as present or absent before saving.');
+      return;
+    }
+
     setIsLoading(true);
-    
-    setTimeout(() => {
+
+    try {
+      const result = await api.attendance.create({
+        date,
+        serviceType,
+        startTime,
+        endTime,
+        attendees: presentMembers,
+        totalCount: presentMembers.length,
+        isCustomService: serviceType !== 'Sunday Main Service'
+      });
+
+      console.log('Attendance saved successfully:', result);
+      toast.success(`Attendance saved! ${presentMembers.length} present, ${absentMembers.length} absent.`);
+
       onSave({
         date,
         serviceType,
@@ -141,8 +161,12 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
         absentMembers,
         totalPresent: presentMembers.length
       });
+    } catch (error: any) {
+      console.error('Failed to save attendance:', error);
+      toast.error(error?.message || 'Failed to save attendance. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   // Calculate stats
@@ -401,9 +425,9 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
               </AlertDescription>
             </Alert>
             
-            <Button 
-              onClick={handleSubmit} 
-              disabled={isLoading || totalMarked === 0}
+            <Button
+              onClick={handleSubmit}
+              disabled={isLoading}
               className="w-full sm:w-auto"
             >
               {isLoading ? 'Saving...' : 'Save Attendance'}
