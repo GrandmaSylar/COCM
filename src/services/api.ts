@@ -111,6 +111,22 @@ export const api = {
 
     getAnalytics: (id: string) => fetchApi(`/members/${id}/analytics`),
 
+    getAttendanceHistory: (id: string, from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to) params.set('to', to);
+      const qs = params.toString();
+      return fetchApi(`/members/${id}/attendance-history${qs ? '?' + qs : ''}`);
+    },
+
+    setSabbatical: (id: string, data: { startDate: string; endDate?: string; reason?: string }) =>
+      fetchApi(`/members/${id}/sabbatical`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }),
+
+    endSabbatical: (id: string) => fetchApi(`/members/${id}/sabbatical`, { method: 'DELETE' }),
+
     uploadPhoto: async (memberId: string, file: File) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${memberId}-${Date.now()}.${fileExt}`;
@@ -152,6 +168,20 @@ export const api = {
     }),
     
     delete: (id: string) => fetchApi(`/attendance/${id}`, { method: 'DELETE' }),
+
+    getEditStatus: (id: string) => fetchApi(`/attendance/${id}/edit-status`),
+
+    getAbsentees: (id: string) => fetchApi(`/attendance/${id}/absentees`),
+
+    saveAbsentees: (id: string, data: any[]) => fetchApi(`/attendance/${id}/absentees`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+    updateAbsentee: (id: string, memberId: string, data: any) => fetchApi(`/attendance/${id}/absentees/${memberId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
   },
 
   // ============================================================================
@@ -194,7 +224,9 @@ export const api = {
     }),
     
     delete: (id: string) => fetchApi(`/giving/${id}`, { method: 'DELETE' }),
-    
+
+    getEditStatus: (id: string) => fetchApi(`/giving/${id}/edit-status`),
+
     types: {
       getAll: () => fetchApi('/giving/types'),
 

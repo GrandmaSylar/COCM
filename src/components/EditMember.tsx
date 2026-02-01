@@ -6,6 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle } from 'lucide-react';
+import { Checkbox } from './ui/checkbox';
 import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, MINISTRIES } from './Members';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -40,6 +41,12 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   });
   
   const [photoPreview, setPhotoPreview] = useState<string | null>(member.photo || null);
+
+  // Sabbatical state
+  const [sabbaticalStartDate, setSabbaticalStartDate] = useState(member.sabbaticalStartDate || '');
+  const [sabbaticalEndDate, setSabbaticalEndDate] = useState(member.sabbaticalEndDate || '');
+  const [sabbaticalReason, setSabbaticalReason] = useState(member.sabbaticalReason || '');
+  const [sabbaticalUntilFurtherNotice, setSabbaticalUntilFurtherNotice] = useState(!member.sabbaticalEndDate && member.status === 'sabbatical');
 
   // Baptism Info State
   const [baptismInfo, setBaptismInfo] = useState<BaptismInfo>(member.baptismInfo || {
@@ -84,12 +91,28 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     setIsLoading(true);
 
     try {
+      // If setting sabbatical, use the dedicated endpoint
+      if (formData.status === 'sabbatical' && member.status !== 'sabbatical') {
+        if (!sabbaticalStartDate) {
+          setIsLoading(false);
+          return;
+        }
+        await api.members.setSabbatical(member.id, {
+          startDate: sabbaticalStartDate,
+          endDate: sabbaticalUntilFurtherNotice ? undefined : sabbaticalEndDate || undefined,
+          reason: sabbaticalReason || undefined,
+        });
+      }
+
       await onSave({
         ...member,
         ...formData,
         gender: formData.gender as 'male' | 'female',
         maritalStatus: formData.maritalStatus || undefined,
         status: formData.status as MemberStatus,
+        sabbaticalStartDate: formData.status === 'sabbatical' ? sabbaticalStartDate : undefined,
+        sabbaticalEndDate: formData.status === 'sabbatical' && !sabbaticalUntilFurtherNotice ? sabbaticalEndDate : undefined,
+        sabbaticalReason: formData.status === 'sabbatical' ? sabbaticalReason : undefined,
         baptismInfo,
         familyMembers,
         legalInfo,
@@ -106,8 +129,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // Auto-generate zone number when zone is selected
-      if (field === 'zone' && value && value !== member.zone) {
+      // Only suggest a zone number when zone changes if zone number is empty (user can always edit zone number)
+      if (field === 'zone' && value && !prev.zoneNumber?.trim()) {
         updated.zoneNumber = generateZoneNumber(value as Zone);
       }
       
@@ -229,7 +252,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
 
   const isValid = formData.firstName && formData.lastName && formData.phone &&
                   formData.gender && formData.dateOfBirth && formData.residenceLocation &&
-                  formData.zone;
+                  formData.zone && formData.zoneNumber?.trim();
 
   return (
     <div className="space-y-6">
@@ -413,6 +436,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="new">New</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="semi-active">Semi-Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
@@ -421,9 +445,56 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Active: Mostly or always present | Semi-Active: Rarely present (less than a month) | Inactive: Absent for more than a month | Sabbatical: Absent with permission | Blacklisted: Sacked/removed
+                  Status is auto-calculated based on last 4 Sunday Main Service attendances. Manual changes here will override until the next recalculation.
                 </p>
               </div>
+
+              {/* Sabbatical Fields - shown when status is sabbatical */}
+              {formData.status === 'sabbatical' && (
+                <div className="space-y-3 p-4 border rounded-lg bg-purple-50/50">
+                  <h4 className="text-sm font-medium">Sabbatical Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-sm">Start Date *</Label>
+                      <Input
+                        type="date"
+                        value={sabbaticalStartDate}
+                        onChange={(e) => setSabbaticalStartDate(e.target.value)}
+                        required
+                      />
+                    </div>
+                    {!sabbaticalUntilFurtherNotice && (
+                      <div className="space-y-1">
+                        <Label className="text-sm">End Date</Label>
+                        <Input
+                          type="date"
+                          value={sabbaticalEndDate}
+                          onChange={(e) => setSabbaticalEndDate(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="sabbaticalUfn"
+                      checked={sabbaticalUntilFurtherNotice}
+                      onCheckedChange={(checked) => {
+                        setSabbaticalUntilFurtherNotice(!!checked);
+                        if (checked) setSabbaticalEndDate('');
+                      }}
+                    />
+                    <Label htmlFor="sabbaticalUfn" className="text-sm">Until further notice</Label>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm">Reason</Label>
+                    <Input
+                      value={sabbaticalReason}
+                      onChange={(e) => setSabbaticalReason(e.target.value)}
+                      placeholder="Reason for sabbatical..."
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Contact Information */}
@@ -511,13 +582,16 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="zoneNumber">Zone Number</Label>
+                  <Label htmlFor="zoneNumber">Zone Number *</Label>
                   <Input
                     id="zoneNumber"
                     value={formData.zoneNumber}
                     onChange={(e) => handleInputChange('zoneNumber', e.target.value)}
-                    placeholder="Zone number"
+                    placeholder="e.g., A01, M15"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Editable. Change Zone and leave this empty to auto-generate a number.
+                  </p>
                 </div>
               </div>
             </div>

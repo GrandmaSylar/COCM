@@ -8,6 +8,7 @@ import { Skeleton } from './ui/skeleton';
 import { Member, ZONES } from './Members';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 
 interface MemberProfileProps {
   member: Member;
@@ -15,9 +16,10 @@ interface MemberProfileProps {
   onEdit: (member: Member) => void;
   onDelete?: (member: Member) => void;
   onViewMember?: (memberId: string) => void;
+  onViewAttendanceHistory?: () => void;
 }
 
-export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember }: MemberProfileProps) {
+export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember, onViewAttendanceHistory }: MemberProfileProps) {
   const { canAccess } = useAuth();
   const canEdit = canAccess('edit_members');
   const canDelete = canAccess('delete_members');
@@ -259,12 +261,65 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   <div>
                     <Badge
                       variant={member.status === 'active' ? 'default' : 'secondary'}
-                      className={member.status === 'active' ? 'bg-green-100 text-green-800' : ''}
+                      className={
+                        member.status === 'new' ? 'bg-cyan-100 text-cyan-800' :
+                        member.status === 'active' ? 'bg-green-100 text-green-800' :
+                        member.status === 'semi-active' ? 'bg-blue-100 text-blue-800' :
+                        member.status === 'sabbatical' ? 'bg-purple-100 text-purple-800' :
+                        member.status === 'blacklisted' ? 'bg-red-100 text-red-800' : ''
+                      }
                     >
-                      {member.status}
+                      {member.status === 'sabbatical' && member.sabbaticalEndDate && new Date(member.sabbaticalEndDate) < new Date() ? 'Sabbatical (Ended)' : member.status}
                     </Badge>
                   </div>
                 </div>
+                {member.status === 'sabbatical' && (
+                  <div className="col-span-full p-3 border rounded-lg bg-purple-50/50 space-y-2">
+                    <label className="text-sm font-medium text-purple-800">Sabbatical Details</label>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {member.sabbaticalStartDate && (
+                        <div>
+                          <span className="text-muted-foreground">Start: </span>
+                          {new Date(member.sabbaticalStartDate).toLocaleDateString()}
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-muted-foreground">End: </span>
+                        {member.sabbaticalEndDate
+                          ? new Date(member.sabbaticalEndDate).toLocaleDateString()
+                          : 'Until further notice'}
+                      </div>
+                      {member.sabbaticalReason && (
+                        <div className="col-span-2">
+                          <span className="text-muted-foreground">Reason: </span>
+                          {member.sabbaticalReason}
+                        </div>
+                      )}
+                    </div>
+                    {canEdit && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={async () => {
+                          try {
+                            await api.members.endSabbatical(member.id);
+                            const updated = await api.members.getById(member.id);
+                            if (updated) {
+                              setMember(updated);
+                            }
+                            toast.success('Sabbatical ended. Status will be recalculated based on attendance.');
+                          } catch (error: any) {
+                            console.error('Failed to end sabbatical:', error);
+                            toast.error(error?.message || 'Failed to end sabbatical');
+                          }
+                        }}
+                      >
+                        End Sabbatical
+                      </Button>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
                   <p>{formatDate(member.dateOfBirth)}</p>
@@ -685,11 +740,21 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
         {/* Stats and Activity Sidebar */}
         <div className="space-y-6">
           {/* Attendance Stats */}
-          <Card>
+          <Card
+            className={onViewAttendanceHistory ? 'cursor-pointer hover:shadow-md transition-shadow group' : ''}
+            onClick={onViewAttendanceHistory}
+          >
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Calendar className="w-5 h-5" />
-                Attendance
+              <CardTitle className="flex items-center justify-between text-lg">
+                <span className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Attendance
+                </span>
+                {onViewAttendanceHistory && (
+                  <span className="text-xs text-muted-foreground font-normal group-hover:text-primary transition-colors">
+                    View History →
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">

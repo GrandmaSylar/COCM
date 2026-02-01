@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck } from 'lucide-react';
+import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
@@ -23,6 +23,7 @@ interface AttendanceRecord {
   totalCount: number;
   isCustomService?: boolean;
   customServiceId?: string;
+  attendanceType?: 'individual' | 'general';
   // Audit fields
   createdAt?: string;
   createdBy?: string;
@@ -47,6 +48,7 @@ interface CustomService {
 interface AttendanceProps {
   onRecordAttendance: () => void;
   onMarkAttendance: () => void;
+  onViewRecord: (id: string) => void;
 }
 
 // Permanent service that cannot be modified
@@ -58,11 +60,12 @@ const SUNDAY_MAIN_SERVICE = {
   isPermanent: true
 };
 
-export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceProps) {
+export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord }: AttendanceProps) {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [customServices, setCustomServices] = useState<CustomService[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
+  const [selectedAttendanceType, setSelectedAttendanceType] = useState('all');
   const [showServiceManager, setShowServiceManager] = useState(false);
   const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
@@ -88,6 +91,28 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
 
   const canRecordAttendance = canAccess('record_attendance');
   const canManageServices = canAccess('manage_services');
+  const isDev = user?.role === 'dev';
+
+  const [, setTick] = useState(0);
+  // Update every minute to refresh edit window timers
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const getEditWindowInfo = (createdAt?: string) => {
+    if (!createdAt) return { canEdit: false, timeRemaining: 0, label: 'Unknown' };
+    const created = new Date(createdAt).getTime();
+    const now = Date.now();
+    const twelveHours = 12 * 60 * 60 * 1000;
+    const remaining = Math.max(0, twelveHours - (now - created));
+    if (remaining > 0) {
+      const hours = Math.floor(remaining / (60 * 60 * 1000));
+      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+      return { canEdit: true, timeRemaining: remaining, label: `${hours}h ${minutes}m remaining` };
+    }
+    return { canEdit: false, timeRemaining: 0, label: 'Locked' };
+  };
 
   // Get all available service types
   const allServiceTypes = [
@@ -98,13 +123,16 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
   const filteredRecords = records.filter(record => {
     const matchesSearch = record.serviceType.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesService = selectedServiceType === 'all' || record.serviceType === selectedServiceType;
-    return matchesSearch && matchesService;
+    const matchesType = selectedAttendanceType === 'all' || record.attendanceType === selectedAttendanceType;
+    return matchesSearch && matchesService && matchesType;
   });
 
-  // Calculate stats
+  // Calculate stats - prefer general (head count) records for trend stats
+  const generalRecords = records.filter(r => r.attendanceType === 'general');
+  const statsRecords = generalRecords.length > 0 ? generalRecords : records;
   const totalServices = records.length;
-  const averageAttendance = totalServices > 0 ? Math.round(records.reduce((sum, record) => sum + record.totalCount, 0) / totalServices) : 0;
-  const thisWeekAttendance = records.filter(record => {
+  const averageAttendance = statsRecords.length > 0 ? Math.round(statsRecords.reduce((sum, record) => sum + record.totalCount, 0) / statsRecords.length) : 0;
+  const thisWeekAttendance = statsRecords.filter(record => {
     const recordDate = new Date(record.date);
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -194,11 +222,11 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
             <>
               <Button variant="outline" onClick={onMarkAttendance}>
                 <UserCheck className="w-4 h-4 mr-2" />
-                Mark Attendance
+                Mark Individual Attendance
               </Button>
               <Button onClick={onRecordAttendance}>
                 <Plus className="w-4 h-4 mr-2" />
-                Record Attendance
+                Record Head Count
               </Button>
             </>
           )}
@@ -285,6 +313,16 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
             ))}
           </SelectContent>
         </Select>
+        <Select value={selectedAttendanceType} onValueChange={setSelectedAttendanceType}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="individual">Individual</SelectItem>
+            <SelectItem value="general">Head Count</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Attendance Records */}
@@ -334,6 +372,11 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-medium">{record.serviceType}</h3>
+                        {record.attendanceType === 'general' ? (
+                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
+                        )}
                         {record.isCustomService && (
                           <Badge variant="outline" className="text-xs">Custom</Badge>
                         )}
@@ -363,11 +406,37 @@ export function Attendance({ onRecordAttendance, onMarkAttendance }: AttendanceP
                 <div className="mt-4 pt-4 border-t">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Recorded members: {record.attendees.length}
+                      {record.attendanceType === 'individual'
+                        ? `Recorded members: ${record.attendees.length}`
+                        : 'Head count record'}
                     </p>
-                    <Badge variant="outline" className="text-xs">
-                      {((record.attendees.length / 355) * 100).toFixed(1)}% of members
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const editInfo = getEditWindowInfo(record.createdAt);
+                        return (
+                          <>
+                            {(editInfo.canEdit || isDev) ? (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                <Unlock className="w-3 h-3 mr-1" />
+                                {isDev && !editInfo.canEdit ? 'Dev Access' : editInfo.label}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-500 border-gray-200">
+                                <Lock className="w-3 h-3 mr-1" />
+                                {editInfo.label}
+                              </Badge>
+                            )}
+                            <Button variant="outline" size="sm" onClick={() => onViewRecord(record.id)}>
+                              {(editInfo.canEdit || isDev) && canRecordAttendance ? (
+                                <><Edit className="w-3 h-3 mr-1" /> Edit</>
+                              ) : (
+                                <>View</>
+                              )}
+                            </Button>
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -657,21 +726,14 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [attendees, setAttendees] = useState<string[]>([]);
   const [totalCount, setTotalCount] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
   const [customServices, setCustomServices] = useState<CustomService[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [membersData, servicesData] = await Promise.all([
-          api.members.getAll(),
-          api.services.getAll()
-        ]);
-        setMembers(membersData || []);
+        const servicesData = await api.services.getAll();
         setCustomServices(servicesData || []);
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -686,18 +748,6 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
     SUNDAY_MAIN_SERVICE.name,
     ...customServices.filter(s => s.isActive).map(s => s.name)
   ];
-
-  const filteredMembers = members.filter(member =>
-    `${member.firstName} ${member.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleMemberToggle = (memberId: string) => {
-    setAttendees(prev =>
-      prev.includes(memberId)
-        ? prev.filter(id => id !== memberId)
-        : [...prev, memberId]
-    );
-  };
 
   const handleServiceTypeChange = (value: string) => {
     setServiceType(value);
@@ -734,26 +784,27 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         serviceType,
         startTime: startTime || undefined,
         endTime: endTime || undefined,
-        attendees,
+        attendees: [],
         totalCount: parseInt(totalCount),
-        isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
+        isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name,
+        attendanceType: 'general'
       });
 
-      console.log('Attendance recorded successfully:', result);
-      toast.success(`Attendance recorded! Total: ${totalCount} attendees.`);
+      console.log('Head count recorded successfully:', result);
+      toast.success(`Head count recorded! Total: ${totalCount} attendees.`);
 
       onSave({
         date,
         serviceType,
         startTime: startTime || undefined,
         endTime: endTime || undefined,
-        attendees,
+        attendees: [],
         totalCount: parseInt(totalCount),
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
       });
     } catch (error: any) {
-      console.error('Failed to record attendance:', error);
-      toast.error(error?.message || 'Failed to record attendance. Please try again.');
+      console.error('Failed to record head count:', error);
+      toast.error(error?.message || 'Failed to record head count. Please try again.');
       setIsLoading(false);
     }
   };
@@ -768,9 +819,9 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1>Record Attendance</h1>
+          <h1>Record General Attendance</h1>
           <p className="text-muted-foreground">
-            Mark attendance for today's service
+            Record head count for today's service
           </p>
         </div>
       </div>
@@ -850,48 +901,12 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
               />
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Mark Individual Members (Optional)</Label>
-                <Badge variant="outline">
-                  {attendees.length} selected
-                </Badge>
-              </div>
-              
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search members..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              <div className="max-h-64 overflow-y-auto border rounded-lg">
-                <div className="p-4 space-y-3">
-                  {filteredMembers.map((member) => (
-                    <div key={member.id} className="flex items-center space-x-3">
-                      <Checkbox
-                        id={member.id}
-                        checked={attendees.includes(member.id)}
-                        onCheckedChange={() => handleMemberToggle(member.id)}
-                      />
-                      <label htmlFor={member.id} className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-medium text-primary">
-                              {member.firstName[0]}{member.lastName[0]}
-                            </span>
-                          </div>
-                          <span>{member.firstName} {member.lastName}</span>
-                        </div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <Alert>
+              <Users className="h-4 w-4" />
+              <AlertDescription>
+                This records the total head count only. To mark individual member attendance, use <strong>Mark Individual Attendance</strong> instead.
+              </AlertDescription>
+            </Alert>
 
             <div className="flex flex-col sm:flex-row gap-3 pt-6">
               <Button type="submit" disabled={!isValid || isLoading}>
@@ -904,6 +919,379 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Attendance Detail / Edit Component
+interface AttendanceDetailProps {
+  recordId: string;
+  onBack: () => void;
+  onSaved: () => void;
+}
+
+export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetailProps) {
+  const [record, setRecord] = useState<AttendanceRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editTotalCount, setEditTotalCount] = useState('');
+  const [members, setMembers] = useState<Member[]>([]);
+  const [editAttendees, setEditAttendees] = useState<string[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [canEdit, setCanEdit] = useState(false);
+  const { user, canAccess } = useAuth();
+
+  const isDev = user?.role === 'dev';
+  const canRecordAttendance = canAccess('record_attendance');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [recordData, editStatus] = await Promise.all([
+          api.attendance.getById(recordId),
+          api.attendance.getEditStatus(recordId)
+        ]);
+        setRecord(recordData);
+        setEditTotalCount(String(recordData.totalCount || 0));
+        setEditAttendees(recordData.attendees || []);
+        setCanEdit((editStatus.canEdit || editStatus.isDev) && canRecordAttendance);
+
+        if (recordData.attendanceType === 'individual') {
+          const membersData = await api.members.getAll();
+          setMembers(membersData || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch attendance record:', error);
+        toast.error('Failed to load attendance record.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [recordId]);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric'
+    });
+  };
+
+  const formatTime = (time?: string) => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours);
+    const period = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+    return `${displayHour}:${minutes} ${period}`;
+  };
+
+  const handleMemberToggle = (memberId: string) => {
+    setEditAttendees(prev =>
+      prev.includes(memberId)
+        ? prev.filter(id => id !== memberId)
+        : [...prev, memberId]
+    );
+  };
+
+  const handleSave = async () => {
+    if (!record) return;
+    setIsSaving(true);
+    try {
+      if (record.attendanceType === 'general') {
+        await api.attendance.update(recordId, {
+          date: record.date,
+          serviceType: record.serviceType,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          totalCount: parseInt(editTotalCount),
+          isCustomService: record.isCustomService
+        });
+      } else {
+        await api.attendance.update(recordId, {
+          date: record.date,
+          serviceType: record.serviceType,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          attendees: editAttendees,
+          totalCount: editAttendees.length,
+          isCustomService: record.isCustomService
+        });
+      }
+      toast.success('Attendance record updated successfully!');
+      onSaved();
+    } catch (error: any) {
+      console.error('Failed to update attendance:', error);
+      toast.error(error?.message || 'Failed to update attendance record.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredMembers = members.filter(member =>
+    `${member.firstName} ${member.lastName} ${member.otherNames || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const presentMembers = members.filter(m => editAttendees.includes(m.id));
+  const absentMembers = members.filter(m => !editAttendees.includes(m.id));
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1>Attendance Record</h1>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!record) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1>Attendance Record</h1>
+            <p className="text-muted-foreground">Record not found.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1>{record.serviceType}</h1>
+              {record.attendanceType === 'general' ? (
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
+              ) : (
+                <Badge className="bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              {formatDate(record.date)}
+              {record.startTime && record.endTime && (
+                <span className="ml-2">{formatTime(record.startTime)} - {formatTime(record.endTime)}</span>
+              )}
+            </p>
+          </div>
+        </div>
+        {canEdit && !isEditing && (
+          <Button onClick={() => setIsEditing(true)}>
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
+        )}
+      </div>
+
+      {/* General (Head Count) View/Edit */}
+      {record.attendanceType === 'general' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Head Count</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editTotalCount">Total Attendance Count</Label>
+                  <Input
+                    id="editTotalCount"
+                    type="number"
+                    value={editTotalCount}
+                    onChange={(e) => setEditTotalCount(e.target.value)}
+                    min="0"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditing(false);
+                    setEditTotalCount(String(record.totalCount));
+                  }}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4">
+                <div className="text-4xl font-bold text-primary">{record.totalCount}</div>
+                <p className="text-muted-foreground mt-1">people attended</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Individual View/Edit */}
+      {record.attendanceType === 'individual' && (
+        <>
+          {/* Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {isEditing ? editAttendees.length : record.attendees.length}
+                </div>
+                <p className="text-sm text-muted-foreground">Present</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-red-600">
+                  {members.length - (isEditing ? editAttendees.length : record.attendees.length)}
+                </div>
+                <p className="text-sm text-muted-foreground">Absent</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-primary">{members.length}</div>
+                <p className="text-sm text-muted-foreground">Total Members</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {isEditing ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Edit Member Attendance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search members..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="max-h-96 overflow-y-auto border rounded-lg divide-y">
+                  {filteredMembers.map((member) => {
+                    const isPresent = editAttendees.includes(member.id);
+                    return (
+                      <div key={member.id} className="flex items-center justify-between p-3 hover:bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isPresent ? 'bg-green-100' : 'bg-red-100'}`}>
+                            <span className={`text-xs font-medium ${isPresent ? 'text-green-700' : 'text-red-700'}`}>
+                              {member.firstName[0]}{member.lastName[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-medium">{member.firstName} {member.lastName}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{member.zoneNumber}</span>
+                          </div>
+                        </div>
+                        <Checkbox
+                          checked={isPresent}
+                          onCheckedChange={() => handleMemberToggle(member.id)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditing(false);
+                    setEditAttendees(record.attendees || []);
+                  }}>
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Present Members */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-green-600" />
+                    Present ({presentMembers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {presentMembers.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No members marked present.</p>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto divide-y">
+                      {presentMembers.map((member) => (
+                        <div key={member.id} className="flex items-center gap-3 py-2">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-green-700">
+                              {member.firstName[0]}{member.lastName[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">{member.firstName} {member.lastName}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{member.zoneNumber}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Absent Members */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <X className="w-5 h-5 text-red-600" />
+                    Absent ({absentMembers.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {absentMembers.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">No members absent.</p>
+                  ) : (
+                    <div className="max-h-64 overflow-y-auto divide-y">
+                      {absentMembers.map((member) => (
+                        <div key={member.id} className="flex items-center gap-3 py-2">
+                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-red-700">
+                              {member.firstName[0]}{member.lastName[0]}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">{member.firstName} {member.lastName}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{member.zoneNumber}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { useAuth } from './AuthContext';
 import { Member, ZONES } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { AbsenteeReview } from './AbsenteeReview';
 
 interface AttendanceRecord {
   id: string;
@@ -51,6 +52,9 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
   const [showOnlyUnmarked, setShowOnlyUnmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [phase, setPhase] = useState<'marking' | 'absentee-review'>('marking');
+  const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
+  const [savedAbsentMemberIds, setSavedAbsentMemberIds] = useState<string[]>([]);
 
   const { user } = useAuth();
 
@@ -146,21 +150,33 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
         endTime,
         attendees: presentMembers,
         totalCount: presentMembers.length,
-        isCustomService: serviceType !== 'Sunday Main Service'
+        isCustomService: serviceType !== 'Sunday Main Service',
+        attendanceType: 'individual'
       });
 
       console.log('Attendance saved successfully:', result);
       toast.success(`Attendance saved! ${presentMembers.length} present, ${absentMembers.length} absent.`);
 
-      onSave({
-        date,
-        serviceType,
-        startTime,
-        endTime,
-        presentMembers,
-        absentMembers,
-        totalPresent: presentMembers.length
-      });
+      // Transition to absentee review if there are absent members
+      const allAbsentIds = members
+        .filter(m => !presentMembers.includes(m.id))
+        .map(m => m.id);
+
+      if (allAbsentIds.length > 0 && result?.id) {
+        setSavedRecordId(result.id);
+        setSavedAbsentMemberIds(allAbsentIds);
+        setPhase('absentee-review');
+      } else {
+        onSave({
+          date,
+          serviceType,
+          startTime,
+          endTime,
+          presentMembers,
+          absentMembers,
+          totalPresent: presentMembers.length
+        });
+      }
     } catch (error: any) {
       console.error('Failed to save attendance:', error);
       toast.error(error?.message || 'Failed to save attendance. Please try again.');
@@ -184,6 +200,36 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
   };
 
   const zones = Object.keys(ZONES) as Array<keyof typeof ZONES>;
+
+  const handleAbsenteeComplete = () => {
+    onSave({
+      date,
+      serviceType,
+      startTime,
+      endTime,
+      presentMembers: Object.entries(attendanceStatus)
+        .filter(([_, status]) => status === 'present')
+        .map(([memberId]) => memberId),
+      absentMembers: Object.entries(attendanceStatus)
+        .filter(([_, status]) => status === 'absent')
+        .map(([memberId]) => memberId),
+      totalPresent: Object.values(attendanceStatus).filter(s => s === 'present').length
+    });
+  };
+
+  // Show absentee review phase after attendance is saved
+  if (phase === 'absentee-review' && savedRecordId) {
+    return (
+      <AbsenteeReview
+        attendanceRecordId={savedRecordId}
+        absentMemberIds={savedAbsentMemberIds}
+        allMembers={members}
+        serviceDate={date}
+        onComplete={handleAbsenteeComplete}
+        onSkip={handleAbsenteeComplete}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

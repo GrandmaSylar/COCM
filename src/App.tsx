@@ -11,10 +11,11 @@ import { Members, Member } from './components/Members';
 import { AddMember } from './components/AddMember';
 import { EditMember } from './components/EditMember';
 import { MemberProfile } from './components/MemberProfile';
-import { Attendance, RecordAttendance } from './components/Attendance';
+import { MemberAttendanceHistory } from './components/MemberAttendanceHistory';
+import { Attendance, RecordAttendance, AttendanceDetail } from './components/Attendance';
 import { MarkAttendance } from './components/MarkAttendance';
 import { Visitors, AddVisitor, VisitorProfile, Visitor } from './components/Visitors';
-import { Giving, RecordGiving } from './components/Giving';
+import { Giving, RecordGiving, GivingDetail } from './components/Giving';
 import { Reports } from './components/Reports';
 import { Settings, AddUser } from './components/Settings';
 import { Help } from './components/Help';
@@ -23,8 +24,9 @@ import { toast } from 'sonner@2.0.3';
 import { api } from './services/api';
 
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
-               'attendance' | 'record-attendance' | 'mark-attendance' | 'visitors' | 'add-visitor' | 'visitor-profile' |
-               'giving' | 'record-giving' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor';
+               'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' |
+               'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
+               'member-attendance-history';
 
 function AppContent() {
   const { isAuthenticated, completeLogin } = useAuth();
@@ -32,6 +34,8 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<AppPage>('login');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+  const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(null);
+  const [selectedGivingId, setSelectedGivingId] = useState<string | null>(null);
   const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
   const [givingRefreshKey, setGivingRefreshKey] = useState(0);
   const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
@@ -126,9 +130,13 @@ function AppContent() {
       } else {
         toast.error('Member not found');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch member:', error);
-      toast.error('Failed to load member profile');
+      if (error?.status === 404) {
+        toast.error('This member is no longer in the directory or the link is invalid.');
+      } else {
+        toast.error(error?.message || 'Failed to load member profile');
+      }
     }
   };
 
@@ -156,9 +164,10 @@ function AppContent() {
       setSelectedMember(memberData); // Update selected member with new data
       setMembersRefreshKey(prev => prev + 1);
       setCurrentPage('member-profile'); // Navigate back to profile
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update member:', error);
-      toast.error('Failed to update member. Please try again.');
+      const message = error?.message || 'Failed to update member. Please try again.';
+      toast.error(message);
     }
   };
 
@@ -290,9 +299,19 @@ function AppContent() {
             onEdit={handleEditMember}
             onDelete={handleDeleteMember}
             onViewMember={handleViewMemberById}
+            onViewAttendanceHistory={() => setCurrentPage('member-attendance-history')}
           />
         ) : null;
-      
+
+      case 'member-attendance-history':
+        return selectedMember ? (
+          <MemberAttendanceHistory
+            memberId={selectedMember.id}
+            memberName={`${selectedMember.firstName} ${selectedMember.lastName}`}
+            onBack={() => setCurrentPage('member-profile')}
+          />
+        ) : null;
+
       case 'edit-member':
         return selectedMember ? (
           <EditMember
@@ -303,19 +322,39 @@ function AppContent() {
         ) : null;
       
       case 'attendance':
-        return <Attendance key={attendanceRefreshKey} onRecordAttendance={handleRecordAttendance} onMarkAttendance={handleMarkAttendance} />;
-      
+        return <Attendance
+          key={attendanceRefreshKey}
+          onRecordAttendance={handleRecordAttendance}
+          onMarkAttendance={handleMarkAttendance}
+          onViewRecord={(id: string) => {
+            setSelectedAttendanceId(id);
+            setCurrentPage('attendance-detail');
+          }}
+        />;
+
+      case 'attendance-detail':
+        return selectedAttendanceId ? (
+          <AttendanceDetail
+            recordId={selectedAttendanceId}
+            onBack={() => setCurrentPage('attendance')}
+            onSaved={() => {
+              setAttendanceRefreshKey(prev => prev + 1);
+              setCurrentPage('attendance');
+            }}
+          />
+        ) : null;
+
       case 'record-attendance':
         return (
-          <RecordAttendance 
+          <RecordAttendance
             onBack={() => setCurrentPage('attendance')}
             onSave={handleSaveAttendance}
           />
         );
-      
+
       case 'mark-attendance':
         return (
-          <MarkAttendance 
+          <MarkAttendance
             onBack={() => setCurrentPage('attendance')}
             onSave={handleSaveMarkedAttendance}
           />
@@ -359,13 +398,46 @@ function AppContent() {
         ) : null;
 
       case 'giving':
-        return <Giving key={givingRefreshKey} onRecordGiving={handleRecordGiving} />;
-      
+        return <Giving
+          key={givingRefreshKey}
+          onRecordGiving={handleRecordGiving}
+          onViewRecord={(id: string) => {
+            setSelectedGivingId(id);
+            setCurrentPage('giving-detail');
+          }}
+        />;
+
+      case 'giving-detail':
+        return selectedGivingId ? (
+          <GivingDetail
+            recordId={selectedGivingId}
+            onBack={() => setCurrentPage('giving')}
+            onSaved={() => {
+              setGivingRefreshKey(prev => prev + 1);
+              setCurrentPage('giving');
+            }}
+          />
+        ) : null;
+
+      case 'manage-giving-types':
+        return (
+          <Giving
+            key={`types-${givingRefreshKey}`}
+            onRecordGiving={handleRecordGiving}
+            onViewRecord={(id: string) => {
+              setSelectedGivingId(id);
+              setCurrentPage('giving-detail');
+            }}
+            initialShowTypeManager={true}
+          />
+        );
+
       case 'record-giving':
         return (
-          <RecordGiving 
+          <RecordGiving
             onBack={() => setCurrentPage('giving')}
             onSave={handleSaveGiving}
+            onManageTypes={() => setCurrentPage('manage-giving-types')}
           />
         );
       

@@ -122,7 +122,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
         ...formData,
         gender: formData.gender as 'male' | 'female',
         maritalStatus: formData.maritalStatus || undefined,
-        status: 'active' as MemberStatus, // Default status for new members
+        status: 'new' as MemberStatus, // Default status for new members - auto-evaluated after 4 Sundays
         baptismInfo,
         familyMembers,
         legalInfo,

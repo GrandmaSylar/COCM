@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { api } from '../services/api';
@@ -44,9 +44,12 @@ interface GivingRecord {
   };
   notes?: string;
   // Audit fields
-  createdBy?: string; // User's name who recorded the giving
-  createdByEmail?: string; // User's email who recorded the giving
+  createdBy?: string;
+  createdByEmail?: string;
   createdAt?: string;
+  editedBy?: string;
+  editedByEmail?: string;
+  editedAt?: string;
 }
 
 interface CustomGivingType {
@@ -63,6 +66,8 @@ interface CustomGivingType {
 
 interface GivingProps {
   onRecordGiving: () => void;
+  onViewRecord?: (id: string) => void;
+  initialShowTypeManager?: boolean;
 }
 
 const serviceTypeLabels = {
@@ -94,12 +99,12 @@ const CURRENCIES = [
   { code: 'JPY', name: 'Japanese Yen', symbol: '¥' },
 ];
 
-export function Giving({ onRecordGiving }: GivingProps) {
+export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = false }: GivingProps) {
   const [records, setRecords] = useState<GivingRecord[]>([]);
   const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
-  const [showCustomTypeManager, setShowCustomTypeManager] = useState(false);
+  const [showCustomTypeManager, setShowCustomTypeManager] = useState(initialShowTypeManager);
   const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
 
@@ -160,6 +165,22 @@ export function Giving({ onRecordGiving }: GivingProps) {
   };
 
   const formatAmount = formatGhanaCedis;
+
+  const EDIT_WINDOW_MS = 3 * 60 * 60 * 1000; // 3 hours
+
+  const getEditWindowInfo = (createdAt?: string) => {
+    if (!createdAt) return { canEdit: false, timeRemaining: '' };
+    const created = new Date(createdAt).getTime();
+    const now = Date.now();
+    const elapsed = now - created;
+    const remaining = EDIT_WINDOW_MS - elapsed;
+    if (remaining <= 0) return { canEdit: false, timeRemaining: '' };
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+    return { canEdit: true, timeRemaining: `${hours}h ${minutes}m left` };
+  };
+
+  const isDev = user?.role === 'dev';
 
   const getServiceTypeColor = (type: string) => {
     switch (type) {
@@ -524,11 +545,39 @@ export function Giving({ onRecordGiving }: GivingProps) {
                   )}
 
                   {/* Footer */}
-                  {record.createdBy && record.createdAt && (
-                    <div className="text-xs text-muted-foreground border-t pt-2">
-                      Recorded by {record.createdBy}{record.createdByEmail && ` (${record.createdByEmail})`} on {formatDate(record.createdAt)}
+                  <div className="flex items-center justify-between border-t pt-2">
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {record.createdBy && record.createdAt && (
+                        <div>Recorded by {record.createdBy}{record.createdByEmail && ` (${record.createdByEmail})`} on {formatDate(record.createdAt)}</div>
+                      )}
+                      {record.editedBy && record.editedAt && (
+                        <div>Edited by {record.editedBy}{record.editedByEmail && ` (${record.editedByEmail})`} on {formatDate(record.editedAt)}</div>
+                      )}
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      {(() => {
+                        const editInfo = getEditWindowInfo(record.createdAt);
+                        const editable = editInfo.canEdit || isDev;
+                        return (
+                          <>
+                            <Badge variant="outline" className={editable ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}>
+                              {editable ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
+                              {editable ? (isDev && !editInfo.canEdit ? 'Dev' : editInfo.timeRemaining) : 'Locked'}
+                            </Badge>
+                            {onViewRecord && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onViewRecord(record.id)}
+                              >
+                                {editable ? <><Edit className="w-3 h-3 mr-1" /> Edit</> : <><Eye className="w-3 h-3 mr-1" /> View</>}
+                              </Button>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -561,7 +610,7 @@ interface CustomTypeManagerProps {
   onAdd: (type: Omit<CustomGivingType, 'id' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>) => void;
 }
 
-function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: CustomTypeManagerProps) {
+export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: CustomTypeManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeDescription, setNewTypeDescription] = useState('');
@@ -691,9 +740,10 @@ function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: C
 interface RecordGivingProps {
   onBack: () => void;
   onSave: (record: Omit<GivingRecord, 'id' | 'totalAmount' | 'createdBy' | 'createdAt'>) => void;
+  onManageTypes?: () => void;
 }
 
-export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
+export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProps) {
   // Service type is fixed to Sunday Main Service for now
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
 
@@ -898,9 +948,17 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
               </div>
 
               {/* Custom Types */}
-              {customTypes.length > 0 && (
-                <div className="space-y-4 pt-4 border-t">
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium">Custom Giving Types</h4>
+                  {onManageTypes && (
+                    <Button type="button" variant="outline" size="sm" onClick={onManageTypes}>
+                      <Plus className="w-3 h-3 mr-1" />
+                      Create Custom Giving Type
+                    </Button>
+                  )}
+                </div>
+                {customTypes.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {customTypes.map((type) => (
                       <div key={type.id} className="space-y-2">
@@ -925,8 +983,12 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No custom giving types yet.{onManageTypes && ' Click "Create Custom Giving Type" to add one.'}
+                  </p>
+                )}
+              </div>
 
               <div className="p-3 bg-primary/10 rounded-lg">
                 <div className="flex justify-between items-center">
@@ -1080,6 +1142,449 @@ export function RecordGiving({ onBack, onSave }: RecordGivingProps) {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
+// GIVING DETAIL - View/Edit a single giving record
+// ============================================================================
+
+interface GivingDetailProps {
+  recordId: string;
+  onBack: () => void;
+  onSaved: () => void;
+}
+
+export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
+  const [record, setRecord] = useState<GivingRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [canEdit, setCanEdit] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState('');
+  const { user } = useAuth();
+
+  // Editable fields
+  const [offeringAmount, setOfferingAmount] = useState('');
+  const [donationAmount, setDonationAmount] = useState('');
+  const [thanksgivingAmount, setThanksgivingAmount] = useState('');
+  const [customTypeAmounts, setCustomTypeAmounts] = useState<{ [key: string]: string }>({});
+  const [cashAmount, setCashAmount] = useState('');
+  const [mobileMoneyAmount, setMobileMoneyAmount] = useState('');
+  const [cardAmount, setCardAmount] = useState('');
+  const [bankTransferAmount, setBankTransferAmount] = useState('');
+  const [foreignCurrency, setForeignCurrency] = useState('');
+  const [foreignAmount, setForeignAmount] = useState('');
+  const [foreignGhsEquivalent, setForeignGhsEquivalent] = useState('');
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    const fetchRecord = async () => {
+      try {
+        const [data, editStatus] = await Promise.all([
+          api.giving.getById(recordId),
+          api.giving.getEditStatus(recordId)
+        ]);
+        setRecord(data);
+        setCanEdit(editStatus.canEdit);
+        setTimeRemaining(editStatus.timeRemaining || '');
+
+        // Populate edit fields
+        if (data) {
+          setOfferingAmount(String(data.offerings?.offering || 0));
+          setDonationAmount(String(data.offerings?.donation || 0));
+          setThanksgivingAmount(String(data.offerings?.thanksgiving || 0));
+          const cta: { [key: string]: string } = {};
+          if (data.offerings?.customTypes) {
+            Object.entries(data.offerings.customTypes).forEach(([k, v]) => {
+              cta[k] = String(v);
+            });
+          }
+          setCustomTypeAmounts(cta);
+          setCashAmount(String(data.paymentBreakdown?.cash || 0));
+          setMobileMoneyAmount(String(data.paymentBreakdown?.mobile_money || 0));
+          setCardAmount(String(data.paymentBreakdown?.card || 0));
+          setBankTransferAmount(String(data.paymentBreakdown?.bank_transfer || 0));
+          if (data.paymentBreakdown?.foreign_currency) {
+            setForeignCurrency(data.paymentBreakdown.foreign_currency.currency || '');
+            setForeignAmount(String(data.paymentBreakdown.foreign_currency.amount || 0));
+            setForeignGhsEquivalent(String(data.paymentBreakdown.foreign_currency.ghs_equivalent || 0));
+          }
+          setNotes(data.notes || '');
+        }
+      } catch (error) {
+        console.error('Failed to fetch giving record:', error);
+        toast.error('Failed to load giving record');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRecord();
+  }, [recordId]);
+
+  const calculateTotal = () => {
+    const offering = parseFloat(offeringAmount) || 0;
+    const donation = parseFloat(donationAmount) || 0;
+    const thanksgiving = parseFloat(thanksgivingAmount) || 0;
+    const customTotal = Object.values(customTypeAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
+    return offering + donation + thanksgiving + customTotal;
+  };
+
+  const calculatePaymentTotal = () => {
+    const cash = parseFloat(cashAmount) || 0;
+    const mobileMoney = parseFloat(mobileMoneyAmount) || 0;
+    const card = parseFloat(cardAmount) || 0;
+    const bankTransfer = parseFloat(bankTransferAmount) || 0;
+    const foreignGhs = parseFloat(foreignGhsEquivalent) || 0;
+    return cash + mobileMoney + card + bankTransfer + foreignGhs;
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const customTypesObj: { [key: string]: number } = {};
+      Object.entries(customTypeAmounts).forEach(([key, value]) => {
+        const amount = parseFloat(value);
+        if (amount > 0) {
+          customTypesObj[key] = amount;
+        }
+      });
+
+      const paymentBreakdown: any = {
+        cash: parseFloat(cashAmount) || 0,
+        mobile_money: parseFloat(mobileMoneyAmount) || 0,
+        card: parseFloat(cardAmount) || 0,
+        bank_transfer: parseFloat(bankTransferAmount) || 0
+      };
+
+      if (foreignCurrency && (parseFloat(foreignAmount) || 0) > 0) {
+        paymentBreakdown.foreign_currency = {
+          currency: foreignCurrency,
+          amount: parseFloat(foreignAmount) || 0,
+          ghs_equivalent: parseFloat(foreignGhsEquivalent) || 0
+        };
+      }
+
+      await api.giving.update(recordId, {
+        offerings: {
+          offering: parseFloat(offeringAmount) || 0,
+          donation: parseFloat(donationAmount) || 0,
+          thanksgiving: parseFloat(thanksgivingAmount) || 0,
+          customTypes: customTypesObj
+        },
+        paymentBreakdown,
+        totalAmount: calculateTotal(),
+        notes: notes || undefined
+      });
+
+      toast.success('Giving record updated successfully!');
+      onSaved();
+    } catch (error: any) {
+      console.error('Failed to update giving record:', error);
+      toast.error(error?.message || 'Failed to update giving record');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1>Giving Record</h1>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!record) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <h1>Giving Record</h1>
+        </div>
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">Record not found.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const total = calculateTotal();
+  const paymentTotal = calculatePaymentTotal();
+  const isBalanced = Math.abs(total - paymentTotal) < 0.01;
+  const isDev = user?.role === 'dev';
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+  };
+
+  // VIEW MODE
+  if (!editing) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1>{record.serviceName}</h1>
+              <p className="text-muted-foreground">{formatDate(record.serviceDate)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={canEdit || isDev ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}>
+              {canEdit || isDev ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
+              {canEdit ? timeRemaining : isDev ? 'Dev Access' : 'Locked'}
+            </Badge>
+            {(canEdit || isDev) && (
+              <Button onClick={() => setEditing(true)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Total Giving</CardTitle>
+              <span className="text-2xl font-bold text-primary">{formatGhanaCedis(record.totalAmount)}</span>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Giving Breakdown */}
+            <div>
+              <h3 className="font-medium mb-3">Giving Breakdown</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-muted/50 rounded-lg">
+                <div>
+                  <p className="text-xs text-muted-foreground">Offering</p>
+                  <p className="font-medium">{formatGhanaCedis(record.offerings.offering)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Donation</p>
+                  <p className="font-medium">{formatGhanaCedis(record.offerings.donation)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Thanksgiving</p>
+                  <p className="font-medium">{formatGhanaCedis(record.offerings.thanksgiving)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Custom Types */}
+            {Object.entries(record.offerings.customTypes).length > 0 && (
+              <div>
+                <h3 className="font-medium mb-3">Custom Types</h3>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(record.offerings.customTypes).map(([type, amount]) => (
+                    <Badge key={type} variant="outline" className="bg-purple-50 text-sm py-1 px-3">
+                      {type}: {formatGhanaCedis(amount)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Payment Breakdown */}
+            <div>
+              <h3 className="font-medium mb-3">Payment Breakdown</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg">
+                {Object.entries(record.paymentBreakdown)
+                  .filter(([key]) => key !== 'foreign_currency')
+                  .map(([method, amount]) => (
+                    <div key={method}>
+                      <p className="text-xs text-muted-foreground">{paymentMethodLabels[method as keyof typeof paymentMethodLabels]}</p>
+                      <p className="font-medium">{formatGhanaCedis(amount as number)}</p>
+                    </div>
+                  ))}
+              </div>
+              {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
+                <div className="mt-2 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Foreign Currency ({record.paymentBreakdown.foreign_currency.currency})</p>
+                  <p className="font-medium">
+                    {CURRENCIES.find(c => c.code === record.paymentBreakdown.foreign_currency?.currency)?.symbol || ''}
+                    {record.paymentBreakdown.foreign_currency.amount.toFixed(2)} (GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)})
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Notes */}
+            {record.notes && (
+              <div>
+                <h3 className="font-medium mb-2">Notes</h3>
+                <p className="text-sm text-muted-foreground italic">{record.notes}</p>
+              </div>
+            )}
+
+            {/* Audit */}
+            {(record.createdBy || record.editedBy) && (
+              <div className="text-xs text-muted-foreground border-t pt-3 space-y-1">
+                {record.createdBy && record.createdAt && (
+                  <div>Recorded by {record.createdBy}{record.createdByEmail && ` (${record.createdByEmail})`} on {formatDate(record.createdAt)}</div>
+                )}
+                {record.editedBy && record.editedAt && (
+                  <div>Edited by {record.editedBy}{record.editedByEmail && ` (${record.editedByEmail})`} on {formatDate(record.editedAt)}</div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // EDIT MODE
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1>Edit Giving Record</h1>
+          <p className="text-muted-foreground">{record.serviceName} - {formatDate(record.serviceDate)}</p>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-6 space-y-6">
+          {/* Giving Breakdown */}
+          <div className="space-y-4">
+            <h3>Giving Breakdown</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-offering">Offering (GH₵)</Label>
+                <Input id="edit-offering" type="number" step="0.01" min="0" value={offeringAmount} onChange={(e) => setOfferingAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-donation">Donation (GH₵)</Label>
+                <Input id="edit-donation" type="number" step="0.01" min="0" value={donationAmount} onChange={(e) => setDonationAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-thanksgiving">Thanksgiving (GH₵)</Label>
+                <Input id="edit-thanksgiving" type="number" step="0.01" min="0" value={thanksgivingAmount} onChange={(e) => setThanksgivingAmount(e.target.value)} placeholder="0.00" />
+              </div>
+            </div>
+
+            {/* Custom Types Edit */}
+            {Object.keys(customTypeAmounts).length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                {Object.entries(customTypeAmounts).map(([typeName, amount]) => (
+                  <div key={typeName} className="space-y-2">
+                    <Label>{typeName} (GH₵)</Label>
+                    <Input type="number" step="0.01" min="0" value={amount} onChange={(e) => setCustomTypeAmounts({ ...customTypeAmounts, [typeName]: e.target.value })} placeholder="0.00" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total Giving:</span>
+                <span className="text-xl font-bold">{formatGhanaCedis(total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Breakdown */}
+          <div className="space-y-4">
+            <h3>Payment Method Breakdown</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Cash (GH₵)</Label>
+                <Input type="number" step="0.01" min="0" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Mobile Money (GH₵)</Label>
+                <Input type="number" step="0.01" min="0" value={mobileMoneyAmount} onChange={(e) => setMobileMoneyAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Card (GH₵)</Label>
+                <Input type="number" step="0.01" min="0" value={cardAmount} onChange={(e) => setCardAmount(e.target.value)} placeholder="0.00" />
+              </div>
+              <div className="space-y-2">
+                <Label>Bank Transfer (GH₵)</Label>
+                <Input type="number" step="0.01" min="0" value={bankTransferAmount} onChange={(e) => setBankTransferAmount(e.target.value)} placeholder="0.00" />
+              </div>
+            </div>
+
+            {/* Foreign Currency */}
+            <div className="space-y-4 pt-4 border-t">
+              <h4 className="text-sm font-medium">Foreign Currency</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={foreignCurrency || 'none'} onValueChange={(val) => setForeignCurrency(val === 'none' ? '' : val)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {CURRENCIES.map((curr) => (
+                        <SelectItem key={curr.code} value={curr.code}>{curr.symbol} {curr.code}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Amount</Label>
+                  <Input type="number" step="0.01" min="0" value={foreignAmount} onChange={(e) => setForeignAmount(e.target.value)} placeholder="0.00" disabled={!foreignCurrency} />
+                </div>
+                <div className="space-y-2">
+                  <Label>GH₵ Equivalent</Label>
+                  <Input type="number" step="0.01" min="0" value={foreignGhsEquivalent} onChange={(e) => setForeignGhsEquivalent(e.target.value)} placeholder="0.00" disabled={!foreignCurrency} />
+                </div>
+              </div>
+            </div>
+
+            <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Payment Total:</span>
+                <span className="text-xl font-bold">{formatGhanaCedis(paymentTotal)}</span>
+              </div>
+              {!isBalanced && total > 0 && (
+                <p className="text-sm text-destructive mt-1">
+                  Payment total must match giving total ({formatGhanaCedis(total)})
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes" />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-4">
+            <Button onClick={handleSave} disabled={saving || !isBalanced || total <= 0}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+            <Button variant="outline" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

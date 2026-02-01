@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { createClient } from "@supabase/supabase-js";
-// Create Hono app with basePath matching function name
+// Create Hono app. Supabase invokes at /functions/v1/server so path is e.g. /members/:id (no /server prefix).
 const app = new Hono().basePath('/server');
 // DEBUG: Check for required Env Vars
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -118,6 +118,130 @@ function toCamelCase(obj) {
   }
   return obj;
 }
+// ============================================================================
+// MEMBER STATUS RECALCULATION
+// ============================================================================
+
+async function recalculateMemberStatuses(changedByUserId?: string) {
+  try {
+    // Get last 4 Sunday Main Service records ordered by date DESC
+    const { data: sundayRecords } = await supabase
+      .from('attendance_records')
+      .select('id, date')
+      .eq('service_type', 'Sunday Main Service')
+      .eq('attendance_type', 'individual')
+      .order('date', { ascending: false })
+      .limit(4);
+
+    if (!sundayRecords || sundayRecords.length < 4) {
+      // Not enough Sunday records to evaluate - skip
+      return;
+    }
+
+    const recordIds = sundayRecords.map(r => r.id);
+    const oldestRecordDate = sundayRecords[sundayRecords.length - 1].date;
+
+    // Get attendance counts per member for those 4 records
+    const { data: attendanceCounts } = await supabase
+      .from('attendance_entries')
+      .select('member_id')
+      .in('attendance_record_id', recordIds);
+
+    // Build a map: memberId -> count of attendances in last 4 Sundays
+    const countMap: Record<string, number> = {};
+    if (attendanceCounts) {
+      for (const entry of attendanceCounts) {
+        countMap[entry.member_id] = (countMap[entry.member_id] || 0) + 1;
+      }
+    }
+
+    // Get all members that should be evaluated
+    const { data: members } = await supabase
+      .from('members')
+      .select('id, status, join_date, sabbatical_end_date')
+      .not('status', 'eq', 'blacklisted');
+
+    if (!members) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const updates: { id: string; oldStatus: string; newStatus: string }[] = [];
+
+    for (const member of members) {
+      // Skip sabbatical members unless their sabbatical has ended
+      if (member.status === 'sabbatical') {
+        if (!member.sabbatical_end_date || member.sabbatical_end_date >= today) {
+          continue; // Still on sabbatical, skip
+        }
+        // Sabbatical ended - check if they attended after end date
+        const { data: postSabbaticalAttendance } = await supabase
+          .from('attendance_entries')
+          .select('id')
+          .eq('member_id', member.id)
+          .in('attendance_record_id', recordIds)
+          .limit(1);
+
+        if (!postSabbaticalAttendance || postSabbaticalAttendance.length === 0) {
+          continue; // No attendance after sabbatical end, keep as sabbatical
+        }
+        // Has attendance - fall through to recalculate
+      }
+
+      // For 'new' members: check if at least 4 Sunday records exist since their join date
+      if (member.status === 'new') {
+        const { count } = await supabase
+          .from('attendance_records')
+          .select('id', { count: 'exact', head: true })
+          .eq('service_type', 'Sunday Main Service')
+          .eq('attendance_type', 'individual')
+          .gte('date', member.join_date);
+
+        if (!count || count < 4) {
+          continue; // Not enough Sundays since they joined, keep as 'new'
+        }
+      }
+
+      const attendCount = countMap[member.id] || 0;
+      let newStatus: string;
+
+      if (attendCount >= 3) {
+        newStatus = 'active';
+      } else if (attendCount >= 1) {
+        newStatus = 'semi-active';
+      } else {
+        newStatus = 'inactive';
+      }
+
+      if (newStatus !== member.status) {
+        updates.push({ id: member.id, oldStatus: member.status, newStatus });
+      }
+    }
+
+    // Apply updates
+    for (const update of updates) {
+      await supabase
+        .from('members')
+        .update({ status: update.newStatus, updated_at: new Date().toISOString() })
+        .eq('id', update.id);
+
+      // Log the status change
+      await supabase
+        .from('member_status_log')
+        .insert({
+          member_id: update.id,
+          previous_status: update.oldStatus,
+          new_status: update.newStatus,
+          change_type: 'automatic',
+          changed_by: changedByUserId || null,
+          reason: `Auto-recalculated after Sunday Main Service attendance`
+        });
+    }
+
+    console.log(`Status recalculation complete: ${updates.length} members updated`);
+  } catch (error) {
+    console.error('Status recalculation error:', error);
+  }
+}
+
 // ============================================================================
 // 2FA HELPER FUNCTIONS
 // ============================================================================
@@ -961,7 +1085,7 @@ app.get("/members", async (c)=>{
       return c.json({ error: 'Failed to fetch members' }, 500);
     }
 
-    // Fetch family members for all members in a separate query
+    // Fetch family members for all members in a single batched query (optimized)
     const memberIds = members?.map(m => m.id) || [];
     let familyMembersMap: Record<string, any[]> = {};
 
@@ -1010,13 +1134,19 @@ app.get("/members/:id", async (c)=>{
     const id = c.req.param('id');
     const { data: member, error } = await supabase.from('members').select(`
         *,
-        family_members (*)
+        family_members!family_members_member_id_fkey (*)
       `).eq('id', id).single();
     if (error) {
       console.error('Error fetching member:', error);
+      // PGRST116 = no rows returned (member does not exist)
+      if (error.code === 'PGRST116') {
+        return c.json({
+          error: 'Member not found'
+        }, 404);
+      }
       return c.json({
-        error: 'Member not found'
-      }, 404);
+        error: error.message || 'Failed to fetch member'
+      }, 500);
     }
     return c.json(toCamelCase(member));
   } catch (error) {
@@ -1040,15 +1170,17 @@ app.get("/members/:id/analytics", async (c)=>{
     const { data: attendanceEntries, error: attendanceError } = await supabase
       .from('attendance_entries')
       .select(`
-        attendance_record:attendance_records (
+        attendance_record:attendance_records!inner (
           id,
           date,
           service_type,
           start_time,
-          end_time
+          end_time,
+          attendance_type
         )
       `)
       .eq('member_id', memberId)
+      .eq('attendance_records.attendance_type', 'individual')
       .order('created_at', { ascending: false });
 
     if (attendanceError) {
@@ -1072,10 +1204,11 @@ app.get("/members/:id/analytics", async (c)=>{
       return recordDate >= thisMonthStart && recordDate <= thisMonthEnd;
     });
 
-    // Get total services this month from attendance_records
+    // Get total individual services this month from attendance_records
     const { data: allServicesThisMonth } = await supabase
       .from('attendance_records')
       .select('id')
+      .eq('attendance_type', 'individual')
       .gte('date', thisMonthStart.toISOString().split('T')[0])
       .lte('date', thisMonthEnd.toISOString().split('T')[0]);
 
@@ -1105,6 +1238,135 @@ app.get("/members/:id/analytics", async (c)=>{
     }, 500);
   }
 });
+
+// ── GET /members/:id/attendance-history ──────────────────────────────
+app.get("/members/:id/attendance-history", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const memberId = c.req.param('id');
+    const fromParam = c.req.query('from');
+    const toParam = c.req.query('to');
+
+    // Get member info (name, join date)
+    const { data: member, error: memberError } = await supabase
+      .from('members')
+      .select('first_name, last_name, other_names, join_date')
+      .eq('id', memberId)
+      .single();
+
+    if (memberError || !member) {
+      return c.json({ error: 'Member not found' }, 404);
+    }
+
+    const joinDate = member.join_date || '2020-01-01';
+    const today = new Date().toISOString().split('T')[0];
+    const from = fromParam || joinDate;
+    const to = toParam || today;
+
+    // Get ALL individual attendance records in the date range
+    const { data: allRecords, error: recordsError } = await supabase
+      .from('attendance_records')
+      .select('id, date, service_type, start_time, end_time')
+      .eq('attendance_type', 'individual')
+      .gte('date', from)
+      .lte('date', to)
+      .order('date', { ascending: false });
+
+    if (recordsError) {
+      console.error('Error fetching attendance records:', recordsError);
+      return c.json({ error: 'Failed to fetch attendance records' }, 500);
+    }
+
+    // Get this member's attendance entries (records they were present for)
+    const { data: presentEntries, error: entriesError } = await supabase
+      .from('attendance_entries')
+      .select('attendance_record_id')
+      .eq('member_id', memberId);
+
+    if (entriesError) {
+      console.error('Error fetching attendance entries:', entriesError);
+      return c.json({ error: 'Failed to fetch attendance entries' }, 500);
+    }
+
+    const presentRecordIds = new Set(
+      (presentEntries || []).map((e: any) => e.attendance_record_id)
+    );
+
+    // Get absentee records for this member
+    const { data: absenteeRecords, error: absenteeError } = await supabase
+      .from('absentee_records')
+      .select('attendance_record_id, requested_permission, reason, reason_notes, absence_start_date, absence_end_date, until_further_notice')
+      .eq('member_id', memberId);
+
+    if (absenteeError) {
+      console.error('Error fetching absentee records:', absenteeError);
+      // Non-fatal, continue without absence info
+    }
+
+    const absenteeMap = new Map<string, any>();
+    (absenteeRecords || []).forEach((r: any) => {
+      absenteeMap.set(r.attendance_record_id, {
+        requestedPermission: r.requested_permission || false,
+        reason: r.reason || null,
+        reasonNotes: r.reason_notes || null,
+        absenceStartDate: r.absence_start_date || null,
+        absenceEndDate: r.absence_end_date || null,
+        untilFurtherNotice: r.until_further_notice || false
+      });
+    });
+
+    // Build records list
+    const serviceTypeNames: Record<string, string> = {
+      sunday_morning: 'Sunday Main Service',
+      sunday_evening: 'Sunday Evening Service',
+      midweek: 'Midweek Service',
+      special: 'Special Service',
+      other: 'Other Service'
+    };
+
+    let totalPresent = 0;
+    let totalAbsent = 0;
+
+    const records = (allRecords || []).map((rec: any) => {
+      const isPresent = presentRecordIds.has(rec.id);
+      if (isPresent) totalPresent++;
+      else totalAbsent++;
+
+      return {
+        date: rec.date,
+        serviceType: rec.service_type,
+        serviceName: serviceTypeNames[rec.service_type] || rec.service_type,
+        startTime: rec.start_time,
+        endTime: rec.end_time,
+        status: isPresent ? 'present' : 'absent',
+        absenceInfo: !isPresent ? (absenteeMap.get(rec.id) || null) : null
+      };
+    });
+
+    const totalServices = records.length;
+    const percentage = totalServices > 0 ? Math.round((totalPresent / totalServices) * 100 * 10) / 10 : 0;
+
+    const memberName = [member.first_name, member.other_names, member.last_name].filter(Boolean).join(' ');
+
+    return c.json({
+      memberName,
+      joinDate,
+      summary: {
+        totalServices,
+        totalPresent,
+        totalAbsent,
+        percentage
+      },
+      records
+    });
+  } catch (error) {
+    console.error('Get member attendance history error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 app.post("/members", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -1128,6 +1390,9 @@ app.post("/members", async (c)=>{
     if (!dbMemberData.join_date) {
       dbMemberData.join_date = new Date().toISOString().split('T')[0];
     }
+
+    // Force 'new' status for all newly created members
+    dbMemberData.status = 'new';
 
     const { data: member, error: memberError } = await supabase.from('members').insert({
       ...dbMemberData,
@@ -1158,7 +1423,7 @@ app.post("/members", async (c)=>{
     }
     const { data: completeMember } = await supabase.from('members').select(`
         *,
-        family_members (*)
+        family_members!family_members_member_id_fkey (*)
       `).eq('id', member.id).single();
     // Convert response back to camelCase for frontend
     return c.json(toCamelCase(completeMember || member), 201);
@@ -1190,11 +1455,45 @@ app.put("/members/:id", async (c)=>{
       delete dbMemberData.photo;
     }
 
-    const { data: member, error: memberError } = await supabase.from('members').update(dbMemberData).eq('id', id).select().single();
+    // Only pass columns that exist on members table (avoid 500 from occupation, hometown, id, etc.)
+    const allowedColumns = [
+      'first_name', 'last_name', 'other_names', 'email', 'phone', 'second_phone',
+      'gender', 'date_of_birth', 'marital_status', 'residence_location', 'digital_address',
+      'zone', 'zone_number', 'notes', 'status', 'join_date', 'photo_url',
+      'baptism_info', 'legal_info', 'ministries',
+      'sabbatical_start_date', 'sabbatical_end_date', 'sabbatical_reason'
+    ];
+    const updatePayload = {};
+    for (const key of allowedColumns) {
+      if (dbMemberData[key] !== undefined) {
+        updatePayload[key] = dbMemberData[key];
+      }
+    }
+
+    // Log manual status changes
+    if (updatePayload.status) {
+      const { data: currentMember } = await supabase
+        .from('members')
+        .select('status')
+        .eq('id', id)
+        .single();
+      if (currentMember && currentMember.status !== updatePayload.status) {
+        await supabase.from('member_status_log').insert({
+          member_id: id,
+          previous_status: currentMember.status,
+          new_status: updatePayload.status,
+          change_type: 'manual',
+          changed_by: user.id,
+          reason: 'Manual status override'
+        });
+      }
+    }
+
+    const { data: member, error: memberError } = await supabase.from('members').update(updatePayload).eq('id', id).select().single();
     if (memberError) {
       console.error('Error updating member:', memberError);
       return c.json({
-        error: 'Failed to update member'
+        error: memberError.message || 'Failed to update member'
       }, 500);
     }
     if (familyMembers) {
@@ -1218,7 +1517,7 @@ app.put("/members/:id", async (c)=>{
     }
     const { data: completeMember } = await supabase.from('members').select(`
         *,
-        family_members (*)
+        family_members!family_members_member_id_fkey (*)
       `).eq('id', id).single();
     return c.json(toCamelCase(completeMember || member));
   } catch (error) {
@@ -1301,29 +1600,81 @@ app.post("/attendance", async (c)=>{
       }, 401);
     }
     const data = await c.req.json();
-    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, ...rest } = data;
-    const { data: record, error: recordError } = await supabase.from('attendance_records').insert({
-      ...rest,
-      service_type: serviceType,
-      start_time: startTime || null,
-      end_time: endTime || null,
-      is_custom_service: isCustomService || false,
-      custom_service_id: customServiceId || null,
-      created_by: user.id,
-      total_count: totalCount || attendees?.length || 0
-    }).select().single();
-    if (recordError) {
-      console.error('Error creating attendance record:', recordError);
-      return c.json({
-        error: 'Failed to create attendance record: ' + recordError.message
-      }, 500);
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, ...rest } = data;
+    const recordType = attendanceType || 'individual';
+    const dateValue = rest.date || data.date;
+
+    // Check if a record already exists for this date + service + type
+    const { data: existingRecord } = await supabase
+      .from('attendance_records')
+      .select('id, created_at')
+      .eq('date', dateValue)
+      .eq('service_type', serviceType)
+      .eq('attendance_type', recordType)
+      .single();
+
+    let record;
+    if (existingRecord) {
+      // Update the existing record instead of creating a duplicate
+      const { data: updated, error: updateError } = await supabase.from('attendance_records').update({
+        start_time: startTime || null,
+        end_time: endTime || null,
+        is_custom_service: isCustomService || false,
+        custom_service_id: customServiceId || null,
+        total_count: totalCount || attendees?.length || 0
+      }).eq('id', existingRecord.id).select().single();
+      if (updateError) {
+        console.error('Error updating attendance record:', updateError);
+        return c.json({
+          error: 'Failed to update attendance record: ' + updateError.message
+        }, 500);
+      }
+      record = updated;
+
+      // For individual records, replace attendance entries
+      if (recordType === 'individual') {
+        await supabase.from('attendance_entries').delete().eq('attendance_record_id', record.id);
+        if (attendees && attendees.length > 0) {
+          const entries = attendees.map((memberId)=>({
+              attendance_record_id: record.id,
+              member_id: memberId
+            }));
+          await supabase.from('attendance_entries').insert(entries);
+        }
+      }
+    } else {
+      // Create new record
+      const { data: created, error: recordError } = await supabase.from('attendance_records').insert({
+        ...rest,
+        service_type: serviceType,
+        start_time: startTime || null,
+        end_time: endTime || null,
+        is_custom_service: isCustomService || false,
+        custom_service_id: customServiceId || null,
+        created_by: user.id,
+        total_count: totalCount || attendees?.length || 0,
+        attendance_type: recordType
+      }).select().single();
+      if (recordError) {
+        console.error('Error creating attendance record:', recordError);
+        return c.json({
+          error: 'Failed to create attendance record: ' + recordError.message
+        }, 500);
+      }
+      record = created;
+
+      // Only create attendance entries for individual records
+      if (recordType === 'individual' && attendees && attendees.length > 0) {
+        const entries = attendees.map((memberId)=>({
+            attendance_record_id: record.id,
+            member_id: memberId
+          }));
+        await supabase.from('attendance_entries').insert(entries);
+      }
     }
-    if (attendees && attendees.length > 0) {
-      const entries = attendees.map((memberId)=>({
-          attendance_record_id: record.id,
-          member_id: memberId
-        }));
-      await supabase.from('attendance_entries').insert(entries);
+    // Recalculate member statuses after Sunday Main Service individual attendance
+    if (serviceType === 'Sunday Main Service' && recordType === 'individual') {
+      await recalculateMemberStatuses(user.id);
     }
     return c.json({
       ...record,
@@ -1336,6 +1687,38 @@ app.post("/attendance", async (c)=>{
     }, 500);
   }
 });
+app.get("/attendance/:id", async (c)=>{
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+    const { data: record, error } = await supabase
+      .from('attendance_records')
+      .select(`
+        *,
+        attendance_entries (
+          member_id
+        )
+      `)
+      .eq('id', id)
+      .single();
+    if (error) {
+      console.error('Error fetching attendance record:', error);
+      if (error.code === 'PGRST116') {
+        return c.json({ error: 'Attendance record not found' }, 404);
+      }
+      return c.json({ error: 'Failed to fetch attendance record' }, 500);
+    }
+    const attendees = (record.attendance_entries || []).map((entry) => entry.member_id);
+    const camelRecord = toCamelCase(record);
+    return c.json({ ...camelRecord, attendees });
+  } catch (error) {
+    console.error('Get attendance by id error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
 app.put("/attendance/:id", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -1345,8 +1728,35 @@ app.put("/attendance/:id", async (c)=>{
       }, 401);
     }
     const id = c.req.param('id');
+
+    // Check edit window (12 hours) - only Dev can edit after window closes
+    const { data: existingRecord } = await supabase
+      .from('attendance_records')
+      .select('created_at, service_type, attendance_type')
+      .eq('id', id)
+      .single();
+
+    if (existingRecord) {
+      const createdAt = new Date(existingRecord.created_at).getTime();
+      const now = Date.now();
+      const twelveHours = 12 * 60 * 60 * 1000;
+      if (now - createdAt > twelveHours) {
+        // Check if user is dev
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (!profile || profile.role !== 'dev') {
+          return c.json({
+            error: 'Edit window has expired (12 hours). Only Dev users can edit after this period.'
+          }, 403);
+        }
+      }
+    }
+
     const data = await c.req.json();
-    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, ...rest } = data;
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, ...rest } = data;
     const { data: record, error: recordError } = await supabase.from('attendance_records').update({
       ...rest,
       service_type: serviceType,
@@ -1362,7 +1772,8 @@ app.put("/attendance/:id", async (c)=>{
         error: 'Failed to update attendance'
       }, 500);
     }
-    if (attendees) {
+    // Only manage attendance entries for individual records
+    if (existingRecord?.attendance_type === 'individual' && attendees) {
       await supabase.from('attendance_entries').delete().eq('attendance_record_id', id);
       if (attendees.length > 0) {
         const entries = attendees.map((memberId)=>({
@@ -1371,6 +1782,10 @@ app.put("/attendance/:id", async (c)=>{
           }));
         await supabase.from('attendance_entries').insert(entries);
       }
+    }
+    // Recalculate member statuses only for individual Sunday Main Service records
+    if ((serviceType === 'Sunday Main Service' || record.service_type === 'Sunday Main Service') && existingRecord?.attendance_type === 'individual') {
+      await recalculateMemberStatuses(user.id);
     }
     return c.json({
       ...record,
@@ -1409,6 +1824,336 @@ app.delete("/attendance/:id", async (c)=>{
     }, 500);
   }
 });
+// ============================================================================
+// ATTENDANCE - EDIT STATUS
+// ============================================================================
+
+app.get("/attendance/:id/edit-status", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+    const { data: record } = await supabase
+      .from('attendance_records')
+      .select('created_at')
+      .eq('id', id)
+      .single();
+
+    if (!record) {
+      return c.json({ error: 'Record not found' }, 404);
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    const createdAt = new Date(record.created_at).getTime();
+    const now = Date.now();
+    const twelveHours = 12 * 60 * 60 * 1000;
+    const timeRemaining = Math.max(0, twelveHours - (now - createdAt));
+    const isDev = profile?.role === 'dev';
+
+    return c.json({
+      canEdit: isDev || timeRemaining > 0,
+      timeRemaining: timeRemaining > 0 ? timeRemaining : null,
+      lockedAt: timeRemaining <= 0 ? new Date(createdAt + twelveHours).toISOString() : null,
+      isDev
+    });
+  } catch (error) {
+    console.error('Get edit status error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// ATTENDANCE - ABSENTEE RECORDS
+// ============================================================================
+
+app.get("/attendance/:id/absentees", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+
+    // Get all member IDs who were present
+    const { data: presentEntries } = await supabase
+      .from('attendance_entries')
+      .select('member_id')
+      .eq('attendance_record_id', id);
+
+    const presentIds = (presentEntries || []).map(e => e.member_id);
+
+    // Get all members
+    const { data: allMembers } = await supabase
+      .from('members')
+      .select('id, first_name, last_name, other_names, zone, zone_number, phone, status, photo_url')
+      .not('status', 'eq', 'blacklisted')
+      .order('first_name');
+
+    if (!allMembers) {
+      return c.json([]);
+    }
+
+    // Filter to only absent members
+    const absentMemberIds = allMembers
+      .filter(m => !presentIds.includes(m.id))
+      .map(m => m.id);
+
+    // Get existing absentee records for this attendance
+    const { data: absenteeRecords } = await supabase
+      .from('absentee_records')
+      .select('*')
+      .eq('attendance_record_id', id);
+
+    const absenteeMap: Record<string, any> = {};
+    if (absenteeRecords) {
+      for (const rec of absenteeRecords) {
+        absenteeMap[rec.member_id] = rec;
+      }
+    }
+
+    // Combine member info with absentee records
+    const absentees = allMembers
+      .filter(m => !presentIds.includes(m.id))
+      .map(m => {
+        const absenteeRecord = absenteeMap[m.id];
+        return toCamelCase({
+          ...m,
+          photo: m.photo_url,
+          absenteeInfo: absenteeRecord ? toCamelCase({
+            id: absenteeRecord.id,
+            requested_permission: absenteeRecord.requested_permission,
+            reason: absenteeRecord.reason,
+            reason_notes: absenteeRecord.reason_notes,
+            absence_start_date: absenteeRecord.absence_start_date,
+            absence_end_date: absenteeRecord.absence_end_date,
+            until_further_notice: absenteeRecord.until_further_notice,
+          }) : null
+        });
+      });
+
+    return c.json(absentees);
+  } catch (error) {
+    console.error('Get absentees error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.post("/attendance/:id/absentees", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const attendanceRecordId = c.req.param('id');
+    const absentees = await c.req.json();
+
+    if (!Array.isArray(absentees) || absentees.length === 0) {
+      return c.json({ error: 'Expected an array of absentee records' }, 400);
+    }
+
+    const records = absentees.map((a: any) => ({
+      attendance_record_id: attendanceRecordId,
+      member_id: a.memberId,
+      requested_permission: a.requestedPermission || false,
+      reason: a.reason || null,
+      reason_notes: a.reasonNotes || null,
+      absence_start_date: a.absenceStartDate || null,
+      absence_end_date: a.absenceEndDate || null,
+      until_further_notice: a.untilFurtherNotice || false,
+    }));
+
+    const { data, error } = await supabase
+      .from('absentee_records')
+      .upsert(records, { onConflict: 'attendance_record_id,member_id' })
+      .select();
+
+    if (error) {
+      console.error('Error saving absentee records:', error);
+      return c.json({ error: 'Failed to save absentee records: ' + error.message }, 500);
+    }
+
+    return c.json(toCamelCase(data), 201);
+  } catch (error) {
+    console.error('Save absentees error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.put("/attendance/:id/absentees/:memberId", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const attendanceRecordId = c.req.param('id');
+    const memberId = c.req.param('memberId');
+    const updateData = await c.req.json();
+
+    const dbData = {
+      requested_permission: updateData.requestedPermission,
+      reason: updateData.reason || null,
+      reason_notes: updateData.reasonNotes || null,
+      absence_start_date: updateData.absenceStartDate || null,
+      absence_end_date: updateData.absenceEndDate || null,
+      until_further_notice: updateData.untilFurtherNotice || false,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from('absentee_records')
+      .upsert({
+        attendance_record_id: attendanceRecordId,
+        member_id: memberId,
+        ...dbData,
+      }, { onConflict: 'attendance_record_id,member_id' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating absentee record:', error);
+      return c.json({ error: 'Failed to update absentee record' }, 500);
+    }
+
+    return c.json(toCamelCase(data));
+  } catch (error) {
+    console.error('Update absentee error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// MEMBER SABBATICAL MANAGEMENT
+// ============================================================================
+
+app.put("/members/:id/sabbatical", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Check permission: admin, dev, or pastor with temp permission
+    const hasPermission = await checkPermission(user.id, 'manage_members');
+    if (!hasPermission) {
+      return c.json({ error: 'Insufficient permissions' }, 403);
+    }
+
+    const id = c.req.param('id');
+    const { startDate, endDate, reason } = await c.req.json();
+
+    if (!startDate) {
+      return c.json({ error: 'Start date is required' }, 400);
+    }
+
+    // Get current status for logging
+    const { data: currentMember } = await supabase
+      .from('members')
+      .select('status')
+      .eq('id', id)
+      .single();
+
+    if (!currentMember) {
+      return c.json({ error: 'Member not found' }, 404);
+    }
+
+    const { data: member, error } = await supabase
+      .from('members')
+      .update({
+        status: 'sabbatical',
+        sabbatical_start_date: startDate,
+        sabbatical_end_date: endDate || null,
+        sabbatical_reason: reason || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error setting sabbatical:', error);
+      return c.json({ error: 'Failed to set sabbatical' }, 500);
+    }
+
+    // Log the status change
+    await supabase.from('member_status_log').insert({
+      member_id: id,
+      previous_status: currentMember.status,
+      new_status: 'sabbatical',
+      change_type: 'manual',
+      changed_by: user.id,
+      reason: reason || 'Sabbatical assigned',
+    });
+
+    return c.json(toCamelCase(member));
+  } catch (error) {
+    console.error('Set sabbatical error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.delete("/members/:id/sabbatical", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const hasPermission = await checkPermission(user.id, 'manage_members');
+    if (!hasPermission) {
+      return c.json({ error: 'Insufficient permissions' }, 403);
+    }
+
+    const id = c.req.param('id');
+
+    // Clear sabbatical fields
+    const { data: member, error } = await supabase
+      .from('members')
+      .update({
+        sabbatical_start_date: null,
+        sabbatical_end_date: null,
+        sabbatical_reason: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error ending sabbatical:', error);
+      return c.json({ error: 'Failed to end sabbatical' }, 500);
+    }
+
+    // Log the status change
+    await supabase.from('member_status_log').insert({
+      member_id: id,
+      previous_status: 'sabbatical',
+      new_status: member.status,
+      change_type: 'manual',
+      changed_by: user.id,
+      reason: 'Sabbatical ended manually',
+    });
+
+    // Trigger recalculation for this member
+    await recalculateMemberStatuses(user.id);
+
+    return c.json(toCamelCase(member));
+  } catch (error) {
+    console.error('End sabbatical error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// SERVICES
+// ============================================================================
+
 app.get("/services", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -1479,15 +2224,18 @@ app.get("/giving", async (c)=>{
       }, 500);
     }
 
-    // Fetch profile info for all creators
-    const creatorIds = [...new Set(records.filter(r => r.created_by).map(r => r.created_by))];
+    // Fetch profile info for all creators and editors
+    const allUserIds = [...new Set([
+      ...records.filter(r => r.created_by).map(r => r.created_by),
+      ...records.filter(r => r.edited_by).map(r => r.edited_by)
+    ])];
     let profilesMap: Record<string, { name: string; email: string }> = {};
 
-    if (creatorIds.length > 0) {
+    if (allUserIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, name, email')
-        .in('id', creatorIds);
+        .in('id', allUserIds);
 
       if (profiles) {
         for (const profile of profiles) {
@@ -1498,6 +2246,7 @@ app.get("/giving", async (c)=>{
 
     const transformed = records.map((record)=>{
         const creator = record.created_by ? profilesMap[record.created_by] : null;
+        const editor = record.edited_by ? profilesMap[record.edited_by] : null;
         return {
           id: record.id,
           serviceName: record.service_name,
@@ -1519,7 +2268,10 @@ app.get("/giving", async (c)=>{
           notes: record.notes,
           createdBy: creator ? creator.name : null,
           createdByEmail: creator ? creator.email : null,
-          createdAt: record.created_at
+          createdAt: record.created_at,
+          editedBy: editor ? editor.name : null,
+          editedByEmail: editor ? editor.email : null,
+          editedAt: record.edited_at
         };
       });
     return c.json(transformed);
@@ -1759,6 +2511,169 @@ app.patch("/giving/types/:id/toggle", async (c) => {
     return c.json(type);
   } catch (error) {
     console.error('Toggle giving type error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// GET single giving record
+app.get("/giving/:id", async (c)=>{
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+    const { data: record, error } = await supabase.from('giving_records').select('*').eq('id', id).single();
+    if (error) {
+      console.error('Error fetching giving record:', error);
+      if (error.code === 'PGRST116') {
+        return c.json({ error: 'Giving record not found' }, 404);
+      }
+      return c.json({ error: 'Failed to fetch giving record' }, 500);
+    }
+    // Get creator and editor info
+    let creatorName = null;
+    let creatorEmail = null;
+    let editorName = null;
+    let editorEmail = null;
+
+    const profileIds = [record.created_by, record.edited_by].filter(Boolean);
+    if (profileIds.length > 0) {
+      const { data: profiles } = await supabase.from('profiles').select('id, name, email').in('id', profileIds);
+      if (profiles) {
+        for (const p of profiles) {
+          if (p.id === record.created_by) { creatorName = p.name; creatorEmail = p.email; }
+          if (p.id === record.edited_by) { editorName = p.name; editorEmail = p.email; }
+        }
+      }
+    }
+
+    return c.json({
+      id: record.id,
+      serviceName: record.service_name,
+      serviceDate: record.service_date,
+      serviceType: record.service_type,
+      offerings: {
+        offering: parseFloat(record.offering_amount),
+        donation: parseFloat(record.donation_amount),
+        thanksgiving: parseFloat(record.thanksgiving_amount),
+        customTypes: record.custom_types
+      },
+      totalAmount: parseFloat(record.total_amount),
+      paymentBreakdown: {
+        cash: parseFloat(record.cash_amount),
+        mobile_money: parseFloat(record.mobile_money_amount),
+        card: parseFloat(record.card_amount),
+        bank_transfer: parseFloat(record.bank_transfer_amount)
+      },
+      notes: record.notes,
+      createdBy: creatorName,
+      createdByEmail: creatorEmail,
+      createdAt: record.created_at,
+      editedBy: editorName,
+      editedByEmail: editorEmail,
+      editedAt: record.edited_at
+    });
+  } catch (error) {
+    console.error('Get giving by id error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT update giving record with 3-hour edit window
+app.put("/giving/:id", async (c)=>{
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+
+    // Check 3-hour edit window
+    const { data: existingRecord } = await supabase
+      .from('giving_records')
+      .select('created_at')
+      .eq('id', id)
+      .single();
+
+    if (existingRecord) {
+      const createdAt = new Date(existingRecord.created_at).getTime();
+      const now = Date.now();
+      const threeHours = 3 * 60 * 60 * 1000;
+      if (now - createdAt > threeHours) {
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+        if (!profile || profile.role !== 'dev') {
+          return c.json({
+            error: 'Edit window has expired (3 hours). Only Dev users can edit after this period.'
+          }, 403);
+        }
+      }
+    }
+
+    const data = await c.req.json();
+    const { data: record, error } = await supabase.from('giving_records').update({
+      service_name: data.serviceName,
+      service_date: data.serviceDate,
+      service_type: data.serviceType,
+      offering_amount: data.offerings.offering,
+      donation_amount: data.offerings.donation,
+      thanksgiving_amount: data.offerings.thanksgiving,
+      custom_types: data.offerings.customTypes,
+      total_amount: data.totalAmount,
+      cash_amount: data.paymentBreakdown.cash,
+      mobile_money_amount: data.paymentBreakdown.mobile_money,
+      card_amount: data.paymentBreakdown.card,
+      bank_transfer_amount: data.paymentBreakdown.bank_transfer,
+      notes: data.notes,
+      edited_by: user.id,
+      edited_at: new Date().toISOString()
+    }).eq('id', id).select().single();
+
+    if (error) {
+      console.error('Error updating giving record:', error);
+      return c.json({ error: 'Failed to update giving record: ' + error.message }, 500);
+    }
+    return c.json(record);
+  } catch (error) {
+    console.error('Update giving error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// GET giving edit status (3-hour window)
+app.get("/giving/:id/edit-status", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    const id = c.req.param('id');
+    const { data: record } = await supabase
+      .from('giving_records')
+      .select('created_at')
+      .eq('id', id)
+      .single();
+
+    if (!record) {
+      return c.json({ error: 'Record not found' }, 404);
+    }
+
+    const createdAt = new Date(record.created_at).getTime();
+    const now = Date.now();
+    const threeHours = 3 * 60 * 60 * 1000;
+    const timeRemaining = Math.max(0, threeHours - (now - createdAt));
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const isDev = profile?.role === 'dev';
+
+    return c.json({
+      canEdit: isDev || timeRemaining > 0,
+      timeRemaining: timeRemaining > 0 ? timeRemaining : null,
+      lockedAt: new Date(createdAt + threeHours).toISOString(),
+      isDev
+    });
+  } catch (error) {
+    console.error('Get giving edit status error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -2008,9 +2923,16 @@ app.get("/stats", async (c)=>{
     // Get this week's attendance (last 7 days)
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    const { data: weekAttendance } = await supabase.from('attendance_records').select('total_count').gte('date', weekAgo.toISOString().split('T')[0]).order('date', {
+    // Prefer general (head count) records for dashboard stats, fall back to any
+    let { data: weekAttendance } = await supabase.from('attendance_records').select('total_count').eq('attendance_type', 'general').gte('date', weekAgo.toISOString().split('T')[0]).order('date', {
       ascending: false
     }).limit(1).single();
+    if (!weekAttendance) {
+      const { data: fallback } = await supabase.from('attendance_records').select('total_count').gte('date', weekAgo.toISOString().split('T')[0]).order('date', {
+        ascending: false
+      }).limit(1).single();
+      weekAttendance = fallback;
+    }
     // Get this month's giving
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
@@ -2039,142 +2961,219 @@ app.get("/reports", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) {
-      return c.json({
-        error: 'Unauthorized'
-      }, 401);
+      return c.json({ error: 'Unauthorized' }, 401);
     }
-    const period = c.req.query('period') || 'year'; // month, quarter, year
-    // Calculate date range
+    const period = c.req.query('period') || 'year';
     const now = new Date();
     const startDate = new Date();
     if (period === 'month') {
       startDate.setDate(1);
     } else if (period === 'quarter') {
       startDate.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
+    } else if (period === '6months') {
+      startDate.setMonth(now.getMonth() - 5, 1);
+    } else if (period === '2years') {
+      startDate.setFullYear(now.getFullYear() - 1, 0, 1);
     } else {
-      startDate.setMonth(0, 1); // Start of year
+      startDate.setMonth(0, 1);
     }
-    // Get all attendance records for the period
-    const { data: attendanceRecords } = await supabase.from('attendance_records').select('date, total_count').gte('date', startDate.toISOString().split('T')[0]).order('date', {
-      ascending: true
-    });
-    // Get all giving records for the period
-    const { data: givingRecords } = await supabase.from('giving_records').select('service_date, total_amount').gte('service_date', startDate.toISOString().split('T')[0]).order('service_date', {
-      ascending: true
-    });
-    // Get all members with creation dates
-    const { data: allMembers } = await supabase.from('members').select('created_at').order('created_at', {
-      ascending: true
-    });
-    // Aggregate data by month
-    const monthlyData = {};
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec'
-    ];
-    // Initialize monthly data structure
-    for(let i = 0; i < 12; i++){
+    const startDateStr = startDate.toISOString().split('T')[0];
+
+    // ── Fetch all data in parallel ──
+    const [
+      { data: generalAttendance },
+      { data: allAttendance },
+      { data: individualAttendance },
+      { data: givingRecordsFull },
+      { data: allMembers },
+    ] = await Promise.all([
+      supabase.from('attendance_records').select('date, total_count, attendance_type').eq('attendance_type', 'general').gte('date', startDateStr).order('date', { ascending: true }),
+      supabase.from('attendance_records').select('date, total_count, attendance_type').gte('date', startDateStr).order('date', { ascending: true }),
+      supabase.from('attendance_records').select('date, total_count').eq('attendance_type', 'individual').gte('date', startDateStr).order('date', { ascending: true }),
+      supabase.from('giving_records').select('service_date, total_amount, offering_amount, donation_amount, thanksgiving_amount, custom_types, cash_amount, mobile_money_amount, card_amount, bank_transfer_amount').gte('service_date', startDateStr).order('service_date', { ascending: true }),
+      supabase.from('members').select('created_at, status, zone').order('created_at', { ascending: true }),
+    ]);
+
+    // Use general attendance for trends, fallback to all
+    let attendanceRecords = generalAttendance && generalAttendance.length > 0 ? generalAttendance : allAttendance;
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // ── Monthly aggregation ──
+    const monthlyData: Record<number, any> = {};
+    for (let i = 0; i < 12; i++) {
       monthlyData[i] = {
         month: months[i],
-        attendance: 0,
-        attendanceCount: 0,
-        giving: 0,
-        members: 0,
-        newMembers: 0
+        attendance: 0, attendanceCount: 0,
+        individualAttendance: 0, individualCount: 0,
+        generalAttendance: 0, generalCount: 0,
+        giving: 0, offering: 0, donation: 0, thanksgiving: 0, customGiving: 0,
+        cash: 0, mobileMoney: 0, card: 0, bankTransfer: 0,
+        members: 0, newMembers: 0,
       };
     }
-    // Aggregate attendance by month
-    attendanceRecords?.forEach((record)=>{
-      const month = new Date(record.date).getMonth();
-      monthlyData[month].attendance += record.total_count;
-      monthlyData[month].attendanceCount++;
+
+    attendanceRecords?.forEach((r: any) => {
+      const m = new Date(r.date).getMonth();
+      monthlyData[m].attendance += r.total_count;
+      monthlyData[m].attendanceCount++;
     });
-    // Calculate average attendance per month
-    for(let i = 0; i < 12; i++){
-      if (monthlyData[i].attendanceCount > 0) {
-        monthlyData[i].attendance = Math.round(monthlyData[i].attendance / monthlyData[i].attendanceCount);
+
+    // Individual vs General by month
+    allAttendance?.forEach((r: any) => {
+      const m = new Date(r.date).getMonth();
+      if (r.attendance_type === 'individual') {
+        monthlyData[m].individualAttendance += r.total_count;
+        monthlyData[m].individualCount++;
+      } else {
+        monthlyData[m].generalAttendance += r.total_count;
+        monthlyData[m].generalCount++;
       }
+    });
+
+    for (let i = 0; i < 12; i++) {
+      if (monthlyData[i].attendanceCount > 0) monthlyData[i].attendance = Math.round(monthlyData[i].attendance / monthlyData[i].attendanceCount);
+      if (monthlyData[i].individualCount > 0) monthlyData[i].individualAttendance = Math.round(monthlyData[i].individualAttendance / monthlyData[i].individualCount);
+      if (monthlyData[i].generalCount > 0) monthlyData[i].generalAttendance = Math.round(monthlyData[i].generalAttendance / monthlyData[i].generalCount);
     }
-    // Aggregate giving by month
-    givingRecords?.forEach((record)=>{
-      const month = new Date(record.service_date).getMonth();
-      monthlyData[month].giving += parseFloat(record.total_amount);
+
+    // Giving by month + breakdown
+    givingRecordsFull?.forEach((r: any) => {
+      const m = new Date(r.service_date).getMonth();
+      monthlyData[m].giving += parseFloat(r.total_amount) || 0;
+      monthlyData[m].offering += parseFloat(r.offering_amount) || 0;
+      monthlyData[m].donation += parseFloat(r.donation_amount) || 0;
+      monthlyData[m].thanksgiving += parseFloat(r.thanksgiving_amount) || 0;
+      const ct = r.custom_types || {};
+      monthlyData[m].customGiving += Object.values(ct).reduce((s: number, v: any) => s + (parseFloat(v) || 0), 0);
+      monthlyData[m].cash += parseFloat(r.cash_amount) || 0;
+      monthlyData[m].mobileMoney += parseFloat(r.mobile_money_amount) || 0;
+      monthlyData[m].card += parseFloat(r.card_amount) || 0;
+      monthlyData[m].bankTransfer += parseFloat(r.bank_transfer_amount) || 0;
     });
-    // Calculate membership growth
-    let cumulativeMembers = 0;
-    allMembers?.forEach((member)=>{
-      const createdDate = new Date(member.created_at);
-      const month = createdDate.getMonth();
-      monthlyData[month].newMembers++;
-      cumulativeMembers++;
+
+    // Membership growth
+    allMembers?.forEach((member: any) => {
+      const m = new Date(member.created_at).getMonth();
+      monthlyData[m].newMembers++;
     });
-    // Set cumulative member count for each month
     let runningTotal = 0;
-    for(let i = 0; i < 12; i++){
+    for (let i = 0; i < 12; i++) {
       runningTotal += monthlyData[i].newMembers;
       monthlyData[i].members = runningTotal;
     }
-    // Convert to arrays for charts
-    const attendanceData = Object.values(monthlyData).map((m)=>({
-        month: m.month,
-        attendance: m.attendance
-      }));
-    const givingData = Object.values(monthlyData).map((m)=>({
-        month: m.month,
-        amount: m.giving
-      }));
-    const membershipData = Object.values(monthlyData).map((m)=>({
-        month: m.month,
-        members: m.members,
-        newMembers: m.newMembers
-      }));
-    // Calculate summary statistics
+
+    // ── Chart data arrays ──
+    const attendanceData = Object.values(monthlyData).map((m: any) => ({
+      month: m.month, attendance: m.attendance,
+      individual: m.individualAttendance, general: m.generalAttendance
+    }));
+    const givingData = Object.values(monthlyData).map((m: any) => ({
+      month: m.month, amount: Math.round(m.giving * 100) / 100,
+      offering: Math.round(m.offering * 100) / 100,
+      donation: Math.round(m.donation * 100) / 100,
+      thanksgiving: Math.round(m.thanksgiving * 100) / 100,
+      custom: Math.round(m.customGiving * 100) / 100
+    }));
+    const membershipData = Object.values(monthlyData).map((m: any) => ({
+      month: m.month, members: m.members, newMembers: m.newMembers
+    }));
+
+    // ── Members by status ──
+    const statusCounts: Record<string, number> = {};
+    allMembers?.forEach((m: any) => {
+      const s = m.status || 'unknown';
+      statusCounts[s] = (statusCounts[s] || 0) + 1;
+    });
+    const membersByStatus = Object.entries(statusCounts).map(([status, count]) => ({ status, count }));
+
+    // ── Members by zone ──
+    const zoneCounts: Record<string, number> = {};
+    allMembers?.forEach((m: any) => {
+      const z = m.zone || 'Unknown';
+      zoneCounts[z] = (zoneCounts[z] || 0) + 1;
+    });
+    const membersByZone = Object.entries(zoneCounts).map(([zone, count]) => ({ zone, count })).sort((a, b) => a.zone.localeCompare(b.zone));
+
+    // ── Giving by type (totals for period) ──
+    let totalOffering = 0, totalDonation = 0, totalThanksgiving = 0, totalCustom = 0;
+    givingRecordsFull?.forEach((r: any) => {
+      totalOffering += parseFloat(r.offering_amount) || 0;
+      totalDonation += parseFloat(r.donation_amount) || 0;
+      totalThanksgiving += parseFloat(r.thanksgiving_amount) || 0;
+      const ct = r.custom_types || {};
+      totalCustom += Object.values(ct).reduce((s: number, v: any) => s + (parseFloat(v) || 0), 0);
+    });
+    const givingByType = [
+      { type: 'Offering', amount: Math.round(totalOffering * 100) / 100 },
+      { type: 'Donation', amount: Math.round(totalDonation * 100) / 100 },
+      { type: 'Thanksgiving', amount: Math.round(totalThanksgiving * 100) / 100 },
+      { type: 'Custom', amount: Math.round(totalCustom * 100) / 100 },
+    ].filter(g => g.amount > 0);
+
+    // ── Giving by payment method ──
+    let totalCash = 0, totalMM = 0, totalCard = 0, totalBT = 0;
+    givingRecordsFull?.forEach((r: any) => {
+      totalCash += parseFloat(r.cash_amount) || 0;
+      totalMM += parseFloat(r.mobile_money_amount) || 0;
+      totalCard += parseFloat(r.card_amount) || 0;
+      totalBT += parseFloat(r.bank_transfer_amount) || 0;
+    });
+    const givingByPaymentMethod = [
+      { method: 'Cash', amount: Math.round(totalCash * 100) / 100 },
+      { method: 'Mobile Money', amount: Math.round(totalMM * 100) / 100 },
+      { method: 'Card', amount: Math.round(totalCard * 100) / 100 },
+      { method: 'Bank Transfer', amount: Math.round(totalBT * 100) / 100 },
+    ].filter(g => g.amount > 0);
+
+    // ── Member retention ──
+    const activeStatuses = new Set(['active', 'semi-active']);
+    const activeMembers = allMembers?.filter((m: any) => activeStatuses.has(m.status)).length || 0;
     const totalMembers = allMembers?.length || 0;
+    const memberRetention = totalMembers > 0 ? Math.round((activeMembers / totalMembers) * 1000) / 10 : 0;
+
+    // ── Summary stats ──
     const totalAttendanceRecords = attendanceRecords?.length || 0;
-    const avgAttendance = totalAttendanceRecords > 0 ? Math.round(attendanceRecords.reduce((sum, r)=>sum + r.total_count, 0) / totalAttendanceRecords) : 0;
-    const totalGiving = givingRecords?.reduce((sum, r)=>sum + parseFloat(r.total_amount), 0) || 0;
-    // Calculate growth rate
-    const firstMonthMembers = membershipData.find((m)=>m.members > 0)?.members || 1;
+    const avgAttendance = totalAttendanceRecords > 0 ? Math.round(attendanceRecords!.reduce((sum: number, r: any) => sum + r.total_count, 0) / totalAttendanceRecords) : 0;
+    const totalGiving = givingRecordsFull?.reduce((sum: number, r: any) => sum + (parseFloat(r.total_amount) || 0), 0) || 0;
+    const firstMonthMembers = membershipData.find((m) => m.members > 0)?.members || 1;
     const lastMonthMembers = membershipData[membershipData.length - 1]?.members || 0;
     const growthRate = firstMonthMembers > 0 ? (lastMonthMembers - firstMonthMembers) / firstMonthMembers * 100 : 0;
-    // Calculate attendance rate (avg attendance / total members)
     const attendanceRate = totalMembers > 0 ? avgAttendance / totalMembers * 100 : 0;
-    // Calculate giving participation (members who gave / total members)
-    const { data: uniqueGivers } = await supabase.from('giving_records').select('member_id').gte('service_date', startDate.toISOString().split('T')[0]);
-    const uniqueGiversCount = new Set(uniqueGivers?.map((g)=>g.member_id)).size;
-    const givingParticipation = totalMembers > 0 ? uniqueGiversCount / totalMembers * 100 : 0;
+    const givingServicesCount = givingRecordsFull?.length || 0;
+    const avgGivingPerService = givingServicesCount > 0 ? Math.round(totalGiving / givingServicesCount * 100) / 100 : 0;
+
+    // Most active zone
+    const mostActiveZone = membersByZone.length > 0 ? membersByZone.reduce((a, b) => a.count > b.count ? a : b).zone : 'N/A';
+
     return c.json({
       attendanceData,
       givingData,
       membershipData,
+      membersByStatus,
+      membersByZone,
+      givingByType,
+      givingByPaymentMethod,
       summary: {
         totalMembers,
         avgAttendance,
         totalGiving,
-        growthRate,
-        attendanceRate,
-        givingParticipation,
+        growthRate: Math.round(growthRate * 10) / 10,
+        attendanceRate: Math.round(attendanceRate * 10) / 10,
+        memberRetention,
+        givingParticipation: 0, // giving_records has no member_id, so skip
         servicesHeld: totalAttendanceRecords,
         newMembersThisMonth: monthlyData[now.getMonth()]?.newMembers || 0,
-        monthlyGiving: monthlyData[now.getMonth()]?.giving || 0,
-        monthlyAvgAttendance: monthlyData[now.getMonth()]?.attendance || 0
+        monthlyGiving: Math.round((monthlyData[now.getMonth()]?.giving || 0) * 100) / 100,
+        monthlyAvgAttendance: monthlyData[now.getMonth()]?.attendance || 0,
+        avgGivingPerService,
+        mostActiveZone,
+        activeMembers
       }
     });
   } catch (error) {
     console.error('Get reports error:', error);
-    return c.json({
-      error: 'Internal server error'
-    }, 500);
+    return c.json({ error: 'Internal server error' }, 500);
   }
 });
 // ============================================================================
