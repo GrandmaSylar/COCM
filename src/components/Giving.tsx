@@ -12,6 +12,7 @@ import { formatGhanaCedis } from './ui/utils';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport, formatCurrencyForExport } from '../utils/export';
+import { useCachedData } from '../hooks/useCachedData';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,27 +106,28 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [showCustomTypeManager, setShowCustomTypeManager] = useState(initialShowTypeManager);
-  const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [givingData, typesData] = await Promise.all([
-          api.giving.getAll(),
-          api.giving.types.getAll()
-        ]);
-        setRecords(givingData || []);
-        setCustomTypes(typesData || []);
-      } catch (error) {
-        console.error('Failed to fetch giving data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: cachedGiving, loading: loadingGiving, refresh: refreshGiving } = useCachedData<any[]>(
+    'giving-records',
+    () => api.giving.getAll(),
+    { duration: 2 * 60 * 1000 }
+  );
+  const { data: cachedTypes, loading: loadingTypes } = useCachedData<CustomGivingType[]>(
+    'giving-types',
+    () => api.giving.types.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
 
-    fetchData();
-  }, []);
+  const loading = loadingGiving || loadingTypes;
+
+  useEffect(() => {
+    if (cachedGiving) setRecords(cachedGiving);
+  }, [cachedGiving]);
+
+  useEffect(() => {
+    if (cachedTypes) setCustomTypes(cachedTypes);
+  }, [cachedTypes]);
 
   const canRecordGiving = canAccess('record_giving');
   const canManageCustomTypes = canAccess('manage_giving_types');
@@ -768,20 +770,17 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
 
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const fetchCustomTypes = async () => {
-      try {
-        const typesData = await api.giving.types.getAll();
-        setCustomTypes((typesData || []).filter(type => type.isActive));
-      } catch (error) {
-        console.error('Failed to fetch custom types:', error);
-      }
-    };
+  const { data: cachedGivingTypes } = useCachedData<CustomGivingType[]>(
+    'giving-types',
+    () => api.giving.types.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
+  const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
 
-    fetchCustomTypes();
+  useEffect(() => {
+    if (cachedGivingTypes) setCustomTypes(cachedGivingTypes.filter(type => type.isActive));
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

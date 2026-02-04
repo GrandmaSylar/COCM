@@ -9,7 +9,7 @@ import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, DollarSign, BarChart3, Church, ClipboardList } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
@@ -109,44 +109,35 @@ export function Settings({ onAddUser }: SettingsProps) {
   const canGrantPermissions = canAccess('grant_permissions');
   const canManageTheme = canAccess('manage_theme');
 
+  const fetchUsers = async () => {
+    if (!canManageUsers) return;
+
+    try {
+      const [allUsersData, pendingUsersData] = await Promise.all([
+        api.users.getAll(),
+        api.users.getPending()
+      ]);
+      setAllSystemUsers(allUsersData);
+      setPendingUsers(pendingUsersData);
+
+      // Fetch all temporary permissions in one batch call
+      if (canGrantPermissions) {
+        try {
+          const tempPermsMap = await api.users.getAllTemporaryPermissions();
+          setUserTempPermissions(tempPermsMap || {});
+        } catch (error) {
+          console.error('Failed to fetch temp permissions:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoadingPending(false);
+    }
+  };
+
   // Fetch all users and pending users
   useEffect(() => {
-    const fetchUsers = async () => {
-      if (!canManageUsers) return;
-
-      try {
-        const [allUsersData, pendingUsersData] = await Promise.all([
-          api.users.getAll(),
-          api.users.getPending()
-        ]);
-        setAllSystemUsers(allUsersData);
-        setPendingUsers(pendingUsersData);
-
-        // Fetch temporary permissions for all users
-        if (canGrantPermissions) {
-          const tempPermsPromises = allUsersData.map(async (u: any) => {
-            try {
-              const perms = await api.users.getTemporaryPermissions(u.id);
-              return { userId: u.id, perms };
-            } catch (error) {
-              console.error(`Failed to fetch temp permissions for user ${u.id}:`, error);
-              return { userId: u.id, perms: [] };
-            }
-          });
-          const tempPermsResults = await Promise.all(tempPermsPromises);
-          const tempPermsMap = tempPermsResults.reduce((acc, { userId, perms }) => {
-            acc[userId] = perms;
-            return acc;
-          }, {} as { [userId: string]: any[] });
-          setUserTempPermissions(tempPermsMap);
-        }
-      } catch (error) {
-        console.error('Failed to fetch users:', error);
-      } finally {
-        setLoadingPending(false);
-      }
-    };
-
     fetchUsers();
   }, [canManageUsers, canGrantPermissions]);
 
@@ -796,6 +787,64 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       </div>
                                     </div>
                                   ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tab Access (Dev Only) */}
+                            {isDev && systemUser.role !== 'dev' && (
+                              <div className="mt-4 p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
+                                      <Shield className="w-4 h-4 text-white" />
+                                    </div>
+                                    <span className="text-sm font-semibold text-secondary dark:text-blue-300">
+                                      Tab Access
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {(systemUser.tabAccess || []).length} of 7 tabs
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                  {[
+                                    { id: 'members', label: 'Members', icon: Users },
+                                    { id: 'visitors', label: 'Visitors', icon: UserPlus },
+                                    { id: 'attendance', label: 'Attendance', icon: Calendar },
+                                    { id: 'giving', label: 'Giving', icon: DollarSign },
+                                    { id: 'reports', label: 'Reports', icon: BarChart3 },
+                                    { id: 'services', label: 'Services', icon: Church },
+                                    { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
+                                  ].map(tab => {
+                                    const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
+                                    return (
+                                      <button
+                                        key={tab.id}
+                                        onClick={async () => {
+                                          const currentTabs = systemUser.tabAccess || [];
+                                          const newTabs = hasAccess
+                                            ? currentTabs.filter((t: string) => t !== tab.id)
+                                            : [...currentTabs, tab.id];
+                                          try {
+                                            await api.users.setTabAccess(systemUser.id, newTabs);
+                                            toast.success(`Updated tab access for ${systemUser.name}`);
+                                            fetchUsers();
+                                          } catch (err) {
+                                            toast.error('Failed to update tab access');
+                                          }
+                                        }}
+                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                                          hasAccess
+                                            ? 'bg-secondary text-white border-secondary shadow-sm shadow-secondary/25'
+                                            : 'bg-card text-muted-foreground border-border/50 hover:border-secondary/50 hover:bg-secondary/5'
+                                        }`}
+                                      >
+                                        <tab.icon className="w-4 h-4" />
+                                        {tab.label}
+                                      </button>
+                                    );
+                                  })}
                                 </div>
                               </div>
                             )}

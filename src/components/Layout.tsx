@@ -2,12 +2,12 @@ import { ReactNode } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from './AuthContext';
 import { useTheme } from './ThemeContext';
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  BarChart3, 
-  Settings, 
+import {
+  Users,
+  Calendar,
+  DollarSign,
+  BarChart3,
+  Settings,
   LogOut,
   Home,
   Menu,
@@ -18,9 +18,13 @@ import {
   Monitor,
   Shield,
   UserPlus,
-  HelpCircle
+  HelpCircle,
+  ClipboardList,
+  Bell,
+  Church
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { api } from '../services/api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,44 +33,45 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
-  const { user, logout, canAccess } = useAuth();
+  const { user, logout, hasTabAccess } = useAuth();
   const { theme, setTheme, isDark } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const data = await api.notifications.getUnreadCount();
+        setUnreadCount(data?.count || 0);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+      }
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'services', label: 'Services', icon: Church },
     { id: 'members', label: 'Members', icon: Users },
     { id: 'visitors', label: 'Visitors', icon: UserPlus },
     { id: 'attendance', label: 'Attendance', icon: Calendar },
     { id: 'giving', label: 'Giving', icon: DollarSign },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
+    { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
     { id: 'help', label: 'Help', icon: HelpCircle },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   const filteredNavItems = navigationItems.filter(item => {
-    // Help is always visible
-    if (item.id === 'help') return true;
-    
-    // Permission-based filtering
-    switch (item.id) {
-      case 'dashboard':
-        return true; // Everyone can see dashboard
-      case 'members':
-        return canAccess('view_members');
-      case 'visitors':
-        return canAccess('view_members'); // Same permissions as members
-      case 'attendance':
-        return canAccess('view_attendance');
-      case 'giving':
-        return canAccess('view_giving');
-      case 'reports':
-        return canAccess('view_reports');
-      case 'settings':
-        return true; // All roles can access settings (at minimum for 2FA preferences)
-      default:
-        return true;
-    }
+    // Always visible tabs
+    if (['dashboard', 'help', 'settings'].includes(item.id)) return true;
+
+    // Tab-access-based filtering
+    return hasTabAccess(item.id);
   });
 
   return (
@@ -75,6 +80,20 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
       <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-medium">CoC.M</h1>
         <div className="flex items-center gap-2">
+          {/* Notification Bell for Mobile */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onNavigate('notifications')}
+            className="w-8 h-8 p-0 relative"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Button>
           {/* Theme Toggle for Mobile */}
           <Button
             variant="ghost"
@@ -122,6 +141,32 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             </div>
             
             <div className="flex-1 flex flex-col justify-between">
+              {/* Notification Bell */}
+              <div className="px-4 pt-3">
+                <button
+                  onClick={() => onNavigate('notifications')}
+                  className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors ${
+                    currentPage === 'notifications'
+                      ? 'bg-secondary text-white'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary/10'
+                  }`}
+                >
+                  <div className="relative">
+                    <Bell className="w-5 h-5 mr-3" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  Notifications
+                  {unreadCount > 0 && (
+                    <span className="ml-auto bg-amber-500 text-white text-xs font-semibold rounded-full px-2 py-0.5">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+              </div>
               <nav className="flex-1 px-4 py-4 space-y-2">
                 {filteredNavItems.map((item) => {
                   const Icon = item.icon;

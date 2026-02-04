@@ -19,6 +19,9 @@ import { Giving, RecordGiving, GivingDetail } from './components/Giving';
 import { Reports } from './components/Reports';
 import { Settings, AddUser } from './components/Settings';
 import { Help } from './components/Help';
+import { Services } from './components/Services';
+import { ActivityLog } from './components/ActivityLog';
+import { Notifications } from './components/Notifications';
 import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner@2.0.3';
 import { api } from './services/api';
@@ -26,7 +29,7 @@ import { api } from './services/api';
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
-               'member-attendance-history';
+               'member-attendance-history' | 'services' | 'activity-log' | 'notifications';
 
 function AppContent() {
   const { isAuthenticated, completeLogin } = useAuth();
@@ -86,6 +89,19 @@ function AppContent() {
   // Auto-navigate to dashboard after successful login
   if (isAuthenticated && currentPage === 'login') {
     setCurrentPage('dashboard');
+
+    // Fetch login summary notifications
+    api.notifications.getLoginSummary().then((summary: any) => {
+      if (summary?.birthdays?.length > 0) {
+        summary.birthdays.forEach((b: any) => {
+          toast.info(`🎂 ${b.name} has a birthday today!`);
+        });
+      }
+      const notifs = summary?.notifications || [];
+      if (notifs.length > 0) {
+        toast.info(`You have ${notifs.length} new notification${notifs.length > 1 ? 's' : ''}.`);
+      }
+    }).catch(() => {});
   }
 
   const handleNavigate = (page: string) => {
@@ -443,7 +459,16 @@ function AppContent() {
       
       case 'reports':
         return <Reports />;
-      
+
+      case 'services':
+        return <Services />;
+
+      case 'activity-log':
+        return <ActivityLog />;
+
+      case 'notifications':
+        return <Notifications />;
+
       case 'help':
         return <Help />;
       

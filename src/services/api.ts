@@ -15,39 +15,107 @@ async function getAccessToken(): Promise<string> {
   return data.session?.access_token || publicAnonKey;
 }
 
+// In-flight request deduplication: prevents duplicate simultaneous GET requests
+const inflightRequests = new Map<string, Promise<any>>();
+
+// Short-lived GET cache (30 seconds) to avoid re-fetching on rapid navigation
+const getCache = new Map<string, { data: any; timestamp: number }>();
+const GET_CACHE_TTL = 30_000; // 30 seconds
+
+function getCacheKey(endpoint: string): string {
+  return endpoint;
+}
+
 async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = await getAccessToken();
-  
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
+  const method = (options.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const cacheKey = getCacheKey(endpoint);
 
-  if (!response.ok) {
-    let errorMessage = `Request failed: ${response.statusText}`;
-    try {
-      const errorData = await response.json();
-      errorMessage = errorData.error || errorMessage;
-    } catch {
-      // If response is not JSON, use status text
+  // For GET requests, check short-lived cache
+  if (isGet) {
+    const cached = getCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < GET_CACHE_TTL) {
+      return cached.data as T;
     }
-    throw new ApiError(response.status, errorMessage);
+
+    // Deduplicate in-flight GET requests
+    const inflight = inflightRequests.get(cacheKey);
+    if (inflight) {
+      return inflight as Promise<T>;
+    }
   }
 
-  // Handle empty responses
-  const text = await response.text();
-  if (!text) {
-    return {} as T;
+  const requestPromise = (async () => {
+    const token = await getAccessToken();
+
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        ...options.headers,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = `Request failed: ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+      }
+      throw new ApiError(response.status, errorMessage);
+    }
+
+    // Handle empty responses
+    const text = await response.text();
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      const parsed = JSON.parse(text);
+      // Cache successful GET responses
+      if (isGet) {
+        getCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+      }
+      return parsed;
+    } catch {
+      return text as any;
+    }
+  })();
+
+  // Track in-flight GET requests for dedup
+  if (isGet) {
+    inflightRequests.set(cacheKey, requestPromise);
+    requestPromise.finally(() => inflightRequests.delete(cacheKey));
   }
 
-  try {
-    return JSON.parse(text);
-  } catch {
-    return text as any;
+  // Mutating requests invalidate related cache entries
+  if (!isGet) {
+    // Extract the resource path (e.g., /members from /members/123)
+    const resourcePath = endpoint.split('/').slice(0, 2).join('/');
+    for (const key of getCache.keys()) {
+      if (key.startsWith(resourcePath)) {
+        getCache.delete(key);
+      }
+    }
+  }
+
+  return requestPromise;
+}
+
+// Allow manual cache invalidation from components
+export function invalidateApiCache(pattern?: string) {
+  if (!pattern) {
+    getCache.clear();
+    return;
+  }
+  for (const key of getCache.keys()) {
+    if (key.includes(pattern)) {
+      getCache.delete(key);
+    }
   }
 }
 
@@ -349,7 +417,96 @@ export const api = {
     getTemporaryPermissions: (userId: string) =>
       fetchApi(`/users/${userId}/temporary-permissions`),
 
+    getAllTemporaryPermissions: () =>
+      fetchApi('/users/temporary-permissions/all'),
+
     updateContact: (userId: string, data: { email?: string; phone?: string }) =>
       fetchApi(`/users/${userId}/contact`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+    getTabAccess: (userId: string) =>
+      fetchApi(`/users/${userId}/tab-access`),
+
+    setTabAccess: (userId: string, tabs: string[]) =>
+      fetchApi(`/users/${userId}/tab-access`, {
+        method: 'PUT',
+        body: JSON.stringify({ tabs })
+      }),
+  },
+
+  // ============================================================================
+  // SERVICE RECORDS
+  // ============================================================================
+
+  serviceRecords: {
+    getAll: (params?: { page?: number; limit?: number; startDate?: string; endDate?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      if (params?.startDate) qs.set('startDate', params.startDate);
+      if (params?.endDate) qs.set('endDate', params.endDate);
+      const q = qs.toString();
+      return fetchApi(`/service-records${q ? '?' + q : ''}`);
+    },
+
+    getById: (id: string) => fetchApi(`/service-records/${id}`),
+
+    getByDate: (date: string) => fetchApi(`/service-records/by-date/${date}`),
+
+    getToday: () => fetchApi('/service-records/today'),
+  },
+
+  // ============================================================================
+  // ACTIVITY LOG
+  // ============================================================================
+
+  activityLog: {
+    getAll: (params?: { page?: number; limit?: number; userId?: string; action?: string; entityType?: string; startDate?: string; endDate?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      if (params?.userId) qs.set('userId', params.userId);
+      if (params?.action) qs.set('action', params.action);
+      if (params?.entityType) qs.set('entityType', params.entityType);
+      if (params?.startDate) qs.set('startDate', params.startDate);
+      if (params?.endDate) qs.set('endDate', params.endDate);
+      const q = qs.toString();
+      return fetchApi(`/activity-log${q ? '?' + q : ''}`);
+    },
+
+    export: (params?: { userId?: string; action?: string; entityType?: string; startDate?: string; endDate?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.userId) qs.set('userId', params.userId);
+      if (params?.action) qs.set('action', params.action);
+      if (params?.entityType) qs.set('entityType', params.entityType);
+      if (params?.startDate) qs.set('startDate', params.startDate);
+      if (params?.endDate) qs.set('endDate', params.endDate);
+      const q = qs.toString();
+      return fetchApi(`/activity-log/export${q ? '?' + q : ''}`);
+    },
+  },
+
+  // ============================================================================
+  // NOTIFICATIONS
+  // ============================================================================
+
+  notifications: {
+    getAll: (params?: { page?: number; limit?: number; unreadOnly?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      if (params?.unreadOnly) qs.set('unreadOnly', 'true');
+      const q = qs.toString();
+      return fetchApi(`/notifications${q ? '?' + q : ''}`);
+    },
+
+    getUnreadCount: () => fetchApi('/notifications/unread-count'),
+
+    getLoginSummary: () => fetchApi('/notifications/login-summary'),
+
+    markAsRead: (id: string) =>
+      fetchApi(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+    markAllAsRead: () =>
+      fetchApi('/notifications/read-all', { method: 'PATCH' }),
   },
 };

@@ -4,8 +4,9 @@ import { Skeleton } from './ui/skeleton';
 import { Users, Calendar, DollarSign, Plus } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../services/api';
+import { useCachedData } from '../hooks/useCachedData';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -13,34 +14,20 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
-  const { user, canAccess } = useAuth();
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    attendanceThisWeek: 0,
-    givingThisMonth: 0,
-    newMembersThisMonth: 0
-  });
-  const [loading, setLoading] = useState(true);
+  const { user, canAccess, hasTabAccess } = useAuth();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await api.stats.getDashboard();
-        setStats({
-          totalMembers: data.totalMembers || 0,
-          attendanceThisWeek: data.attendanceThisWeek || 0,
-          givingThisMonth: data.givingThisMonth || 0,
-          newMembersThisMonth: data.newMembersThisMonth || 0
-        });
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: statsData, loading } = useCachedData(
+    'dashboard-stats',
+    () => api.stats.getDashboard(),
+    { duration: 2 * 60 * 1000 } // 2 minutes
+  );
 
-    fetchStats();
-  }, []);
+  const stats = {
+    totalMembers: statsData?.totalMembers || 0,
+    attendanceThisWeek: statsData?.attendanceThisWeek || 0,
+    givingThisMonth: statsData?.givingThisMonth || 0,
+    newMembersThisMonth: statsData?.newMembersThisMonth || 0,
+  };
 
   const quickActions = [
     {
@@ -48,40 +35,45 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       label: 'Add New Member',
       icon: Users,
       description: 'Register a new church member',
-      permission: 'manage_members'
+      permission: 'manage_members',
+      tab: 'members'
     },
     {
       id: 'record-attendance',
       label: 'Record Attendance',
       icon: Calendar,
       description: 'Mark attendance for today\'s service',
-      permission: 'record_attendance'
+      permission: 'record_attendance',
+      tab: 'attendance'
     },
     {
       id: 'record-giving',
       label: 'Record Giving',
       icon: DollarSign,
       description: 'Add offering or donation record',
-      permission: 'record_giving'
+      permission: 'record_giving',
+      tab: 'giving'
     },
     {
       id: 'add-visitor',
       label: 'Add Visitor',
       icon: Users,
       description: 'Register a new church visitor',
-      permission: 'manage_members'
+      permission: 'manage_members',
+      tab: 'visitors'
     },
     {
       id: 'mark-attendance',
       label: 'Mark Individual Attendance',
       icon: Calendar,
       description: 'Quick attendance marking for a member',
-      permission: 'record_attendance'
+      permission: 'record_attendance',
+      tab: 'attendance'
     }
   ];
 
   const filteredQuickActions = quickActions.filter(action =>
-    canAccess(action.permission)
+    canAccess(action.permission) && hasTabAccess(action.tab)
   );
 
   const recentActivity: any[] = [];
@@ -165,10 +157,12 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('members')}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-secondary" onClick={() => onNavigate('members')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm text-muted-foreground">Total Members</CardTitle>
-            <Users className="w-4 h-4 text-muted-foreground" />
+            <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+              <Users className="w-4 h-4 text-secondary" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalMembers}</div>
@@ -178,20 +172,24 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('attendance')}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-amber-500" onClick={() => onNavigate('attendance')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm text-muted-foreground">This Week's Attendance</CardTitle>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <Calendar className="w-4 h-4 text-amber-500" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.attendanceThisWeek}</div>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => onNavigate('giving')}>
+        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-emerald-500" onClick={() => onNavigate('giving')}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm text-muted-foreground">Monthly Giving</CardTitle>
-            <DollarSign className="w-4 h-4 text-muted-foreground" />
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <DollarSign className="w-4 h-4 text-emerald-500" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatGhanaCedis(stats.givingThisMonth)}</div>
@@ -206,14 +204,16 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
           {filteredQuickActions.map((action) => {
             const Icon = action.icon;
             return (
-              <Card key={action.id} className="cursor-pointer hover:shadow-md transition-shadow">
+              <Card key={action.id} className="cursor-pointer hover:shadow-md transition-shadow group">
                 <CardContent className="p-4">
                   <Button
                     variant="outline"
-                    className="w-full h-auto p-4 flex flex-col items-center gap-3"
+                    className="w-full h-auto p-4 flex flex-col items-center gap-3 border-dashed border-secondary/30 hover:border-secondary hover:bg-secondary/5"
                     onClick={() => onQuickAction(action.id)}
                   >
-                    <Icon className="w-8 h-8 text-primary" />
+                    <div className="w-12 h-12 rounded-xl bg-secondary/10 group-hover:bg-secondary/20 flex items-center justify-center transition-colors">
+                      <Icon className="w-6 h-6 text-secondary" />
+                    </div>
                     <div className="text-center">
                       <div className="font-medium">{action.label}</div>
                       <div className="text-xs text-muted-foreground mt-1">

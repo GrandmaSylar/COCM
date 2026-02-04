@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -14,6 +14,7 @@ import {
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
 import { api } from '../services/api';
+import { useCachedData } from '../hooks/useCachedData';
 
 export interface Visitor {
   id: string;
@@ -48,28 +49,18 @@ interface VisitorsProps {
 }
 
 export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: VisitorsProps) {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMembershipInterest, setSelectedMembershipInterest] = useState('all');
-  const [loading, setLoading] = useState(true);
 
   const { canAccess } = useAuth();
   const canManageVisitors = canAccess('manage_members'); // Same permission as managing members
 
-  useEffect(() => {
-    const fetchVisitors = async () => {
-      try {
-        const visitorsData = await api.visitors.getAll();
-        setVisitors(visitorsData || []);
-      } catch (error) {
-        console.error('Failed to fetch visitors:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVisitors();
-  }, []);
+  const { data: visitorsData, loading, refresh: refreshVisitors } = useCachedData<Visitor[]>(
+    'visitors-list',
+    () => api.visitors.getAll(),
+    { duration: 3 * 60 * 1000 } // 3 minutes
+  );
+  const visitors = visitorsData || [];
 
   const filteredVisitors = visitors.filter(visitor => {
     const matchesSearch = `${visitor.firstName} ${visitor.lastName} ${visitor.otherNames}`.toLowerCase().includes(searchTerm.toLowerCase()) ||

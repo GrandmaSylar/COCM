@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -12,6 +12,7 @@ import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { useCachedData } from '../hooks/useCachedData';
 
 interface AttendanceRecord {
   id: string;
@@ -67,26 +68,27 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [selectedAttendanceType, setSelectedAttendanceType] = useState('all');
   const [showServiceManager, setShowServiceManager] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { user, canAccess } = useAuth();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [attendanceData, servicesData] = await Promise.all([
-          api.attendance.getAll(),
-          api.services.getAll()
-        ]);
-        setRecords(attendanceData || []);
-        setCustomServices(servicesData || []);
-      } catch (error) {
-        console.error('Failed to fetch attendance data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: cachedAttendance, loading: loadingAttendance, refresh: refreshAttendance } = useCachedData<any[]>(
+    'attendance-records',
+    () => api.attendance.getAll(),
+    { duration: 2 * 60 * 1000 }
+  );
+  const { data: cachedServices, loading: loadingServices } = useCachedData<any[]>(
+    'custom-services',
+    () => api.services.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
 
-    fetchData();
+  const loading = loadingAttendance || loadingServices;
+
+  useEffect(() => {
+    if (cachedAttendance) setRecords(cachedAttendance);
+  }, [cachedAttendance]);
+
+  useEffect(() => {
+    if (cachedServices) setCustomServices(cachedServices);
   }, []);
 
   const canRecordAttendance = canAccess('record_attendance');
@@ -728,17 +730,15 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   const [endTime, setEndTime] = useState('');
   const [totalCount, setTotalCount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { data: cachedSvc } = useCachedData<CustomService[]>(
+    'custom-services',
+    () => api.services.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
   const [customServices, setCustomServices] = useState<CustomService[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const servicesData = await api.services.getAll();
-        setCustomServices(servicesData || []);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-      }
-    };
+    if (cachedSvc) setCustomServices(cachedSvc);
 
     fetchData();
   }, []);

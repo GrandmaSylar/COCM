@@ -166,21 +166,51 @@ async function recalculateMemberStatuses(changedByUserId?: string) {
     const today = new Date().toISOString().split('T')[0];
     const updates: { id: string; oldStatus: string; newStatus: string }[] = [];
 
+    // Batch: find which sabbatical members (ended) have attendance in last 4 records
+    // This replaces the per-member query in the loop
+    const endedSabbaticalIds = members
+      .filter(m => m.status === 'sabbatical' && m.sabbatical_end_date && m.sabbatical_end_date < today)
+      .map(m => m.id);
+    const sabbaticalWithAttendance = new Set<string>();
+    if (endedSabbaticalIds.length > 0) {
+      const { data: sabbAtt } = await supabase.from('attendance_entries')
+        .select('member_id')
+        .in('member_id', endedSabbaticalIds)
+        .in('attendance_record_id', recordIds);
+      if (sabbAtt) {
+        for (const e of sabbAtt) sabbaticalWithAttendance.add(e.member_id);
+      }
+    }
+
+    // Batch: for 'new' members, get count of Sunday records since each unique join_date
+    // Group new members by join_date to minimize queries
+    const newMembers = members.filter(m => m.status === 'new');
+    const joinDates = [...new Set(newMembers.map(m => m.join_date).filter(Boolean))];
+    const sundayCountSinceJoin: Record<string, number> = {};
+    if (joinDates.length > 0) {
+      // Get the earliest join date and fetch all Sunday records from there
+      const earliestJoin = joinDates.sort()[0];
+      const { data: allSundaysSinceJoin } = await supabase
+        .from('attendance_records')
+        .select('id, date')
+        .eq('service_type', 'Sunday Main Service')
+        .eq('attendance_type', 'individual')
+        .gte('date', earliestJoin)
+        .order('date', { ascending: true });
+      if (allSundaysSinceJoin) {
+        for (const jd of joinDates) {
+          sundayCountSinceJoin[jd] = allSundaysSinceJoin.filter(r => r.date >= jd).length;
+        }
+      }
+    }
+
     for (const member of members) {
       // Skip sabbatical members unless their sabbatical has ended
       if (member.status === 'sabbatical') {
         if (!member.sabbatical_end_date || member.sabbatical_end_date >= today) {
           continue; // Still on sabbatical, skip
         }
-        // Sabbatical ended - check if they attended after end date
-        const { data: postSabbaticalAttendance } = await supabase
-          .from('attendance_entries')
-          .select('id')
-          .eq('member_id', member.id)
-          .in('attendance_record_id', recordIds)
-          .limit(1);
-
-        if (!postSabbaticalAttendance || postSabbaticalAttendance.length === 0) {
+        if (!sabbaticalWithAttendance.has(member.id)) {
           continue; // No attendance after sabbatical end, keep as sabbatical
         }
         // Has attendance - fall through to recalculate
@@ -188,14 +218,8 @@ async function recalculateMemberStatuses(changedByUserId?: string) {
 
       // For 'new' members: check if at least 4 Sunday records exist since their join date
       if (member.status === 'new') {
-        const { count } = await supabase
-          .from('attendance_records')
-          .select('id', { count: 'exact', head: true })
-          .eq('service_type', 'Sunday Main Service')
-          .eq('attendance_type', 'individual')
-          .gte('date', member.join_date);
-
-        if (!count || count < 4) {
+        const count = sundayCountSinceJoin[member.join_date] || 0;
+        if (count < 4) {
           continue; // Not enough Sundays since they joined, keep as 'new'
         }
       }
@@ -234,11 +258,123 @@ async function recalculateMemberStatuses(changedByUserId?: string) {
           changed_by: changedByUserId || null,
           reason: `Auto-recalculated after Sunday Main Service attendance`
         });
+
+      // Get member name for notification
+      const { data: memberInfo } = await supabase.from('members').select('first_name, last_name').eq('id', update.id).single();
+      const mName = memberInfo ? `${memberInfo.first_name} ${memberInfo.last_name}` : 'A member';
+
+      // Notify users with members tab access
+      notifyTabUsers('members', {
+        type: 'member_status_change', title: 'Member Status Changed',
+        message: `${mName} changed from ${update.oldStatus} to ${update.newStatus} (auto-recalculated).`,
+        entityType: 'member', entityId: update.id, excludeUserId: changedByUserId
+      });
     }
 
     console.log(`Status recalculation complete: ${updates.length} members updated`);
   } catch (error) {
     console.error('Status recalculation error:', error);
+  }
+}
+
+// ============================================================================
+// ACTIVITY LOG HELPER
+// ============================================================================
+async function logActivity(opts: {
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  description: string;
+  metadata?: any;
+}) {
+  try {
+    await supabase.from('activity_log').insert({
+      user_id: opts.userId,
+      user_name: opts.userName,
+      user_role: opts.userRole,
+      action: opts.action,
+      entity_type: opts.entityType,
+      entity_id: opts.entityId || null,
+      description: opts.description,
+      metadata: opts.metadata || {},
+    });
+  } catch (err) {
+    console.error('Failed to log activity:', err);
+  }
+}
+
+// Helper to get profile for logging
+async function getProfileForLog(userId: string) {
+  const { data } = await supabase.from('profiles').select('name, role').eq('id', userId).single();
+  return data || { name: 'Unknown', role: 'unknown' };
+}
+
+// ============================================================================
+// NOTIFICATION HELPERS
+// ============================================================================
+async function createNotification(opts: {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  tab?: string;
+  entityType?: string;
+  entityId?: string;
+}) {
+  try {
+    await supabase.from('notifications').insert({
+      user_id: opts.userId,
+      type: opts.type,
+      title: opts.title,
+      message: opts.message,
+      tab: opts.tab || null,
+      entity_type: opts.entityType || null,
+      entity_id: opts.entityId || null,
+    });
+  } catch (err) {
+    console.error('Failed to create notification:', err);
+  }
+}
+
+async function notifyTabUsers(tab: string, opts: {
+  type: string;
+  title: string;
+  message: string;
+  entityType?: string;
+  entityId?: string;
+  excludeUserId?: string;
+}) {
+  try {
+    // Get all dev users (always have access)
+    const { data: devUsers } = await supabase.from('profiles').select('id').eq('role', 'dev').eq('is_active', true);
+    // Get users with explicit tab access
+    const { data: tabUsers } = await supabase.from('user_tab_access').select('user_id').eq('tab', tab);
+
+    const userIds = new Set<string>();
+    if (devUsers) devUsers.forEach(u => userIds.add(u.id));
+    if (tabUsers) tabUsers.forEach(u => userIds.add(u.user_id));
+
+    // Exclude the user who triggered the action
+    if (opts.excludeUserId) userIds.delete(opts.excludeUserId);
+
+    const notifications = Array.from(userIds).map(userId => ({
+      user_id: userId,
+      type: opts.type,
+      title: opts.title,
+      message: opts.message,
+      tab,
+      entity_type: opts.entityType || null,
+      entity_id: opts.entityId || null,
+    }));
+
+    if (notifications.length > 0) {
+      await supabase.from('notifications').insert(notifications);
+    }
+  } catch (err) {
+    console.error('Failed to notify tab users:', err);
   }
 }
 
@@ -586,6 +722,12 @@ app.post("/auth/signin", async (c)=>{
       });
     }
 
+    // Log login activity
+    logActivity({
+      userId: profile.id, userName: profile.name, userRole: profile.role,
+      action: 'login', entityType: 'session', description: `${profile.name} logged in`
+    });
+
     return c.json({
       session: data.session,
       user: {
@@ -619,6 +761,14 @@ app.post("/auth/signout", async (c)=>{
       const userClient = getSupabaseClient(token);
       await userClient.auth.signOut();
     }
+
+    // Log logout activity
+    const logProfile = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logProfile.name, userRole: logProfile.role,
+      action: 'logout', entityType: 'session', description: `${logProfile.name} logged out`
+    });
+
     return c.json({
       message: 'Signed out successfully'
     });
@@ -1425,6 +1575,22 @@ app.post("/members", async (c)=>{
         *,
         family_members!family_members_member_id_fkey (*)
       `).eq('id', member.id).single();
+
+    // Log activity
+    const logP = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logP.name, userRole: logP.role,
+      action: 'create', entityType: 'member', entityId: member.id,
+      description: `Registered new member: ${dbMemberData.first_name} ${dbMemberData.last_name}`
+    });
+
+    // Notify users with members tab access
+    notifyTabUsers('members', {
+      type: 'member_registered', title: 'New Member Registered',
+      message: `${dbMemberData.first_name} ${dbMemberData.last_name} was registered as a new member.`,
+      entityType: 'member', entityId: member.id, excludeUserId: user.id
+    });
+
     // Convert response back to camelCase for frontend
     return c.json(toCamelCase(completeMember || member), 201);
   } catch (error) {
@@ -1519,6 +1685,15 @@ app.put("/members/:id", async (c)=>{
         *,
         family_members!family_members_member_id_fkey (*)
       `).eq('id', id).single();
+
+    // Log activity
+    const logP2 = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logP2.name, userRole: logP2.role,
+      action: 'update', entityType: 'member', entityId: id,
+      description: `Updated member: ${member.first_name} ${member.last_name}`
+    });
+
     return c.json(toCamelCase(completeMember || member));
   } catch (error) {
     console.error('Update member error:', error);
@@ -1536,6 +1711,10 @@ app.delete("/members/:id", async (c)=>{
       }, 401);
     }
     const id = c.req.param('id');
+
+    // Get member name before deleting
+    const { data: memberToDelete } = await supabase.from('members').select('first_name, last_name').eq('id', id).single();
+
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) {
       console.error('Error deleting member:', error);
@@ -1543,6 +1722,16 @@ app.delete("/members/:id", async (c)=>{
         error: 'Failed to delete member'
       }, 500);
     }
+
+    // Log activity
+    const logP3 = await getProfileForLog(user.id);
+    const delName = memberToDelete ? `${memberToDelete.first_name} ${memberToDelete.last_name}` : id;
+    logActivity({
+      userId: user.id, userName: logP3.name, userRole: logP3.role,
+      action: 'delete', entityType: 'member', entityId: id,
+      description: `Deleted member: ${delName}`
+    });
+
     return c.json({
       message: 'Member deleted successfully'
     });
@@ -1676,6 +1865,46 @@ app.post("/attendance", async (c)=>{
     if (serviceType === 'Sunday Main Service' && recordType === 'individual') {
       await recalculateMemberStatuses(user.id);
     }
+
+    // Auto-create/update service_record
+    try {
+      const attCount = totalCount || attendees?.length || 0;
+      const { data: existingSR } = await supabase.from('service_records')
+        .select('id, attendance_record_id').eq('service_date', dateValue).eq('service_type', serviceType).single();
+      if (existingSR) {
+        await supabase.from('service_records').update({
+          attendance_record_id: record.id, updated_at: new Date().toISOString()
+        }).eq('id', existingSR.id);
+      } else {
+        await supabase.from('service_records').insert({
+          service_date: dateValue, service_type: serviceType,
+          attendance_record_id: record.id, created_by: user.id
+        });
+      }
+    } catch (srErr) { console.error('Service record auto-create error:', srErr); }
+
+    // Log activity
+    const logPA = await getProfileForLog(user.id);
+    const attTotal = totalCount || attendees?.length || 0;
+    logActivity({
+      userId: user.id, userName: logPA.name, userRole: logPA.role,
+      action: existingRecord ? 'update' : 'create', entityType: 'attendance', entityId: record.id,
+      description: `${existingRecord ? 'Updated' : 'Recorded'} ${recordType} attendance for ${serviceType} on ${dateValue} (${attTotal} ${recordType === 'individual' ? 'members' : 'head count'})`
+    });
+
+    // Check for new high attendance and notify
+    try {
+      const { data: maxAtt } = await supabase.from('attendance_records')
+        .select('total_count').order('total_count', { ascending: false }).limit(1).neq('id', record.id).single();
+      if (maxAtt && attTotal > maxAtt.total_count) {
+        notifyTabUsers('attendance', {
+          type: 'attendance_record', title: 'New Attendance Record!',
+          message: `${serviceType} on ${dateValue} had ${attTotal} attendees — a new high! Previous record was ${maxAtt.total_count}.`,
+          entityType: 'attendance', entityId: record.id, excludeUserId: user.id
+        });
+      }
+    } catch (nErr) { console.error('Notification check error:', nErr); }
+
     return c.json({
       ...record,
       attendees
@@ -2313,6 +2542,43 @@ app.post("/giving", async (c)=>{
         error: 'Failed to create giving record: ' + error.message
       }, 500);
     }
+    // Auto-create/update service_record for giving
+    try {
+      const { data: existingSR } = await supabase.from('service_records')
+        .select('id, giving_record_id').eq('service_date', data.serviceDate).eq('service_type', data.serviceType).single();
+      if (existingSR) {
+        await supabase.from('service_records').update({
+          giving_record_id: record.id, updated_at: new Date().toISOString()
+        }).eq('id', existingSR.id);
+      } else {
+        await supabase.from('service_records').insert({
+          service_date: data.serviceDate, service_type: data.serviceType,
+          giving_record_id: record.id, created_by: user.id
+        });
+      }
+    } catch (srErr) { console.error('Service record auto-create error:', srErr); }
+
+    // Log activity
+    const logPG = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logPG.name, userRole: logPG.role,
+      action: 'create', entityType: 'giving', entityId: record.id,
+      description: `Recorded giving for ${data.serviceName || data.serviceType} on ${data.serviceDate} — GH₵${data.totalAmount}`
+    });
+
+    // Check for new high giving and notify
+    try {
+      const { data: maxGiving } = await supabase.from('giving_records')
+        .select('total_amount').order('total_amount', { ascending: false }).limit(1).neq('id', record.id).single();
+      if (maxGiving && parseFloat(record.total_amount) > parseFloat(maxGiving.total_amount)) {
+        notifyTabUsers('giving', {
+          type: 'giving_record', title: 'New Giving Record!',
+          message: `${data.serviceName || data.serviceType} on ${data.serviceDate} raised GH₵${data.totalAmount} — a new high!`,
+          entityType: 'giving', entityId: record.id, excludeUserId: user.id
+        });
+      }
+    } catch (nErr) { console.error('Notification check error:', nErr); }
+
     return c.json(record, 201);
   } catch (error) {
     console.error('Create giving error:', error);
@@ -2761,6 +3027,27 @@ app.post("/visitors", async (c)=>{
         error: 'Failed to create visitor: ' + error.message
       }, 500);
     }
+    // Log activity
+    const logPV = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logPV.name, userRole: logPV.role,
+      action: 'create', entityType: 'visitor', entityId: visitor.id,
+      description: `Registered visitor: ${data.firstName} ${data.lastName}`
+    });
+
+    // Auto-update service_record visitor count
+    try {
+      if (data.visitDate && data.serviceType) {
+        const { data: sr } = await supabase.from('service_records')
+          .select('id, visitors_count').eq('service_date', data.visitDate).eq('service_type', data.serviceType).single();
+        if (sr) {
+          await supabase.from('service_records').update({
+            visitors_count: (sr.visitors_count || 0) + 1, updated_at: new Date().toISOString()
+          }).eq('id', sr.id);
+        }
+      }
+    } catch (srErr) { console.error('Service record visitor update error:', srErr); }
+
     return c.json(visitor, 201);
   } catch (error) {
     console.error('Create visitor error:', error);
@@ -3204,7 +3491,23 @@ app.get("/users", async (c)=>{
         error: 'Failed to fetch users'
       }, 500);
     }
-    return c.json(toCamelCase(users));
+
+    // Fetch tab access for all users
+    const { data: allTabAccess } = await supabase.from('user_tab_access').select('user_id, tab');
+    const tabAccessMap: Record<string, string[]> = {};
+    if (allTabAccess) {
+      for (const ta of allTabAccess) {
+        if (!tabAccessMap[ta.user_id]) tabAccessMap[ta.user_id] = [];
+        tabAccessMap[ta.user_id].push(ta.tab);
+      }
+    }
+
+    const usersWithTabs = (users || []).map((u: any) => ({
+      ...toCamelCase(u),
+      tabAccess: tabAccessMap[u.id] || []
+    }));
+
+    return c.json(usersWithTabs);
   } catch (error) {
     console.error('Get users error:', error);
     return c.json({
@@ -3322,6 +3625,14 @@ app.post("/users", async (c)=>{
         error: 'Failed to create user profile'
       }, 500);
     }
+    // Log activity
+    const logPU = await getProfileForLog(user.id);
+    logActivity({
+      userId: user.id, userName: logPU.name, userRole: logPU.role,
+      action: 'create', entityType: 'user', entityId: authData.user.id,
+      description: `Created user account: ${name} (${role})`
+    });
+
     return c.json({
       user: {
         id: authData.user.id,
@@ -3673,6 +3984,37 @@ app.delete("/users/:id/revoke-permission/:permission", async (c) => {
   }
 });
 
+// Get all temporary permissions (batch - avoids N+1 per-user queries)
+app.get("/users/temporary-permissions/all", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data, error } = await supabase
+      .from('temporary_permissions')
+      .select('*')
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return c.json({ error: 'Failed to fetch temporary permissions' }, 500);
+    }
+
+    // Group by user_id
+    const grouped: Record<string, any[]> = {};
+    for (const perm of (data || [])) {
+      const uid = perm.user_id;
+      if (!grouped[uid]) grouped[uid] = [];
+      grouped[uid].push(perm);
+    }
+
+    return c.json(grouped);
+  } catch (error) {
+    console.error('Get all temporary permissions error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Get temporary permissions for a user
 app.get("/users/:id/temporary-permissions", async (c) => {
   try {
@@ -3698,6 +4040,822 @@ app.get("/users/:id/temporary-permissions", async (c) => {
     return c.json(data || []);
   } catch (error) {
     console.error('Get temporary permissions error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// TAB ACCESS ENDPOINTS
+// ============================================================================
+
+// Get tab access for a user
+app.get("/users/:id/tab-access", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const userId = c.req.param('id');
+    const { data, error } = await supabase.from('user_tab_access')
+      .select('tab').eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching tab access:', error);
+      return c.json({ error: 'Failed to fetch tab access' }, 500);
+    }
+
+    return c.json({ tabs: (data || []).map(d => d.tab) });
+  } catch (error) {
+    console.error('Get tab access error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Set tab access for a user (dev only)
+app.put("/users/:id/tab-access", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: profile } = await supabase.from('profiles').select('role, name').eq('id', user.id).single();
+    if (!profile || profile.role !== 'dev') {
+      return c.json({ error: 'Forbidden: Only dev can manage tab access' }, 403);
+    }
+
+    const userId = c.req.param('id');
+    const { tabs } = await c.req.json();
+
+    if (!Array.isArray(tabs)) {
+      return c.json({ error: 'tabs must be an array' }, 400);
+    }
+
+    // Delete existing tab access
+    await supabase.from('user_tab_access').delete().eq('user_id', userId);
+
+    // Insert new tab access
+    if (tabs.length > 0) {
+      const rows = tabs.map((tab: string) => ({
+        user_id: userId,
+        tab,
+        granted_by: user.id
+      }));
+      const { error } = await supabase.from('user_tab_access').insert(rows);
+      if (error) {
+        console.error('Error setting tab access:', error);
+        return c.json({ error: 'Failed to set tab access' }, 500);
+      }
+    }
+
+    // Log activity
+    const { data: targetProfile } = await supabase.from('profiles').select('name').eq('id', userId).single();
+    logActivity({
+      userId: user.id, userName: profile.name, userRole: profile.role,
+      action: 'update', entityType: 'user', entityId: userId,
+      description: `Updated tab access for ${targetProfile?.name || userId}: ${tabs.join(', ') || 'none'}`
+    });
+
+    return c.json({ tabs });
+  } catch (error) {
+    console.error('Set tab access error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// SERVICE RECORDS ENDPOINTS
+// ============================================================================
+
+// Get today's (or most recent) service records
+// Helper: enrich and group service records by date, combining multiple service types
+// Uses batch queries instead of per-record to avoid N+1
+async function enrichAndGroupByDate(records: any[]) {
+  if (!records || records.length === 0) return [];
+
+  // Sort by created_at desc so newest records come first (they overwrite older)
+  const sorted = [...records].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Collect all IDs for batch fetching
+  const attendanceIds = sorted.map(sr => sr.attendance_record_id).filter(Boolean);
+  const givingIds = sorted.map(sr => sr.giving_record_id).filter(Boolean);
+  const allDates = [...new Set(sorted.map(sr => sr.service_date))];
+
+  // Batch fetch attendance totals
+  const attendanceMap: Record<string, number> = {};
+  if (attendanceIds.length > 0) {
+    const { data: attData } = await supabase.from('attendance_records')
+      .select('id, total_count')
+      .in('id', attendanceIds);
+    if (attData) {
+      for (const a of attData) attendanceMap[a.id] = a.total_count || 0;
+    }
+  }
+
+  // Batch fetch absentee counts
+  const absenteeMap: Record<string, number> = {};
+  if (attendanceIds.length > 0) {
+    const { data: absData } = await supabase.from('absentee_records')
+      .select('attendance_record_id')
+      .in('attendance_record_id', attendanceIds);
+    if (absData) {
+      for (const a of absData) {
+        absenteeMap[a.attendance_record_id] = (absenteeMap[a.attendance_record_id] || 0) + 1;
+      }
+    }
+  }
+
+  // Batch fetch giving totals
+  const givingMap: Record<string, number> = {};
+  if (givingIds.length > 0) {
+    const { data: givData } = await supabase.from('giving_records')
+      .select('id, total_amount')
+      .in('id', givingIds);
+    if (givData) {
+      for (const g of givData) givingMap[g.id] = g.total_amount || 0;
+    }
+  }
+
+  // Batch fetch visitor counts per date
+  const visitorCountMap: Record<string, number> = {};
+  if (allDates.length > 0) {
+    const { data: visData } = await supabase.from('visitors')
+      .select('visit_date')
+      .in('visit_date', allDates);
+    if (visData) {
+      for (const v of visData) {
+        visitorCountMap[v.visit_date] = (visitorCountMap[v.visit_date] || 0) + 1;
+      }
+    }
+  }
+
+  // Group by service_date
+  const dateMap: Record<string, any[]> = {};
+  for (const sr of sorted) {
+    const d = sr.service_date;
+    if (!dateMap[d]) dateMap[d] = [];
+    dateMap[d].push(sr);
+  }
+
+  const grouped = Object.entries(dateMap).map(([date, srs]) => {
+    let totalAttendance = 0;
+    let totalGiving = 0;
+    let totalAbsentees = 0;
+    let totalVisitors = 0;
+    let totalNewMembers = 0;
+    const serviceTypes: string[] = [];
+
+    for (const sr of srs) {
+      if (sr.service_type && !serviceTypes.includes(sr.service_type)) {
+        serviceTypes.push(sr.service_type);
+      }
+      if (sr.attendance_record_id) {
+        totalAttendance += attendanceMap[sr.attendance_record_id] || 0;
+        totalAbsentees += absenteeMap[sr.attendance_record_id] || 0;
+      }
+      if (sr.giving_record_id) {
+        totalGiving += givingMap[sr.giving_record_id] || 0;
+      }
+      totalVisitors += sr.visitors_count || 0;
+      totalNewMembers += sr.members_registered || 0;
+    }
+
+    // Use visitor table count if higher
+    const dbVisitorCount = visitorCountMap[date] || 0;
+    if (dbVisitorCount > totalVisitors) totalVisitors = dbVisitorCount;
+
+    return {
+      serviceDate: date,
+      serviceTypes,
+      serviceType: serviceTypes.join(', ') || 'Service',
+      totalAttendance,
+      totalGiving,
+      absenteesCount: totalAbsentees,
+      visitorsCount: totalVisitors,
+      membersRegistered: totalNewMembers,
+      recordCount: srs.length,
+    };
+  });
+
+  // Sort by date descending
+  grouped.sort((a, b) => b.serviceDate.localeCompare(a.serviceDate));
+  return grouped;
+}
+
+app.get("/service-records/today", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Try today first
+    let { data: records, error } = await supabase.from('service_records')
+      .select('*')
+      .eq('service_date', today)
+      .order('created_at', { ascending: false });
+
+    // If no records today, get most recent date's records
+    if (!error && (!records || records.length === 0)) {
+      const { data: latestOne } = await supabase.from('service_records')
+        .select('service_date')
+        .order('service_date', { ascending: false })
+        .limit(1);
+      if (latestOne && latestOne.length > 0) {
+        const latestDate = latestOne[0].service_date;
+        const { data: latestRecords } = await supabase.from('service_records')
+          .select('*')
+          .eq('service_date', latestDate)
+          .order('created_at', { ascending: false });
+        records = latestRecords || [];
+      }
+    }
+
+    if (error) {
+      return c.json({ error: 'Failed to fetch service records' }, 500);
+    }
+
+    const grouped = await enrichAndGroupByDate(records || []);
+    return c.json(grouped);
+  } catch (error) {
+    console.error('Get today service records error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get all service records (grouped by date)
+app.get("/service-records", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const startDate = c.req.query('startDate');
+    const endDate = c.req.query('endDate');
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '20');
+
+    // First get distinct dates with pagination
+    let dateQuery = supabase.from('service_records')
+      .select('service_date')
+      .order('service_date', { ascending: false });
+
+    if (startDate) dateQuery = dateQuery.gte('service_date', startDate);
+    if (endDate) dateQuery = dateQuery.lte('service_date', endDate);
+
+    const { data: allDates, error: dateError } = await dateQuery;
+
+    if (dateError) {
+      return c.json({ error: 'Failed to fetch service records' }, 500);
+    }
+
+    // Get unique dates
+    const uniqueDates = [...new Set((allDates || []).map((d: any) => d.service_date))];
+    const totalDates = uniqueDates.length;
+    const offset = (page - 1) * limit;
+    const paginatedDates = uniqueDates.slice(offset, offset + limit);
+
+    if (paginatedDates.length === 0) {
+      return c.json({ records: [], total: totalDates, page, limit });
+    }
+
+    // Fetch all records for these dates
+    const { data: records, error } = await supabase.from('service_records')
+      .select('*')
+      .in('service_date', paginatedDates)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return c.json({ error: 'Failed to fetch service records' }, 500);
+    }
+
+    const grouped = await enrichAndGroupByDate(records || []);
+    return c.json({ records: grouped, total: totalDates, page, limit });
+  } catch (error) {
+    console.error('Get service records error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get combined service record detail for a date
+app.get("/service-records/by-date/:date", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const date = c.req.param('date');
+    const { data: records, error } = await supabase.from('service_records')
+      .select('*')
+      .eq('service_date', date)
+      .order('created_at', { ascending: false });
+
+    if (error || !records || records.length === 0) {
+      return c.json({ error: 'No service records found for this date' }, 404);
+    }
+
+    const serviceTypes: string[] = [];
+    const services: any[] = [];
+
+    // Process each service record (newest first = overwrites)
+    for (const sr of records) {
+      if (sr.service_type && !serviceTypes.includes(sr.service_type)) {
+        serviceTypes.push(sr.service_type);
+      }
+
+      let attendance = null;
+      let giving = null;
+      let attendees: any[] = [];
+      let absentees: any[] = [];
+
+      if (sr.attendance_record_id) {
+        const { data: att } = await supabase.from('attendance_records')
+          .select('*').eq('id', sr.attendance_record_id).single();
+        attendance = att ? toCamelCase(att) : null;
+
+        const { data: entries } = await supabase.from('attendance_entries')
+          .select('member_id, members!inner(first_name, last_name, zone)')
+          .eq('attendance_record_id', sr.attendance_record_id);
+        attendees = (entries || []).map((e: any) => ({
+          memberId: e.member_id,
+          firstName: e.members.first_name,
+          lastName: e.members.last_name,
+          zone: e.members.zone
+        }));
+
+        const { data: abs } = await supabase.from('absentee_records')
+          .select('*, members!inner(first_name, last_name)')
+          .eq('attendance_record_id', sr.attendance_record_id);
+        absentees = (abs || []).map((a: any) => toCamelCase({
+          ...a,
+          memberName: `${a.members.first_name} ${a.members.last_name}`
+        }));
+      }
+
+      if (sr.giving_record_id) {
+        const { data: giv } = await supabase.from('giving_records')
+          .select('*').eq('id', sr.giving_record_id).single();
+        giving = giv ? toCamelCase(giv) : null;
+      }
+
+      services.push({
+        ...toCamelCase(sr),
+        attendance,
+        giving,
+        attendees,
+        absentees,
+      });
+    }
+
+    // Combine totals across all services for this date
+    let totalAttendance = 0;
+    let totalGivingAmount = 0;
+    let allAttendees: any[] = [];
+    let allAbsentees: any[] = [];
+    const seenAttendeeIds = new Set<string>();
+    const seenAbsenteeIds = new Set<string>();
+
+    for (const svc of services) {
+      if (svc.attendance) totalAttendance += svc.attendance.totalCount || 0;
+      if (svc.giving) totalGivingAmount += svc.giving.totalAmount || svc.giving.total_amount || 0;
+
+      for (const a of svc.attendees) {
+        if (!seenAttendeeIds.has(a.memberId)) {
+          seenAttendeeIds.add(a.memberId);
+          allAttendees.push(a);
+        }
+      }
+      for (const a of svc.absentees) {
+        const abId = a.id || a.memberId;
+        if (!seenAbsenteeIds.has(abId)) {
+          seenAbsenteeIds.add(abId);
+          allAbsentees.push(a);
+        }
+      }
+    }
+
+    // Get visitors for this date
+    const { data: visitors } = await supabase.from('visitors')
+      .select('id, first_name, last_name, phone')
+      .eq('visit_date', date);
+
+    // Get new members registered on this date
+    const { data: newMembers } = await supabase.from('members')
+      .select('id, first_name, last_name, zone')
+      .eq('join_date', date);
+
+    return c.json({
+      serviceDate: date,
+      serviceTypes,
+      serviceType: serviceTypes.join(', ') || 'Service',
+      totalAttendance,
+      totalGivingAmount,
+      services,
+      attendees: allAttendees,
+      absentees: allAbsentees,
+      visitors: (visitors || []).map((v: any) => toCamelCase(v)),
+      newMembers: (newMembers || []).map((m: any) => toCamelCase(m)),
+    });
+  } catch (error) {
+    console.error('Get service record by date error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get single service record detail (legacy, kept for compatibility)
+app.get("/service-records/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const id = c.req.param('id');
+    const { data: sr, error } = await supabase.from('service_records')
+      .select('*').eq('id', id).single();
+
+    if (error || !sr) {
+      return c.json({ error: 'Service record not found' }, 404);
+    }
+
+    // Redirect to by-date endpoint logic
+    const date = sr.service_date;
+    const { data: records } = await supabase.from('service_records')
+      .select('*')
+      .eq('service_date', date)
+      .order('created_at', { ascending: false });
+
+    const serviceTypes: string[] = [];
+    const services: any[] = [];
+
+    for (const rec of (records || [sr])) {
+      if (rec.service_type && !serviceTypes.includes(rec.service_type)) {
+        serviceTypes.push(rec.service_type);
+      }
+
+      let attendance = null;
+      let giving = null;
+      let attendees: any[] = [];
+      let absentees: any[] = [];
+
+      if (rec.attendance_record_id) {
+        const { data: att } = await supabase.from('attendance_records')
+          .select('*').eq('id', rec.attendance_record_id).single();
+        attendance = att ? toCamelCase(att) : null;
+
+        const { data: entries } = await supabase.from('attendance_entries')
+          .select('member_id, members!inner(first_name, last_name, zone)')
+          .eq('attendance_record_id', rec.attendance_record_id);
+        attendees = (entries || []).map((e: any) => ({
+          memberId: e.member_id,
+          firstName: e.members.first_name,
+          lastName: e.members.last_name,
+          zone: e.members.zone
+        }));
+
+        const { data: abs } = await supabase.from('absentee_records')
+          .select('*, members!inner(first_name, last_name)')
+          .eq('attendance_record_id', rec.attendance_record_id);
+        absentees = (abs || []).map((a: any) => toCamelCase({
+          ...a,
+          memberName: `${a.members.first_name} ${a.members.last_name}`
+        }));
+      }
+
+      if (rec.giving_record_id) {
+        const { data: giv } = await supabase.from('giving_records')
+          .select('*').eq('id', rec.giving_record_id).single();
+        giving = giv ? toCamelCase(giv) : null;
+      }
+
+      services.push({ ...toCamelCase(rec), attendance, giving, attendees, absentees });
+    }
+
+    let totalAttendance = 0;
+    let totalGivingAmount = 0;
+    let allAttendees: any[] = [];
+    let allAbsentees: any[] = [];
+    const seenAttendeeIds = new Set<string>();
+    const seenAbsenteeIds = new Set<string>();
+
+    for (const svc of services) {
+      if (svc.attendance) totalAttendance += svc.attendance.totalCount || 0;
+      if (svc.giving) totalGivingAmount += svc.giving.totalAmount || svc.giving.total_amount || 0;
+      for (const a of svc.attendees) {
+        if (!seenAttendeeIds.has(a.memberId)) { seenAttendeeIds.add(a.memberId); allAttendees.push(a); }
+      }
+      for (const a of svc.absentees) {
+        const abId = a.id || a.memberId;
+        if (!seenAbsenteeIds.has(abId)) { seenAbsenteeIds.add(abId); allAbsentees.push(a); }
+      }
+    }
+
+    const { data: visitors } = await supabase.from('visitors')
+      .select('id, first_name, last_name, phone').eq('visit_date', date);
+    const { data: newMembers } = await supabase.from('members')
+      .select('id, first_name, last_name, zone').eq('join_date', date);
+
+    return c.json({
+      serviceDate: date,
+      serviceTypes,
+      serviceType: serviceTypes.join(', ') || 'Service',
+      totalAttendance,
+      totalGivingAmount,
+      services,
+      attendees: allAttendees,
+      absentees: allAbsentees,
+      visitors: (visitors || []).map((v: any) => toCamelCase(v)),
+      newMembers: (newMembers || []).map((m: any) => toCamelCase(m)),
+    });
+  } catch (error) {
+    console.error('Get service record detail error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// ACTIVITY LOG ENDPOINTS
+// ============================================================================
+
+// Get activity log
+app.get("/activity-log", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '50');
+    const offset = (page - 1) * limit;
+    const userId = c.req.query('userId');
+    const action = c.req.query('action');
+    const entityType = c.req.query('entityType');
+    const startDate = c.req.query('startDate');
+    const endDate = c.req.query('endDate');
+
+    let query = supabase.from('activity_log')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // Non-dev users can only see their own logs
+    if (!profile || profile.role !== 'dev') {
+      query = query.eq('user_id', user.id);
+    } else if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    if (action) query = query.eq('action', action);
+    if (entityType) query = query.eq('entity_type', entityType);
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate + 'T23:59:59.999Z');
+
+    const { data: logs, error, count } = await query;
+
+    if (error) {
+      console.error('Error fetching activity log:', error);
+      return c.json({ error: 'Failed to fetch activity log' }, 500);
+    }
+
+    return c.json({
+      logs: (logs || []).map((l: any) => toCamelCase(l)),
+      total: count || 0,
+      page,
+      limit
+    });
+  } catch (error) {
+    console.error('Get activity log error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Export activity log
+app.get("/activity-log/export", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+
+    const userId = c.req.query('userId');
+    const action = c.req.query('action');
+    const entityType = c.req.query('entityType');
+    const startDate = c.req.query('startDate');
+    const endDate = c.req.query('endDate');
+
+    let query = supabase.from('activity_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(5000);
+
+    if (!profile || profile.role !== 'dev') {
+      query = query.eq('user_id', user.id);
+    } else if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    if (action) query = query.eq('action', action);
+    if (entityType) query = query.eq('entity_type', entityType);
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate + 'T23:59:59.999Z');
+
+    const { data: logs, error } = await query;
+
+    if (error) {
+      return c.json({ error: 'Failed to export activity log' }, 500);
+    }
+
+    return c.json({ logs: (logs || []).map((l: any) => toCamelCase(l)) });
+  } catch (error) {
+    console.error('Export activity log error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// NOTIFICATION ENDPOINTS
+// ============================================================================
+
+// Get notifications for current user
+app.get("/notifications", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const page = parseInt(c.req.query('page') || '1');
+    const limit = parseInt(c.req.query('limit') || '20');
+    const offset = (page - 1) * limit;
+    const unreadOnly = c.req.query('unreadOnly') === 'true';
+
+    let query = supabase.from('notifications')
+      .select('*', { count: 'exact' })
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (unreadOnly) query = query.eq('is_read', false);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      return c.json({ error: 'Failed to fetch notifications' }, 500);
+    }
+
+    return c.json({
+      notifications: (data || []).map((n: any) => toCamelCase(n)),
+      total: count || 0,
+      page,
+      limit
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get unread count
+app.get("/notifications/unread-count", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { count, error } = await supabase.from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    if (error) {
+      return c.json({ error: 'Failed to fetch unread count' }, 500);
+    }
+
+    return c.json({ count: count || 0 });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Login summary — notifications since last login + birthday check
+app.get("/notifications/login-summary", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Get user's tab access
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const isDev = profile?.role === 'dev';
+
+    let accessibleTabs: string[] = [];
+    if (isDev) {
+      accessibleTabs = ['members', 'visitors', 'attendance', 'giving', 'reports', 'services', 'activity-log'];
+    } else {
+      const { data: tabData } = await supabase.from('user_tab_access').select('tab').eq('user_id', user.id);
+      accessibleTabs = (tabData || []).map(t => t.tab);
+    }
+
+    // Get unread notifications for accessible tabs
+    const { data: unread } = await supabase.from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // Filter to accessible tabs
+    const filtered = (unread || []).filter(n => !n.tab || accessibleTabs.includes(n.tab));
+
+    // Birthday check - members with birthdays today
+    let birthdays: any[] = [];
+    if (isDev || accessibleTabs.includes('members')) {
+      const today = new Date();
+      const month = today.getMonth() + 1;
+      const day = today.getDate();
+
+      const { data: bdayMembers } = await supabase.from('members')
+        .select('id, first_name, last_name, date_of_birth')
+        .not('date_of_birth', 'is', null);
+
+      birthdays = (bdayMembers || []).filter((m: any) => {
+        if (!m.date_of_birth) return false;
+        const d = new Date(m.date_of_birth);
+        return d.getMonth() + 1 === month && d.getDate() === day;
+      }).map((m: any) => ({
+        memberId: m.id,
+        name: `${m.first_name} ${m.last_name}`,
+        dateOfBirth: m.date_of_birth
+      }));
+
+      // Create birthday notifications if not already created today
+      for (const bday of birthdays) {
+        const todayStr = today.toISOString().split('T')[0];
+        const { data: existing } = await supabase.from('notifications')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('type', 'birthday')
+          .eq('entity_id', bday.memberId)
+          .gte('created_at', todayStr)
+          .limit(1);
+
+        if (!existing || existing.length === 0) {
+          await createNotification({
+            userId: user.id,
+            type: 'birthday',
+            title: 'Birthday Today!',
+            message: `${bday.name} has a birthday today.`,
+            tab: 'members',
+            entityType: 'member',
+            entityId: bday.memberId
+          });
+        }
+      }
+    }
+
+    return c.json({
+      notifications: filtered.map((n: any) => toCamelCase(n)),
+      birthdays,
+      accessibleTabs
+    });
+  } catch (error) {
+    console.error('Login summary error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Mark notification as read
+app.patch("/notifications/:id/read", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const id = c.req.param('id');
+    const { error } = await supabase.from('notifications')
+      .update({ is_read: true })
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return c.json({ error: 'Failed to mark as read' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Mark notification read error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Mark all notifications as read
+app.patch("/notifications/read-all", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { error } = await supabase.from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', user.id)
+      .eq('is_read', false);
+
+    if (error) {
+      return c.json({ error: 'Failed to mark all as read' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Mark all read error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

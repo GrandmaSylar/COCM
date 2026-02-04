@@ -20,6 +20,7 @@ export interface User {
   role: UserRole;
   permissions?: string[]; // Computed from role
   temporaryPermissions?: TemporaryPermission[]; // Fetched from temporary_permissions table
+  tabAccess?: string[]; // Tabs this user can access
   isActive: boolean;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
@@ -65,6 +66,7 @@ interface AuthContextType {
   updateRolePermissions: (role: UserRole, permissions: string[]) => void;
   toggleUserStatus: (userId: string) => void;
   canAccess: (permission: string) => boolean;
+  hasTabAccess: (tab: string) => boolean;
   isDev: boolean;
   isAdmin: boolean;
   grantTemporaryPermission: (userId: string, permission: string, durationHours: number) => void;
@@ -146,13 +148,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to fetch temporary permissions:', error);
     }
 
+    // Fetch tab access
+    let tabAccess: string[] = [];
+    try {
+      const { api } = await import('../services/api');
+      const tabData = await api.users.getTabAccess(userId);
+      tabAccess = tabData?.tabs || [];
+    } catch (error) {
+      console.error('Failed to fetch tab access:', error);
+    }
+
     return {
       id: profile.id,
       name: profile.name,
       email: profile.email,
       role: profile.role,
       isActive: profile.is_active,
-      temporaryPermissions
+      temporaryPermissions,
+      tabAccess
     };
   };
 
@@ -371,6 +384,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return validTempPerms.some(tp => tp.permission === permission);
   };
 
+  const hasTabAccess = (tab: string): boolean => {
+    if (!user || !user.isActive) return false;
+
+    // Dev role can access everything
+    if (user.role === 'dev') return true;
+
+    // Dashboard, settings, and help are always accessible
+    if (['dashboard', 'settings', 'help'].includes(tab)) return true;
+
+    // Check user's tab access
+    return (user.tabAccess || []).includes(tab);
+  };
+
   const grantTemporaryPermission = (userId: string, permission: string, durationHours: number) => {
     // Only Admin and Dev can grant temporary permissions
     if (!user || (user.role !== 'admin' && user.role !== 'dev')) return;
@@ -487,6 +513,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateRolePermissions,
     toggleUserStatus,
     canAccess,
+    hasTabAccess,
     isDev,
     isAdmin,
     grantTemporaryPermission,
