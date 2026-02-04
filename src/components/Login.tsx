@@ -97,7 +97,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="Enter your email or phone number"
+                  placeholder="e.g. email@example.com or 0201234567"
                   required
                   autoComplete="email"
                 />

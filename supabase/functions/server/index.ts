@@ -382,6 +382,14 @@ async function notifyTabUsers(tab: string, opts: {
 // 2FA HELPER FUNCTIONS
 // ============================================================================
 
+function normalizePhone(phone: string): string {
+  const stripped = phone.replace(/[\s\-()]/g, '');
+  if (/^0\d{9}$/.test(stripped)) return '+233' + stripped.slice(1);
+  if (/^233\d{9}$/.test(stripped)) return '+' + stripped;
+  if (/^\+233\d{9}$/.test(stripped)) return stripped;
+  return stripped;
+}
+
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
@@ -540,6 +548,7 @@ app.post("/auth/signup", async (c)=>{
         error: 'Invalid role'
       }, 400);
     }
+    const normalizedSignupPhone = phone ? normalizePhone(phone) : null;
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -547,7 +556,7 @@ app.post("/auth/signup", async (c)=>{
       user_metadata: {
         name,
         role,
-        phone
+        phone: normalizedSignupPhone
       }
     });
     if (authError) {
@@ -565,7 +574,7 @@ app.post("/auth/signup", async (c)=>{
       id: authData.user.id,
       name,
       email,
-      phone: phone || null,
+      phone: normalizedSignupPhone,
       role,
       is_active: false,
       approval_status: 'pending'
@@ -609,11 +618,25 @@ app.post("/auth/signin", async (c)=>{
         loginEmail = identifier;
       } else {
         // It's a phone number, look up the email
-        const { data: profile, error: profileError } = await supabase
+        // Try normalized form first, then raw input (for legacy data)
+        const normalizedPhone = normalizePhone(identifier);
+        const strippedPhone = identifier.replace(/[\s\-()]/g, '');
+        let { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
-          .eq('phone', identifier)
+          .eq('phone', normalizedPhone)
           .single();
+
+        // Fallback: try raw/stripped input in case DB has un-normalized data
+        if ((profileError || !profile) && normalizedPhone !== strippedPhone) {
+          const fallback = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('phone', strippedPhone)
+            .single();
+          profile = fallback.data;
+          profileError = fallback.error;
+        }
 
         if (profileError || !profile) {
           return c.json({
@@ -624,11 +647,23 @@ app.post("/auth/signin", async (c)=>{
       }
     } else if (phone && !email) {
       // Legacy phone field support
-      const { data: profile, error: profileError } = await supabase
+      const normalizedLegacyPhone = normalizePhone(phone);
+      const strippedLegacyPhone = phone.replace(/[\s\-()]/g, '');
+      let { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
-        .eq('phone', phone)
+        .eq('phone', normalizedLegacyPhone)
         .single();
+
+      if ((profileError || !profile) && normalizedLegacyPhone !== strippedLegacyPhone) {
+        const fallback = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('phone', strippedLegacyPhone)
+          .single();
+        profile = fallback.data;
+        profileError = fallback.error;
+      }
 
       if (profileError || !profile) {
         return c.json({
@@ -1037,12 +1072,24 @@ app.post("/auth/forgot-password", async (c) => {
         .single();
       profile = data;
     } else {
+      const normalizedFP = normalizePhone(identifier);
+      const strippedFP = identifier.replace(/[\s\-()]/g, '');
       const { data } = await supabase
         .from('profiles')
         .select('id, email, phone, name')
-        .eq('phone', identifier)
+        .eq('phone', normalizedFP)
         .single();
       profile = data;
+
+      // Fallback: try raw/stripped input for legacy data
+      if (!profile && normalizedFP !== strippedFP) {
+        const { data: fallbackData } = await supabase
+          .from('profiles')
+          .select('id, email, phone, name')
+          .eq('phone', strippedFP)
+          .single();
+        profile = fallbackData;
+      }
     }
 
     if (!profile) {
@@ -3586,13 +3633,15 @@ app.post("/users", async (c)=>{
         error: 'Only developers can create developer accounts'
       }, 403);
     }
+    const normalizedUserPhone = phone ? normalizePhone(phone) : null;
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
       user_metadata: {
         name,
-        role
+        role,
+        phone: normalizedUserPhone
       }
     });
     if (authError) {
@@ -3610,7 +3659,7 @@ app.post("/users", async (c)=>{
       id: authData.user.id,
       name,
       email,
-      phone: phone || null,
+      phone: normalizedUserPhone,
       role,
       is_active: true,
       approval_status: 'approved',
@@ -3747,7 +3796,7 @@ app.patch("/users/:id/contact", async (c) => {
 
     const profileUpdate: any = {};
     if (email) profileUpdate.email = email;
-    if (phone !== undefined) profileUpdate.phone = phone || null;
+    if (phone !== undefined) profileUpdate.phone = phone ? normalizePhone(phone) : null;
 
     // Update profiles table
     const { data: updatedProfile, error: profileError } = await supabase

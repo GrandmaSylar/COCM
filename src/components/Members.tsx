@@ -723,69 +723,69 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
-        <Card>
-          <CardContent className="p-4">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 stagger-children">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
               <div className="text-2xl font-bold">{members.length}</div>
-              <p className="text-sm text-muted-foreground">Total Members</p>
+              <p className="text-xs text-muted-foreground">Total</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-cyan-600">
+              <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
                 {members.filter(m => m.status === 'new').length}
               </div>
-              <p className="text-sm text-muted-foreground">New</p>
+              <p className="text-xs text-muted-foreground">New</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {members.filter(m => m.status === 'active').length}
               </div>
-              <p className="text-sm text-muted-foreground">Active</p>
+              <p className="text-xs text-muted-foreground">Active</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {members.filter(m => m.status === 'semi-active').length}
               </div>
-              <p className="text-sm text-muted-foreground">Semi-Active</p>
+              <p className="text-xs text-muted-foreground">Semi-Active</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                 {members.filter(m => m.status === 'inactive').length}
               </div>
-              <p className="text-sm text-muted-foreground">Inactive</p>
+              <p className="text-xs text-muted-foreground">Inactive</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
+          <CardContent className="p-3">
             <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                 {members.filter(m => m.status === 'sabbatical').length}
               </div>
-              <p className="text-sm text-muted-foreground">Sabbatical</p>
+              <p className="text-xs text-muted-foreground">Sabbatical</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Members List */}
-      <div className="space-y-4">
+      <div className="space-y-4 stagger-children">
         {members.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center space-y-4">
@@ -814,7 +814,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
           </Card>
         ) : (
           filteredMembers.map((member) => (
-            <Card key={member.id} className="hover:shadow-md transition-shadow">
+            <Card key={member.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

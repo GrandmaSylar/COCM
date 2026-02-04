@@ -20,7 +20,7 @@ const inflightRequests = new Map<string, Promise<any>>();
 
 // Short-lived GET cache (30 seconds) to avoid re-fetching on rapid navigation
 const getCache = new Map<string, { data: any; timestamp: number }>();
-const GET_CACHE_TTL = 30_000; // 30 seconds
+const GET_CACHE_TTL = 60_000; // 60 seconds
 
 function getCacheKey(endpoint: string): string {
   return endpoint;
@@ -196,13 +196,20 @@ export const api = {
     endSabbatical: (id: string) => fetchApi(`/members/${id}/sabbatical`, { method: 'DELETE' }),
 
     uploadPhoto: async (memberId: string, file: File) => {
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${memberId}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
+      // Determine content type from file or extension
+      const contentType = file.type || {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
+        heif: 'image/heif', svg: 'image/svg+xml', bmp: 'image/bmp',
+      }[fileExt] || 'image/jpeg';
+
       const { error: uploadError } = await supabase.storage
         .from('member-photos')
-        .upload(filePath, file);
+        .upload(filePath, file, { contentType, upsert: true });
 
       if (uploadError) {
         throw new Error('Failed to upload photo');

@@ -89,7 +89,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
           >
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center animate-soft-pulse">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -204,8 +204,8 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 bg-black/50">
-            <div className="fixed inset-y-0 left-0 w-64 bg-card shadow-xl">
+          <div className="lg:hidden fixed inset-0 z-50 bg-black/50 animate-fade-in">
+            <div className="fixed inset-y-0 left-0 w-64 bg-card shadow-xl animate-slide-in-left">
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-4 py-3 border-b">
                   <h1 className="text-lg">Church of Christ, Mataheko</h1>
@@ -259,29 +259,35 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* Main Content */}
         <div className="flex-1 lg:ml-64">
-          <main className="p-4 lg:p-6">
-            {children}
+          <main className="p-4 lg:p-6 pb-24 lg:pb-6">
+            <div key={currentPage} className="page-transition">
+              {children}
+            </div>
           </main>
         </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t safe-bottom z-40 animate-slide-in-bottom">
         <div className="flex">
           {filteredNavItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
+            const isActive = currentPage === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`flex-1 flex flex-col items-center py-2 px-1 ${
-                  currentPage === item.id
+                className={`flex-1 flex flex-col items-center py-2.5 px-1 transition-colors ${
+                  isActive
                     ? 'text-primary'
-                    : 'text-muted-foreground'
+                    : 'text-muted-foreground active:text-primary'
                 }`}
               >
-                <Icon className="w-5 h-5 mb-1" />
-                <span className="text-xs">{item.label}</span>
+                <div className={`transition-transform ${isActive ? 'scale-110' : ''}`}>
+                  <Icon className="w-5 h-5 mb-0.5" />
+                </div>
+                <span className={`text-[10px] ${isActive ? 'font-semibold' : ''}`}>{item.label}</span>
+                {isActive && <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />}
               </button>
             );
           })}

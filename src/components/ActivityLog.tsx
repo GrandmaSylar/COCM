@@ -130,11 +130,9 @@ export function ActivityLog() {
     const diffMins = Math.floor(diffMs / 60000);
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    // After 1 hour, show precise date and time
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' at ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -222,13 +220,13 @@ export function ActivityLog() {
       ) : logs.length === 0 ? (
         <Card><CardContent className="p-6 text-center text-muted-foreground">No activity logs found.</CardContent></Card>
       ) : (
-        <Card>
+        <Card className="animate-fade-in">
           <CardContent className="p-0 divide-y">
             {logs.map((log) => {
               const IconComp = actionIcons[log.action] || Plus;
               const iconColor = actionColors[log.action] || 'text-gray-500';
               return (
-                <div key={log.id} className="flex items-start gap-3 p-3">
+                <div key={log.id} className="flex items-start gap-3 p-3 hover:bg-muted/30 transition-colors">
                   <div className={`mt-0.5 ${iconColor}`}>
                     <IconComp className="w-4 h-4" />
                   </div>

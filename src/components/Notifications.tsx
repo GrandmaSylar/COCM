@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Bell, CheckCheck, Users, Calendar, DollarSign, Cake, AlertCircle, Eye } from 'lucide-react';
+import { Bell, CheckCheck, Users, Calendar, DollarSign, Cake, AlertCircle, Eye, ChevronRight, UserPlus } from 'lucide-react';
 import { api } from '../services/api';
 
 interface Notification {
@@ -17,9 +17,13 @@ interface Notification {
   createdAt: string;
 }
 
+interface NotificationsProps {
+  onNotificationClick?: (notification: Notification) => void;
+}
+
 const typeIcons: Record<string, any> = {
   member_status_change: Users,
-  member_registered: Users,
+  member_registered: UserPlus,
   giving_record: DollarSign,
   attendance_record: Calendar,
   birthday: Cake,
@@ -35,7 +39,16 @@ const typeColors: Record<string, string> = {
   system: 'text-secondary',
 };
 
-export function Notifications() {
+const typeBgColors: Record<string, string> = {
+  member_status_change: 'bg-secondary/10',
+  member_registered: 'bg-emerald-500/10',
+  giving_record: 'bg-emerald-500/10',
+  attendance_record: 'bg-amber-500/10',
+  birthday: 'bg-pink-500/10',
+  system: 'bg-secondary/10',
+};
+
+export function Notifications({ onNotificationClick }: NotificationsProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -77,6 +90,13 @@ export function Notifications() {
     }
   };
 
+  const handleNotificationClick = async (n: Notification) => {
+    if (!n.isRead) {
+      await markAsRead(n.id);
+    }
+    onNotificationClick?.(n);
+  };
+
   const formatTime = (d: string) => {
     const date = new Date(d);
     const now = new Date();
@@ -96,11 +116,14 @@ export function Notifications() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center shadow-sm">
             <Bell className="w-5 h-5 text-secondary" />
           </div>
-          <h1>Notifications</h1>
+          <div>
+            <h1 className="text-xl font-semibold">Notifications</h1>
+            {total > 0 && <p className="text-sm text-muted-foreground">{unreadCount} unread</p>}
+          </div>
         </div>
         <div className="flex gap-2">
           <Button
@@ -119,28 +142,37 @@ export function Notifications() {
       </div>
 
       {loading ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16" />
+            <Skeleton key={i} className="h-20 rounded-xl" />
           ))}
         </div>
       ) : notifications.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>{showUnreadOnly ? 'No unread notifications.' : 'No notifications yet.'}</p>
+        <Card className="shadow-sm">
+          <CardContent className="p-12 text-center text-muted-foreground">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Bell className="w-8 h-8 opacity-40" />
+            </div>
+            <p className="font-medium">{showUnreadOnly ? 'No unread notifications' : 'No notifications yet'}</p>
+            <p className="text-sm mt-1">You're all caught up!</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2 stagger-children">
           {notifications.map((n) => {
             const IconComp = typeIcons[n.type] || Bell;
             const iconColor = typeColors[n.type] || 'text-gray-500';
+            const iconBg = typeBgColors[n.type] || 'bg-gray-500/10';
+            const isClickable = !!onNotificationClick;
             return (
-              <Card key={n.id} className={`transition-colors ${!n.isRead ? 'border-l-4 border-l-amber-500 bg-amber-500/5' : ''}`}>
-                <CardContent className="p-3 flex items-start gap-3">
-                  <div className={`mt-0.5 ${iconColor}`}>
-                    <IconComp className="w-5 h-5" />
+              <Card
+                key={n.id}
+                className={`transition-all shadow-sm hover:shadow-md ${!n.isRead ? 'border-l-4 border-l-amber-500 bg-amber-500/5' : ''} ${isClickable ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+                onClick={() => isClickable && handleNotificationClick(n)}
+              >
+                <CardContent className="p-4 flex items-start gap-3">
+                  <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
+                    <IconComp className={`w-4 h-4 ${iconColor}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
@@ -149,14 +181,19 @@ export function Notifications() {
                     </div>
                     <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
                     {n.tab && (
-                      <span className="inline-block mt-1 text-xs bg-muted px-2 py-0.5 rounded capitalize">{n.tab}</span>
+                      <span className="inline-block mt-1.5 text-xs bg-muted px-2 py-0.5 rounded-full capitalize">{n.tab}</span>
                     )}
                   </div>
-                  {!n.isRead && (
-                    <Button variant="ghost" size="sm" className="shrink-0" onClick={() => markAsRead(n.id)}>
-                      <Eye className="w-3 h-3" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!n.isRead && (
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); markAsRead(n.id); }}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                    {isClickable && (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             );

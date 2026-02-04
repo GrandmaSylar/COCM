@@ -43,9 +43,10 @@ interface ServiceDateDetail {
 
 interface ServicesProps {
   onViewRecord?: (id: string) => void;
+  onViewMember?: (memberId: string) => void;
 }
 
-export function Services({ onViewRecord }: ServicesProps) {
+export function Services({ onViewRecord, onViewMember }: ServicesProps) {
   const [todayRecords, setTodayRecords] = useState<ServiceDateSummary[]>([]);
   const [pastRecords, setPastRecords] = useState<ServiceDateSummary[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ServiceDateDetail | null>(null);
@@ -119,7 +120,7 @@ export function Services({ onViewRecord }: ServicesProps) {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">
           <Card className="border-t-4 border-t-secondary">
             <CardContent className="p-4 text-center">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-secondary/10 flex items-center justify-center">
@@ -188,23 +189,6 @@ export function Services({ onViewRecord }: ServicesProps) {
           </div>
         ))}
 
-        {/* Combined Attendees */}
-        {sr.attendees && sr.attendees.length > 0 && (
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Attendees ({sr.attendees.length})</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {sr.attendees.map((a) => (
-                  <div key={a.memberId} className="text-sm flex justify-between px-2 py-1 bg-muted/50 rounded">
-                    <span>{a.firstName} {a.lastName}</span>
-                    <span className="text-muted-foreground">Zone {a.zone}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Combined Absentees */}
         {sr.absentees && sr.absentees.length > 0 && (
           <Card>
@@ -212,9 +196,18 @@ export function Services({ onViewRecord }: ServicesProps) {
             <CardContent>
               <div className="space-y-2">
                 {sr.absentees.map((a: any) => (
-                  <div key={a.id || a.memberId} className="text-sm flex justify-between px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded">
-                    <span>{a.memberName}</span>
-                    <span className="text-muted-foreground">{a.reason || 'No reason'}{a.requestedPermission ? ' (with permission)' : ''}</span>
+                  <div key={a.id || a.memberId} className="text-sm flex justify-between items-center px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded">
+                    {onViewMember && (a.memberId || a.id) ? (
+                      <button
+                        onClick={() => onViewMember(a.memberId || a.id)}
+                        className="text-left font-medium hover:text-primary hover:underline cursor-pointer transition-colors"
+                      >
+                        {a.memberName}
+                      </button>
+                    ) : (
+                      <span>{a.memberName}</span>
+                    )}
+                    <span className="text-muted-foreground text-xs">{a.reason || 'No reason'}{a.requestedPermission ? ' (with permission)' : ''}</span>
                   </div>
                 ))}
               </div>
@@ -269,9 +262,9 @@ export function Services({ onViewRecord }: ServicesProps) {
           <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">
             {todayRecords[0]?.serviceDate === new Date().toISOString().split('T')[0] ? "Today's Service" : 'Latest Service'}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-children">
             {todayRecords.map((sr) => (
-              <Card key={sr.serviceDate} className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-secondary" onClick={() => openDetail(sr.serviceDate)}>
+              <Card key={sr.serviceDate} className="cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all border-l-4 border-l-secondary" onClick={() => openDetail(sr.serviceDate)}>
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>

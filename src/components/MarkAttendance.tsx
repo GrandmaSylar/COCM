@@ -13,6 +13,7 @@ import { Member, ZONES } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { AbsenteeReview } from './AbsenteeReview';
+import { useCachedData } from '../hooks/useCachedData';
 
 interface AttendanceRecord {
   id: string;
@@ -57,6 +58,36 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
   const [savedAbsentMemberIds, setSavedAbsentMemberIds] = useState<string[]>([]);
 
   const { user } = useAuth();
+
+  const { data: cachedServices } = useCachedData<any[]>(
+    'custom-services',
+    () => api.services.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
+  const [customServices, setCustomServices] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (cachedServices) setCustomServices(cachedServices);
+  }, [cachedServices]);
+
+  const availableServices = [
+    SUNDAY_MAIN_SERVICE.name,
+    ...customServices.filter((s: any) => s.isActive).map((s: any) => s.name)
+  ];
+
+  const handleServiceTypeChange = (value: string) => {
+    setServiceType(value);
+    if (value === SUNDAY_MAIN_SERVICE.name) {
+      setStartTime(SUNDAY_MAIN_SERVICE.startTime);
+      setEndTime(SUNDAY_MAIN_SERVICE.endTime);
+    } else {
+      const cs = customServices.find((s: any) => s.name === value);
+      if (cs) {
+        setStartTime(cs.startTime);
+        setEndTime(cs.endTime);
+      }
+    }
+  };
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -258,13 +289,14 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="serviceType">Service Type</Label>
-              <Select value={serviceType} onValueChange={setServiceType}>
+              <Select value={serviceType} onValueChange={handleServiceTypeChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
-                  {/* Add custom services here */}
+                  {availableServices.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

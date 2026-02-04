@@ -191,7 +191,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="0XX XXX XXXX"
+                    placeholder="e.g. 0201234567 or +233201234567"
                     required
                   />
                 </div>

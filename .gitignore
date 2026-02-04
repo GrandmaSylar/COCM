@@ -1,1 +1,6 @@
 .env
+node_modules/
+build/
+.vite/
+
+.vercel

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, DollarSign, Plus } from 'lucide-react';
+import { Users, Calendar, DollarSign, Plus, TrendingUp, UserPlus, ChevronRight } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useState } from 'react';
@@ -148,81 +148,96 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div className="mb-6">
-        <h1 className="mb-2">Welcome back, {user?.name}!</h1>
+      <div className="mb-2">
+        <h1 className="text-2xl font-semibold mb-1">Welcome back, {user?.name}!</h1>
         <p className="text-muted-foreground">
           Here's what's happening in your church today.
         </p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-secondary" onClick={() => onNavigate('members')}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Members</CardTitle>
-            <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
-              <Users className="w-4 h-4 text-secondary" />
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger-children">
+        <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm overflow-hidden" onClick={() => onNavigate('members')}>
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              <div className="w-2 bg-secondary" />
+              <div className="flex-1 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Total Members</span>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-secondary" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold tracking-tight">{stats.totalMembers}</div>
+                {stats.newMembersThisMonth > 0 && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    +{stats.newMembersThisMonth} new this month
+                  </p>
+                )}
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalMembers}</div>
-            <p className="text-xs text-muted-foreground">
-              +{stats.newMembersThisMonth} new this month
-            </p>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-amber-500" onClick={() => onNavigate('attendance')}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm text-muted-foreground">This Week's Attendance</CardTitle>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-              <Calendar className="w-4 h-4 text-amber-500" />
+        <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm overflow-hidden" onClick={() => onNavigate('attendance')}>
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              <div className="w-2 bg-amber-500" />
+              <div className="flex-1 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">This Week's Attendance</span>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-amber-500" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold tracking-tight">{stats.attendanceThisWeek}</div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.attendanceThisWeek}</div>
           </CardContent>
         </Card>
 
-        <Card className="cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-emerald-500" onClick={() => onNavigate('giving')}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Monthly Giving</CardTitle>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-              <DollarSign className="w-4 h-4 text-emerald-500" />
+        <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm overflow-hidden" onClick={() => onNavigate('giving')}>
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
+              <div className="w-2 bg-emerald-500" />
+              <div className="flex-1 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-muted-foreground">Monthly Giving</span>
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-emerald-500" />
+                  </div>
+                </div>
+                <div className="text-3xl font-bold tracking-tight">{formatGhanaCedis(stats.givingThisMonth)}</div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatGhanaCedis(stats.givingThisMonth)}</div>
           </CardContent>
         </Card>
       </div>
 
       {/* Quick Actions */}
       <div>
-        <h2 className="mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
           {filteredQuickActions.map((action) => {
             const Icon = action.icon;
             return (
-              <Card key={action.id} className="cursor-pointer hover:shadow-md transition-shadow group">
-                <CardContent className="p-4">
-                  <Button
-                    variant="outline"
-                    className="w-full h-auto p-4 flex flex-col items-center gap-3 border-dashed border-secondary/30 hover:border-secondary hover:bg-secondary/5"
-                    onClick={() => onQuickAction(action.id)}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-secondary/10 group-hover:bg-secondary/20 flex items-center justify-center transition-colors">
-                      <Icon className="w-6 h-6 text-secondary" />
-                    </div>
-                    <div className="text-center">
-                      <div className="font-medium">{action.label}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {action.description}
-                      </div>
-                    </div>
-                  </Button>
-                </CardContent>
-              </Card>
+              <button
+                key={action.id}
+                onClick={() => onQuickAction(action.id)}
+                className="flex items-center gap-3 p-4 rounded-xl border border-dashed border-secondary/30 hover:border-secondary hover:bg-secondary/5 transition-all hover:shadow-sm group text-left"
+              >
+                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-secondary/15 to-secondary/5 group-hover:from-secondary/25 group-hover:to-secondary/10 flex items-center justify-center transition-colors shrink-0">
+                  <Icon className="w-5 h-5 text-secondary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{action.label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {action.description}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </button>
             );
           })}
         </div>
@@ -231,13 +246,13 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       {/* Recent Activity */}
       {recentActivity.length > 0 && (
         <div>
-          <h2 className="mb-4">Recent Activity</h2>
-          <Card>
+          <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+          <Card className="shadow-sm">
             <CardContent className="p-0">
               {recentActivity.map((activity, index) => (
                 <div
                   key={activity.id}
-                  className={`p-4 flex items-start gap-3 ${
+                  className={`p-4 flex items-start gap-3 hover:bg-muted/30 transition-colors ${
                     index !== recentActivity.length - 1 ? 'border-b' : ''
                   }`}
                 >

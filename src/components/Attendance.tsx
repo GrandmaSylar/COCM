@@ -89,7 +89,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
 
   useEffect(() => {
     if (cachedServices) setCustomServices(cachedServices);
-  }, []);
+  }, [cachedServices]);
 
   const canRecordAttendance = canAccess('record_attendance');
   const canManageServices = canAccess('manage_services');
@@ -249,7 +249,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       </Alert>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -739,9 +739,7 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
 
   useEffect(() => {
     if (cachedSvc) setCustomServices(cachedSvc);
-
-    fetchData();
-  }, []);
+  }, [cachedSvc]);
 
   // Get available service types
   const availableServices = [

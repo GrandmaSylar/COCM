@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AuthProvider, useAuth, TwoFAData } from './components/AuthContext';
 import { ThemeProvider } from './components/ThemeContext';
 import { Login } from './components/Login';
@@ -14,7 +14,7 @@ import { MemberProfile } from './components/MemberProfile';
 import { MemberAttendanceHistory } from './components/MemberAttendanceHistory';
 import { Attendance, RecordAttendance, AttendanceDetail } from './components/Attendance';
 import { MarkAttendance } from './components/MarkAttendance';
-import { Visitors, AddVisitor, VisitorProfile, Visitor } from './components/Visitors';
+import { Visitors, AddVisitor, VisitorProfile, EditVisitor, Visitor } from './components/Visitors';
 import { Giving, RecordGiving, GivingDetail } from './components/Giving';
 import { Reports } from './components/Reports';
 import { Settings, AddUser } from './components/Settings';
@@ -27,14 +27,43 @@ import { toast } from 'sonner@2.0.3';
 import { api } from './services/api';
 
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
-               'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' |
+               'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
                'member-attendance-history' | 'services' | 'activity-log' | 'notifications';
 
+// Map sub-pages to their parent for back navigation
+const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
+  'add-member': 'members',
+  'edit-member': 'member-profile',
+  'member-profile': 'members',
+  'member-attendance-history': 'member-profile',
+  'record-attendance': 'attendance',
+  'mark-attendance': 'attendance',
+  'attendance-detail': 'attendance',
+  'add-visitor': 'visitors',
+  'visitor-profile': 'visitors',
+  'edit-visitor': 'visitor-profile',
+  'convert-visitor': 'visitor-profile',
+  'record-giving': 'giving',
+  'giving-detail': 'giving',
+  'manage-giving-types': 'giving',
+  'add-user': 'settings',
+};
+
 function AppContent() {
   const { isAuthenticated, completeLogin } = useAuth();
-  // Start with login page - user must authenticate first
-  const [currentPage, setCurrentPage] = useState<AppPage>('login');
+  const isNavigatingRef = useRef(false);
+
+  // Restore page from sessionStorage
+  const getInitialPage = (): AppPage => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('currentPage');
+      if (saved) return saved as AppPage;
+    }
+    return 'login';
+  };
+
+  const [currentPage, setCurrentPage] = useState<AppPage>(getInitialPage);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
   const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(null);
@@ -44,6 +73,96 @@ function AppContent() {
   const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
   const [membersRefreshKey, setMembersRefreshKey] = useState(0);
   const [twoFAData, setTwoFAData] = useState<TwoFAData | null>(null);
+  const [restoringState, setRestoringState] = useState(true);
+
+  // Persist page to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem('currentPage', currentPage);
+  }, [currentPage]);
+
+  // Persist entity IDs to sessionStorage
+  useEffect(() => {
+    if (selectedMember) sessionStorage.setItem('selectedMemberId', selectedMember.id);
+    else sessionStorage.removeItem('selectedMemberId');
+  }, [selectedMember]);
+
+  useEffect(() => {
+    if (selectedVisitor) sessionStorage.setItem('selectedVisitorId', selectedVisitor.id);
+    else sessionStorage.removeItem('selectedVisitorId');
+  }, [selectedVisitor]);
+
+  useEffect(() => {
+    if (selectedAttendanceId) sessionStorage.setItem('selectedAttendanceId', selectedAttendanceId);
+    else sessionStorage.removeItem('selectedAttendanceId');
+  }, [selectedAttendanceId]);
+
+  useEffect(() => {
+    if (selectedGivingId) sessionStorage.setItem('selectedGivingId', selectedGivingId);
+    else sessionStorage.removeItem('selectedGivingId');
+  }, [selectedGivingId]);
+
+  // Restore entities from sessionStorage on mount
+  useEffect(() => {
+    const restoreState = async () => {
+      try {
+        const memberId = sessionStorage.getItem('selectedMemberId');
+        const visitorId = sessionStorage.getItem('selectedVisitorId');
+        const attId = sessionStorage.getItem('selectedAttendanceId');
+        const givId = sessionStorage.getItem('selectedGivingId');
+
+        if (memberId && !selectedMember) {
+          try {
+            const member = await api.members.getById(memberId);
+            if (member) setSelectedMember(member);
+          } catch { /* member may no longer exist */ }
+        }
+        if (visitorId && !selectedVisitor) {
+          try {
+            const visitor = await api.visitors.getById(visitorId);
+            if (visitor) setSelectedVisitor(visitor);
+          } catch { /* visitor may no longer exist */ }
+        }
+        if (attId) setSelectedAttendanceId(attId);
+        if (givId) setSelectedGivingId(givId);
+      } finally {
+        setRestoringState(false);
+      }
+    };
+    if (isAuthenticated) {
+      restoreState();
+    } else {
+      setRestoringState(false);
+    }
+  }, [isAuthenticated]);
+
+  // Browser back/forward button support
+  const navigateTo = useCallback((page: AppPage, pushState = true) => {
+    if (pushState && !isNavigatingRef.current) {
+      window.history.pushState({ page }, '', undefined);
+    }
+    setCurrentPage(page);
+  }, []);
+
+  useEffect(() => {
+    // Set initial history state
+    window.history.replaceState({ page: currentPage }, '', undefined);
+
+    const handlePopState = (event: PopStateEvent) => {
+      isNavigatingRef.current = true;
+      const page = event.state?.page as AppPage;
+      if (page) {
+        setCurrentPage(page);
+      } else {
+        // If no state, go to parent or dashboard
+        const parent = PAGE_PARENT[currentPage] || 'dashboard';
+        setCurrentPage(parent);
+      }
+      setTimeout(() => { isNavigatingRef.current = false; }, 0);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Show authentication pages when not authenticated
   if (!isAuthenticated) {
@@ -68,7 +187,7 @@ function AppContent() {
             onVerified={async (session, user) => {
               await completeLogin(session, user);
               setTwoFAData(null);
-              setCurrentPage('dashboard');
+              navigateTo('dashboard');
             }}
             onCancel={() => {
               setTwoFAData(null);
@@ -88,7 +207,7 @@ function AppContent() {
 
   // Auto-navigate to dashboard after successful login
   if (isAuthenticated && currentPage === 'login') {
-    setCurrentPage('dashboard');
+    navigateTo('dashboard', false);
 
     // Fetch login summary notifications
     api.notifications.getLoginSummary().then((summary: any) => {
@@ -102,39 +221,46 @@ function AppContent() {
         toast.info(`You have ${notifs.length} new notification${notifs.length > 1 ? 's' : ''}.`);
       }
     }).catch(() => {});
+
+    // Prefetch critical data
+    Promise.all([
+      api.members.getAll(),
+      api.services.getAll(),
+      api.giving.types.getAll(),
+    ]).catch(() => {});
   }
 
   const handleNavigate = (page: string) => {
-    setCurrentPage(page as AppPage);
+    navigateTo(page as AppPage);
   };
 
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'add-member':
-        setCurrentPage('add-member');
+        navigateTo('add-member');
         break;
       case 'record-attendance':
-        setCurrentPage('record-attendance');
+        navigateTo('record-attendance');
         break;
       case 'mark-attendance':
-        setCurrentPage('mark-attendance');
+        navigateTo('mark-attendance');
         break;
       case 'record-giving':
-        setCurrentPage('record-giving');
+        navigateTo('record-giving');
         break;
       case 'add-visitor':
-        setCurrentPage('add-visitor');
+        navigateTo('add-visitor');
         break;
     }
   };
 
   const handleAddMember = () => {
-    setCurrentPage('add-member');
+    navigateTo('add-member');
   };
 
   const handleViewMember = (member: Member) => {
     setSelectedMember(member);
-    setCurrentPage('member-profile');
+    navigateTo('member-profile');
   };
 
   const handleViewMemberById = async (memberId: string) => {
@@ -142,7 +268,7 @@ function AppContent() {
       const member = await api.members.getById(memberId);
       if (member) {
         setSelectedMember(member);
-        setCurrentPage('member-profile');
+        navigateTo('member-profile');
       } else {
         toast.error('Member not found');
       }
@@ -161,7 +287,7 @@ function AppContent() {
       await api.members.create(memberData);
       toast.success('Member added successfully!');
       setMembersRefreshKey(prev => prev + 1);
-      setCurrentPage('members');
+      navigateTo('members');
     } catch (error) {
       console.error('Failed to add member:', error);
       toast.error('Failed to add member. Please try again.');
@@ -170,16 +296,16 @@ function AppContent() {
 
   const handleEditMember = (member: Member) => {
     setSelectedMember(member);
-    setCurrentPage('edit-member');
+    navigateTo('edit-member');
   };
 
   const handleUpdateMember = async (memberData: Member) => {
     try {
       await api.members.update(memberData.id, memberData);
       toast.success('Member updated successfully!');
-      setSelectedMember(memberData); // Update selected member with new data
+      setSelectedMember(memberData);
       setMembersRefreshKey(prev => prev + 1);
-      setCurrentPage('member-profile'); // Navigate back to profile
+      navigateTo('member-profile');
     } catch (error: any) {
       console.error('Failed to update member:', error);
       const message = error?.message || 'Failed to update member. Please try again.';
@@ -193,7 +319,7 @@ function AppContent() {
       toast.success('Member deleted successfully!');
       setSelectedMember(null);
       setMembersRefreshKey(prev => prev + 1);
-      setCurrentPage('members');
+      navigateTo('members');
     } catch (error) {
       console.error('Failed to delete member:', error);
       toast.error('Failed to delete member. Please try again.');
@@ -201,72 +327,87 @@ function AppContent() {
   };
 
   const handleRecordAttendance = () => {
-    setCurrentPage('record-attendance');
+    navigateTo('record-attendance');
   };
 
   const handleMarkAttendance = () => {
-    setCurrentPage('mark-attendance');
+    navigateTo('mark-attendance');
   };
 
   const handleSaveAttendance = (attendanceData: any) => {
     toast.success('Attendance recorded successfully!');
     setAttendanceRefreshKey(prev => prev + 1);
-    setCurrentPage('attendance');
+    navigateTo('attendance');
   };
 
   const handleSaveMarkedAttendance = (attendanceData: any) => {
     toast.success('Individual attendance marked successfully!');
     setAttendanceRefreshKey(prev => prev + 1);
-    setCurrentPage('attendance');
+    navigateTo('attendance');
   };
 
   const handleRecordGiving = () => {
-    setCurrentPage('record-giving');
+    navigateTo('record-giving');
   };
 
   const handleSaveGiving = (givingData: any) => {
     toast.success('Giving record added successfully!');
     setGivingRefreshKey(prev => prev + 1);
-    setCurrentPage('giving');
+    navigateTo('giving');
   };
 
   const handleAddUser = () => {
-    setCurrentPage('add-user');
+    navigateTo('add-user');
   };
 
   const handleSaveUser = (userData: any) => {
-    // In real app, this would save to API/database
     toast.success('User created successfully!');
-    setCurrentPage('settings');
+    navigateTo('settings');
   };
 
   // Visitor handlers
   const handleAddVisitor = () => {
-    setCurrentPage('add-visitor');
+    navigateTo('add-visitor');
   };
 
   const handleViewVisitor = (visitor: Visitor) => {
     setSelectedVisitor(visitor);
-    setCurrentPage('visitor-profile');
+    navigateTo('visitor-profile');
+  };
+
+  const handleEditVisitor = (visitor: Visitor) => {
+    setSelectedVisitor(visitor);
+    navigateTo('edit-visitor');
+  };
+
+  const handleUpdateVisitor = async (visitorData: Visitor) => {
+    try {
+      await api.visitors.update(visitorData.id, visitorData);
+      toast.success('Visitor updated successfully!');
+      setSelectedVisitor(visitorData);
+      setVisitorsRefreshKey(prev => prev + 1);
+      navigateTo('visitor-profile');
+    } catch (error: any) {
+      console.error('Failed to update visitor:', error);
+      toast.error(error?.message || 'Failed to update visitor. Please try again.');
+    }
   };
 
   const handleSaveVisitor = (visitorData: Omit<Visitor, 'id'>) => {
     toast.success('Visitor added successfully!');
     setVisitorsRefreshKey(prev => prev + 1);
-    setCurrentPage('visitors');
+    navigateTo('visitors');
   };
 
   const handleConvertVisitorToMember = (visitor: Visitor) => {
     setSelectedVisitor(visitor);
-    setCurrentPage('convert-visitor');
+    navigateTo('convert-visitor');
   };
 
   const handleSaveConvertedMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
     try {
-      // Create the member
       await api.members.create(memberData);
 
-      // Mark visitor as converted if we have a selected visitor
       if (selectedVisitor) {
         await api.visitors.update(selectedVisitor.id, {
           ...selectedVisitor,
@@ -277,45 +418,74 @@ function AppContent() {
       toast.success('Visitor converted to member successfully!');
       setMembersRefreshKey(prev => prev + 1);
       setSelectedVisitor(null);
-      setCurrentPage('members');
+      navigateTo('members');
     } catch (error) {
       console.error('Failed to convert visitor:', error);
       toast.error('Failed to convert visitor. Please try again.');
     }
   };
 
+  // Notification click handler - navigate to relevant page
+  const handleNotificationClick = (notification: any) => {
+    const { type, entityType, entityId } = notification;
+
+    if (type === 'member_registered' || entityType === 'user') {
+      navigateTo('settings');
+    } else if ((type === 'member_status_change' || type === 'birthday') && entityId) {
+      handleViewMemberById(entityId);
+    } else if (type === 'attendance_record' || entityType === 'attendance') {
+      navigateTo('attendance');
+    } else if (type === 'giving_record' || entityType === 'giving') {
+      navigateTo('giving');
+    } else if (entityType === 'member' && entityId) {
+      handleViewMemberById(entityId);
+    } else if (entityType === 'visitor') {
+      navigateTo('visitors');
+    }
+  };
+
+  if (restoringState && isAuthenticated) {
+    return (
+      <Layout currentPage={currentPage} onNavigate={handleNavigate}>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    );
+  }
+
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;
-      
+
       case 'members':
         return (
           <Members
             key={membersRefreshKey}
             onAddMember={handleAddMember}
             onViewMember={handleViewMember}
-            onAddFromVisitor={() => setCurrentPage('visitors')}
+            onAddFromVisitor={() => navigateTo('visitors')}
           />
         );
-      
+
       case 'add-member':
         return (
-          <AddMember 
-            onBack={() => setCurrentPage('members')} 
+          <AddMember
+            onBack={() => navigateTo('members')}
             onSave={handleSaveMember}
           />
         );
-      
+
       case 'member-profile':
         return selectedMember ? (
           <MemberProfile
             member={selectedMember}
-            onBack={() => setCurrentPage('members')}
+            onBack={() => navigateTo('members')}
             onEdit={handleEditMember}
             onDelete={handleDeleteMember}
             onViewMember={handleViewMemberById}
-            onViewAttendanceHistory={() => setCurrentPage('member-attendance-history')}
+            onViewAttendanceHistory={() => navigateTo('member-attendance-history')}
           />
         ) : null;
 
@@ -324,7 +494,7 @@ function AppContent() {
           <MemberAttendanceHistory
             memberId={selectedMember.id}
             memberName={`${selectedMember.firstName} ${selectedMember.lastName}`}
-            onBack={() => setCurrentPage('member-profile')}
+            onBack={() => navigateTo('member-profile')}
           />
         ) : null;
 
@@ -332,11 +502,11 @@ function AppContent() {
         return selectedMember ? (
           <EditMember
             member={selectedMember}
-            onBack={() => setCurrentPage('member-profile')}
+            onBack={() => navigateTo('member-profile')}
             onSave={handleUpdateMember}
           />
         ) : null;
-      
+
       case 'attendance':
         return <Attendance
           key={attendanceRefreshKey}
@@ -344,7 +514,7 @@ function AppContent() {
           onMarkAttendance={handleMarkAttendance}
           onViewRecord={(id: string) => {
             setSelectedAttendanceId(id);
-            setCurrentPage('attendance-detail');
+            navigateTo('attendance-detail');
           }}
         />;
 
@@ -352,10 +522,10 @@ function AppContent() {
         return selectedAttendanceId ? (
           <AttendanceDetail
             recordId={selectedAttendanceId}
-            onBack={() => setCurrentPage('attendance')}
+            onBack={() => navigateTo('attendance')}
             onSaved={() => {
               setAttendanceRefreshKey(prev => prev + 1);
-              setCurrentPage('attendance');
+              navigateTo('attendance');
             }}
           />
         ) : null;
@@ -363,7 +533,7 @@ function AppContent() {
       case 'record-attendance':
         return (
           <RecordAttendance
-            onBack={() => setCurrentPage('attendance')}
+            onBack={() => navigateTo('attendance')}
             onSave={handleSaveAttendance}
           />
         );
@@ -371,11 +541,11 @@ function AppContent() {
       case 'mark-attendance':
         return (
           <MarkAttendance
-            onBack={() => setCurrentPage('attendance')}
+            onBack={() => navigateTo('attendance')}
             onSave={handleSaveMarkedAttendance}
           />
         );
-      
+
       case 'visitors':
         return (
           <Visitors
@@ -385,29 +555,38 @@ function AppContent() {
             onConvertToMember={handleConvertVisitorToMember}
           />
         );
-      
+
       case 'add-visitor':
         return (
-          <AddVisitor 
-            onBack={() => setCurrentPage('visitors')}
+          <AddVisitor
+            onBack={() => navigateTo('visitors')}
             onSave={handleSaveVisitor}
           />
         );
-      
+
       case 'visitor-profile':
         return selectedVisitor ? (
-          <VisitorProfile 
+          <VisitorProfile
             visitor={selectedVisitor}
-            onBack={() => setCurrentPage('visitors')}
-            onEdit={(visitor) => toast.info('Edit visitor functionality would be implemented here')}
+            onBack={() => navigateTo('visitors')}
+            onEdit={handleEditVisitor}
             onConvertToMember={handleConvertVisitorToMember}
           />
         ) : null;
-      
+
+      case 'edit-visitor':
+        return selectedVisitor ? (
+          <EditVisitor
+            visitor={selectedVisitor}
+            onBack={() => navigateTo('visitor-profile')}
+            onSave={handleUpdateVisitor}
+          />
+        ) : null;
+
       case 'convert-visitor':
         return selectedVisitor ? (
-          <AddMember 
-            onBack={() => setCurrentPage('visitor-profile')}
+          <AddMember
+            onBack={() => navigateTo('visitor-profile')}
             onSave={handleSaveConvertedMember}
             visitorData={selectedVisitor}
           />
@@ -419,7 +598,7 @@ function AppContent() {
           onRecordGiving={handleRecordGiving}
           onViewRecord={(id: string) => {
             setSelectedGivingId(id);
-            setCurrentPage('giving-detail');
+            navigateTo('giving-detail');
           }}
         />;
 
@@ -427,10 +606,10 @@ function AppContent() {
         return selectedGivingId ? (
           <GivingDetail
             recordId={selectedGivingId}
-            onBack={() => setCurrentPage('giving')}
+            onBack={() => navigateTo('giving')}
             onSaved={() => {
               setGivingRefreshKey(prev => prev + 1);
-              setCurrentPage('giving');
+              navigateTo('giving');
             }}
           />
         ) : null;
@@ -442,7 +621,7 @@ function AppContent() {
             onRecordGiving={handleRecordGiving}
             onViewRecord={(id: string) => {
               setSelectedGivingId(id);
-              setCurrentPage('giving-detail');
+              navigateTo('giving-detail');
             }}
             initialShowTypeManager={true}
           />
@@ -451,44 +630,42 @@ function AppContent() {
       case 'record-giving':
         return (
           <RecordGiving
-            onBack={() => setCurrentPage('giving')}
+            onBack={() => navigateTo('giving')}
             onSave={handleSaveGiving}
-            onManageTypes={() => setCurrentPage('manage-giving-types')}
+            onManageTypes={() => navigateTo('manage-giving-types')}
           />
         );
-      
+
       case 'reports':
         return <Reports />;
 
       case 'services':
-        return <Services />;
+        return <Services onViewMember={handleViewMemberById} />;
 
       case 'activity-log':
         return <ActivityLog />;
 
       case 'notifications':
-        return <Notifications />;
+        return <Notifications onNotificationClick={handleNotificationClick} />;
 
       case 'help':
         return <Help />;
-      
+
       case 'settings':
         return <Settings onAddUser={handleAddUser} />;
-      
+
       case 'add-user':
         return (
-          <AddUser 
-            onBack={() => setCurrentPage('settings')}
+          <AddUser
+            onBack={() => navigateTo('settings')}
             onSave={handleSaveUser}
           />
         );
-      
+
       default:
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;
     }
   };
-
-  // No need to redirect since we start in dashboard mode
 
   return (
     <Layout currentPage={currentPage} onNavigate={handleNavigate}>

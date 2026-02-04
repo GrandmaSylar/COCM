@@ -126,28 +126,28 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 stagger-children">
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="text-center">
               <div className="text-2xl font-bold">{totalVisitors}</div>
-              <p className="text-sm text-muted-foreground">Total Visitors</p>
+              <p className="text-xs text-muted-foreground">Total Visitors</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{interestedInMembership}</div>
-              <p className="text-sm text-muted-foreground">Interested in Membership</p>
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{interestedInMembership}</div>
+              <p className="text-xs text-muted-foreground">Interested in Membership</p>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{thisMonthVisitors}</div>
-              <p className="text-sm text-muted-foreground">This Month</p>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{thisMonthVisitors}</div>
+              <p className="text-xs text-muted-foreground">This Month</p>
             </div>
           </CardContent>
         </Card>
@@ -206,7 +206,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
           </Card>
         ) : (
           filteredVisitors.map((visitor) => (
-            <Card key={visitor.id} className="hover:shadow-md transition-shadow">
+            <Card key={visitor.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -620,6 +620,315 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
               </Button>
               <Button type="submit" disabled={!isValid || isLoading}>
                 {isLoading ? 'Saving...' : 'Save Visitor'}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Edit Visitor Component
+interface EditVisitorProps {
+  visitor: Visitor;
+  onBack: () => void;
+  onSave: (visitor: Visitor) => void;
+}
+
+export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
+  const [formData, setFormData] = useState({
+    firstName: visitor.firstName,
+    lastName: visitor.lastName,
+    otherNames: visitor.otherNames || '',
+    email: visitor.email || '',
+    phone: visitor.phone,
+    secondPhone: visitor.secondPhone || '',
+    gender: visitor.gender || '' as 'male' | 'female' | '',
+    dateOfBirth: visitor.dateOfBirth || '',
+    residenceLocation: visitor.residenceLocation,
+    visitDate: visitor.visitDate,
+    serviceType: visitor.serviceType,
+    referredBy: visitor.referredBy || '',
+    interestedInMembership: visitor.interestedInMembership,
+    notes: visitor.notes || '',
+    potentialZone: visitor.potentialZone || '' as Zone | ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
+  const [referrerSearchQuery, setReferrerSearchQuery] = useState(visitor.referredBy || '');
+  const [showReferrerSuggestions, setShowReferrerSuggestions] = useState(false);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const data = await api.members.getAll();
+        setMembers(data || []);
+      } catch (error) {
+        console.error('Failed to fetch members:', error);
+      }
+    };
+    fetchMembers();
+  }, []);
+
+  const filteredMembers = members.filter(member =>
+    `${member.firstName} ${member.lastName}`.toLowerCase().includes(referrerSearchQuery.toLowerCase())
+  ).slice(0, 5);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.firstName || !formData.lastName || !formData.phone || !formData.residenceLocation) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      onSave({
+        ...visitor,
+        ...formData,
+        potentialZone: formData.potentialZone || undefined
+      } as Visitor);
+    } catch (error) {
+      console.error('Failed to update visitor:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const isValid = formData.firstName && formData.lastName && formData.phone && formData.residenceLocation;
+  const zones = Object.keys(ZONES) as Array<keyof typeof ZONES>;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div>
+          <h1>Edit Visitor</h1>
+          <p className="text-muted-foreground">
+            Update visitor information
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Visitor Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="font-medium">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-firstName">First Name *</Label>
+                  <Input
+                    id="edit-firstName"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-otherNames">Other Names</Label>
+                  <Input
+                    id="edit-otherNames"
+                    value={formData.otherNames}
+                    onChange={(e) => setFormData(prev => ({ ...prev, otherNames: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-lastName">Last Name *</Label>
+                  <Input
+                    id="edit-lastName"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-gender">Gender</Label>
+                  <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-dateOfBirth">Date of Birth</Label>
+                  <Input
+                    id="edit-dateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="space-y-4">
+              <h3 className="font-medium">Contact Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone">Phone Number *</Label>
+                  <Input
+                    id="edit-phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="+233 XX XXX XXXX"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-secondPhone">Second Phone</Label>
+                  <Input
+                    id="edit-secondPhone"
+                    value={formData.secondPhone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, secondPhone: e.target.value }))}
+                    placeholder="+233 XX XXX XXXX"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-email">Email Address</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-residenceLocation">Residence Location *</Label>
+                  <Input
+                    id="edit-residenceLocation"
+                    value={formData.residenceLocation}
+                    onChange={(e) => setFormData(prev => ({ ...prev, residenceLocation: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Visit Information */}
+            <div className="space-y-4">
+              <h3 className="font-medium">Visit Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-visitDate">Visit Date</Label>
+                  <Input
+                    id="edit-visitDate"
+                    type="date"
+                    value={formData.visitDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, visitDate: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-serviceType">Service Type</Label>
+                  <Select value={formData.serviceType} onValueChange={(value) => setFormData(prev => ({ ...prev, serviceType: value }))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 relative">
+                  <Label htmlFor="edit-referredBy">Referred By (Member)</Label>
+                  <Input
+                    id="edit-referredBy"
+                    value={referrerSearchQuery || formData.referredBy}
+                    onChange={(e) => {
+                      setReferrerSearchQuery(e.target.value);
+                      setFormData(prev => ({ ...prev, referredBy: e.target.value }));
+                      setShowReferrerSuggestions(true);
+                    }}
+                    onFocus={() => setShowReferrerSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowReferrerSuggestions(false), 200)}
+                    placeholder="Search member name..."
+                  />
+                  {showReferrerSuggestions && referrerSearchQuery && filteredMembers.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {filteredMembers.map(member => (
+                        <div
+                          key={member.id}
+                          className="p-2 hover:bg-muted cursor-pointer"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const fullName = `${member.firstName} ${member.lastName}`;
+                            setFormData(prev => ({ ...prev, referredBy: fullName }));
+                            setReferrerSearchQuery(fullName);
+                            setShowReferrerSuggestions(false);
+                          }}
+                        >
+                          <div className="font-medium">{member.firstName} {member.lastName}</div>
+                          <div className="text-xs text-muted-foreground">{member.phone}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-potentialZone">Potential Zone Assignment</Label>
+                  <Select value={formData.potentialZone} onValueChange={(value: Zone) => setFormData(prev => ({ ...prev, potentialZone: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select potential zone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {zones.map((zone) => (
+                        <SelectItem key={zone} value={zone}>
+                          Zone {zone} - {ZONES[zone]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-2 pt-6">
+                  <input
+                    type="checkbox"
+                    id="edit-interestedInMembership"
+                    checked={formData.interestedInMembership}
+                    onChange={(e) => setFormData(prev => ({ ...prev, interestedInMembership: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="edit-interestedInMembership">Interested in Membership</Label>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Textarea
+                id="edit-notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Any additional notes about the visitor..."
+                rows={3}
+              />
+            </div>
+
+            <div className="flex gap-4">
+              <Button type="button" variant="outline" onClick={onBack}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!isValid || isLoading}>
+                {isLoading ? 'Saving...' : 'Update Visitor'}
               </Button>
             </div>
           </form>

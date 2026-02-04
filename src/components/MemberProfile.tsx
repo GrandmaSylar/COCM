@@ -177,47 +177,79 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     );
   }
 
+  const statusColorMap: Record<string, string> = {
+    new: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    'semi-active': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
+    sabbatical: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    blacklisted: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1>{member.firstName} {member.lastName}</h1>
-            <p className="text-muted-foreground">Member Profile</p>
+      {/* Hero Header */}
+      <Card className="overflow-hidden shadow-sm">
+        <div className="bg-gradient-to-r from-secondary/15 via-secondary/5 to-transparent p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-white/50 dark:hover:bg-black/20">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">Member Profile</span>
+          </div>
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            <div className="w-24 h-24 bg-white dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-lg ring-4 ring-white/50 dark:ring-card/50 shrink-0">
+              {member.photo ? (
+                <img src={member.photo} alt={`${member.firstName} ${member.lastName}`} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-3xl font-semibold text-primary">
+                  {member.firstName[0]}{member.lastName[0]}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <h1 className="text-2xl font-bold">{member.firstName} {member.otherNames && `${member.otherNames} `}{member.lastName}</h1>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
+                <Badge className={statusColorMap[member.status] || ''}>
+                  {member.status === 'sabbatical' && member.sabbaticalEndDate && new Date(member.sabbaticalEndDate) < new Date() ? 'Sabbatical (Ended)' : member.status}
+                </Badge>
+                <span className="text-sm text-muted-foreground">Zone {member.zone}</span>
+                <span className="text-sm text-muted-foreground">&middot;</span>
+                <span className="text-sm text-muted-foreground capitalize">{member.gender}</span>
+                <span className="text-sm text-muted-foreground">&middot;</span>
+                <span className="text-sm text-muted-foreground">{calculateAge(member.dateOfBirth)} yrs</span>
+              </div>
+              <div className="flex gap-2 mt-3 justify-center sm:justify-start">
+                {canEdit && (
+                  <Button size="sm" onClick={() => onEdit(member)}>
+                    <Edit className="w-3.5 h-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                )}
+                {canDelete && onDelete && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
+                        onDelete(member);
+                      }
+                    }}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          {canEdit && (
-            <Button onClick={() => onEdit(member)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
-            </Button>
-          )}
-          {canDelete && onDelete && (
-            <Button
-              variant="destructive"
-              onClick={() => {
-                if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
-                  onDelete(member);
-                }
-              }}
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </Button>
-          )}
-        </div>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Member Information */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6 stagger-children">
           {/* Basic Info Card */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="w-5 h-5" />
@@ -225,18 +257,6 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-center lg:justify-start mb-6">
-                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
-                  {member.photo ? (
-                    <img src={member.photo} alt={`${member.firstName} ${member.lastName}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-2xl font-medium text-primary">
-                      {member.firstName[0]}{member.lastName[0]}
-                    </span>
-                  )}
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Full Name</label>
@@ -255,23 +275,6 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Age</label>
                   <p>{calculateAge(member.dateOfBirth)} years old</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Status</label>
-                  <div>
-                    <Badge
-                      variant={member.status === 'active' ? 'default' : 'secondary'}
-                      className={
-                        member.status === 'new' ? 'bg-cyan-100 text-cyan-800' :
-                        member.status === 'active' ? 'bg-green-100 text-green-800' :
-                        member.status === 'semi-active' ? 'bg-blue-100 text-blue-800' :
-                        member.status === 'sabbatical' ? 'bg-purple-100 text-purple-800' :
-                        member.status === 'blacklisted' ? 'bg-red-100 text-red-800' : ''
-                      }
-                    >
-                      {member.status === 'sabbatical' && member.sabbaticalEndDate && new Date(member.sabbaticalEndDate) < new Date() ? 'Sabbatical (Ended)' : member.status}
-                    </Badge>
-                  </div>
                 </div>
                 {member.status === 'sabbatical' && (
                   <div className="col-span-full p-3 border rounded-lg bg-purple-50/50 space-y-2">
@@ -741,7 +744,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
         <div className="space-y-6">
           {/* Attendance Stats */}
           <Card
-            className={onViewAttendanceHistory ? 'cursor-pointer hover:shadow-md transition-shadow group' : ''}
+            className={`shadow-sm ${onViewAttendanceHistory ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group' : ''}`}
             onClick={onViewAttendanceHistory}
           >
             <CardHeader>
@@ -758,44 +761,51 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{attendanceStats.percentage}%</div>
-                <p className="text-sm text-muted-foreground">This Month</p>
+              <div className="flex justify-center">
+                <div className="relative w-28 h-28">
+                  <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8"
+                      className={attendanceStats.percentage >= 75 ? 'text-emerald-500' : attendanceStats.percentage >= 50 ? 'text-amber-500' : 'text-red-500'}
+                      strokeDasharray={`${attendanceStats.percentage * 2.64} ${264 - attendanceStats.percentage * 2.64}`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-2xl font-bold">{attendanceStats.percentage}%</span>
+                    <span className="text-[10px] text-muted-foreground">This Month</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Attended</span>
-                  <span>{attendanceStats.thisMonth}/{attendanceStats.totalServices}</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className="bg-primary h-2 rounded-full"
-                    style={{ width: `${attendanceStats.percentage}%` }}
-                  />
-                </div>
+              <div className="text-center text-sm text-muted-foreground">
+                {attendanceStats.thisMonth} of {attendanceStats.totalServices} services attended
               </div>
             </CardContent>
           </Card>
 
           {/* Recent Activity */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle className="text-lg">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {recentActivity.map((activity, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className="w-2 h-2 rounded-full mt-2 bg-blue-500" />
-                    <div>
-                      <p className="text-sm font-medium">{activity.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(activity.date)}
-                      </p>
+              {recentActivity.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No recent activity</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentActivity.map((activity, index) => (
+                    <div key={index} className="flex items-start gap-3">
+                      <div className="w-2 h-2 rounded-full mt-2 bg-secondary shrink-0" />
+                      <div>
+                        <p className="text-sm">{activity.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(activity.date)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
