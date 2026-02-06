@@ -237,7 +237,7 @@ export function AbsenteeReview({
                           {member.firstName[0]}{member.lastName[0]}
                         </span>
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-medium">
                           {member.firstName} {member.otherNames || ''} {member.lastName}
                         </h4>
@@ -342,7 +342,7 @@ export function AbsenteeReview({
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <Alert className="flex-1">
+            <Alert className="flex-1 min-w-0">
               <AlertDescription>
                 <strong>{absentees.length}</strong> absent members. <strong>{withPermission}</strong> with permission recorded.
               </AlertDescription>

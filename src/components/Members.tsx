@@ -817,7 +817,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
             <Card key={member.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
                         {member.photo ? (

@@ -113,7 +113,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
                     <Skeleton className="w-10 h-10 rounded-full" />
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <Skeleton className="h-5 w-32 mb-1" />
                       <Skeleton className="h-3 w-48" />
                     </div>
@@ -132,7 +132,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <Skeleton className="w-2 h-2 rounded-full mt-2" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <Skeleton className="h-4 w-3/4 mb-1" />
                     <Skeleton className="h-3 w-24" />
                   </div>
@@ -257,7 +257,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                   }`}
                 >
                   <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0" />
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm">{activity.message}</p>
                     <p className="text-xs text-muted-foreground">{activity.time}</p>
                   </div>

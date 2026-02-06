@@ -137,7 +137,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name *</Label>
                   <Input
@@ -172,7 +172,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
               </div>
 
               {/* Email and Phone */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address *</Label>
                   <Input
@@ -198,7 +198,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
               </div>
 
               {/* Role and Ministry */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label>Role *</Label>
                   <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>

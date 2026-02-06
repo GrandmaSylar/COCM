@@ -259,7 +259,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* Main Content */}
         <div className="flex-1 lg:ml-64">
-          <main className="p-4 lg:p-6 pb-24 lg:pb-6">
+          <main className="p-3 sm:p-4 lg:p-6 pb-24 lg:pb-6">
             <div key={currentPage} className="page-transition">
               {children}
             </div>

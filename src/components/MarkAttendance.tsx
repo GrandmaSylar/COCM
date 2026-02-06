@@ -336,7 +336,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
       </Card>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card>
           <CardContent className="p-4 text-center">
             <div className="text-2xl font-bold text-green-600">{totalPresent}</div>
@@ -497,7 +497,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <Alert className="flex-1">
+            <Alert className="flex-1 min-w-0">
               <AlertDescription>
                 <strong>Summary:</strong> {totalPresent} present, {totalAbsent} absent, {totalUnmarked} unmarked out of {members.length} total members.
               </AlertDescription>

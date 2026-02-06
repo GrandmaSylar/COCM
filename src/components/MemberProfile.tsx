@@ -641,7 +641,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                       key={familyMember.id}
                       className={`flex items-start justify-between p-3 border rounded-lg ${familyMember.isLinked && onViewMember ? 'hover:bg-muted/50 transition-colors' : ''}`}
                     >
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-medium">
                             {familyMember.firstName} {familyMember.otherNames && `${familyMember.otherNames} `}{familyMember.lastName}

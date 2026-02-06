@@ -487,7 +487,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   </div>
 
                   {/* Breakdown */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
                     <div>
                       <p className="text-xs text-muted-foreground">Offering</p>
                       <p className="font-medium">{formatAmount(record.offerings.offering)}</p>
@@ -695,7 +695,7 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
             ) : (
               customTypes.map((type) => (
                 <div key={type.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <h3 className="font-medium">{type.name}</h3>
                       <Badge variant={type.isActive ? 'default' : 'secondary'}>
@@ -1373,7 +1373,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
             {/* Giving Breakdown */}
             <div>
               <h3 className="font-medium mb-3">Giving Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">Offering</p>
                   <p className="font-medium">{formatGhanaCedis(record.offerings.offering)}</p>
@@ -1406,7 +1406,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
             {/* Payment Breakdown */}
             <div>
               <h3 className="font-medium mb-3">Payment Breakdown</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
                 {Object.entries(record.paymentBreakdown)
                   .filter(([key]) => key !== 'foreign_currency')
                   .map(([method, amount]) => (

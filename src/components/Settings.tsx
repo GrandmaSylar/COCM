@@ -321,21 +321,21 @@ export function Settings({ onAddUser }: SettingsProps) {
   const hasAdminAccess = canManageUsers || canManageSettings;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full overflow-hidden">
         <div>
-          <h1 className="flex items-center gap-2">
+          <h1 className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <SettingsIcon className="w-6 h-6" />
             Settings
             {isDev && (
-              <Badge variant="outline" className="ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+              <Badge variant="outline" className="ml-1 sm:ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
                 <Crown className="w-3 h-3 mr-1" />
                 Dev Mode
               </Badge>
             )}
             {isAdmin && !isDev && (
-              <Badge variant="outline" className="ml-2 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+              <Badge variant="outline" className="ml-1 sm:ml-2 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
                 Admin
               </Badge>
             )}
@@ -370,8 +370,8 @@ export function Settings({ onAddUser }: SettingsProps) {
         </Alert>
       )}
 
-      <Tabs defaultValue={hasAdminAccess ? "users" : "security"} className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue={hasAdminAccess ? "users" : "security"} className="space-y-6 w-full">
+        <TabsList className="w-full overflow-x-auto flex flex-wrap h-auto">
           {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
           {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
           {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
@@ -380,7 +380,7 @@ export function Settings({ onAddUser }: SettingsProps) {
         </TabsList>
 
         {/* Users & Permissions Tab */}
-        <TabsContent value="users" className="space-y-6">
+        <TabsContent value="users" className="space-y-6 w-full overflow-hidden">
           {/* Pending Users Section */}
           {pendingUsers.length > 0 && (
             <div>
@@ -392,15 +392,15 @@ export function Settings({ onAddUser }: SettingsProps) {
                 {pendingUsers.map((pendingUser) => (
                   <Card key={pendingUser.id} className="border-orange-200 dark:border-orange-800">
                     <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4 flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                        <div className="flex items-start gap-3 sm:gap-4 flex-1">
                           <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
                               {pendingUser.name.split(' ').map((n: string) => n[0]).join('')}
                             </span>
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{pendingUser.name}</h3>
                               <Badge className={roleColors[pendingUser.role as UserRole]}>
                                 {roleLabels[pendingUser.role as UserRole]}
@@ -424,11 +424,11 @@ export function Settings({ onAddUser }: SettingsProps) {
                             </p>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                           <Button
                             onClick={() => handleApproveUser(pendingUser.id)}
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
                           >
                             Approve
                           </Button>
@@ -436,7 +436,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                             onClick={() => handleRejectUser(pendingUser.id)}
                             variant="outline"
                             size="sm"
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-600 hover:text-red-700 w-full sm:w-auto"
                           >
                             Reject
                           </Button>
@@ -450,8 +450,8 @@ export function Settings({ onAddUser }: SettingsProps) {
           )}
 
           {/* System Overview */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Card>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 w-full">
+            <Card className="min-w-0">
               <CardContent className="p-4">
                 <div className="flex flex-col items-center text-center gap-2">
                   <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
@@ -523,12 +523,12 @@ export function Settings({ onAddUser }: SettingsProps) {
           </div>
 
           {/* User List */}
-          <div>
+          <div className="w-full overflow-hidden">
             <h2 className="mb-4">System Users</h2>
 
             {/* Search, Filter, Sort Controls */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col gap-2 sm:gap-3 mb-4 overflow-x-hidden">
+              <div className="relative flex-1 min-w-0">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name or email..."
@@ -538,53 +538,55 @@ export function Settings({ onAddUser }: SettingsProps) {
                 />
               </div>
 
-              <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {Object.entries(roleLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+                <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
+                  <SelectTrigger className="w-full min-w-0">
+                    <SelectValue placeholder="Filter by role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {Object.entries(roleLabels).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={userStatusFilter} onValueChange={setUserStatusFilter}>
+                  <SelectTrigger className="w-full min-w-0">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={`${userSortBy}-${userSortOrder}`} onValueChange={(value) => {
-                const [sortBy, sortOrder] = value.split('-') as [typeof userSortBy, typeof userSortOrder];
-                setUserSortBy(sortBy);
-                setUserSortOrder(sortOrder);
-              }}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-                  <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-                  <SelectItem value="role-asc">Role (A-Z)</SelectItem>
-                  <SelectItem value="role-desc">Role (Z-A)</SelectItem>
-                  <SelectItem value="status-asc">Status (Active first)</SelectItem>
-                  <SelectItem value="status-desc">Status (Inactive first)</SelectItem>
-                  <SelectItem value="lastLogin-desc">Last Login (Recent)</SelectItem>
-                  <SelectItem value="lastLogin-asc">Last Login (Oldest)</SelectItem>
-                </SelectContent>
-              </Select>
+                <Select value={`${userSortBy}-${userSortOrder}`} onValueChange={(value) => {
+                  const [sortBy, sortOrder] = value.split('-') as [typeof userSortBy, typeof userSortOrder];
+                  setUserSortBy(sortBy);
+                  setUserSortOrder(sortOrder);
+                }}>
+                  <SelectTrigger className="w-full min-w-0">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+                    <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+                    <SelectItem value="role-asc">Role (A-Z)</SelectItem>
+                    <SelectItem value="role-desc">Role (Z-A)</SelectItem>
+                    <SelectItem value="status-asc">Status (Active first)</SelectItem>
+                    <SelectItem value="status-desc">Status (Inactive first)</SelectItem>
+                    <SelectItem value="lastLogin-desc">Last Login (Recent)</SelectItem>
+                    <SelectItem value="lastLogin-asc">Last Login (Oldest)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 w-full overflow-hidden">
               {(() => {
                 // Apply filters and sorting
                 let filteredUsers = allSystemUsers.filter(u => {
@@ -644,17 +646,17 @@ export function Settings({ onAddUser }: SettingsProps) {
                 const tempPerms = userTempPermissions[systemUser.id] || [];
                 
                 return (
-                  <Card key={systemUser.id} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-4 flex-1">
+                  <Card key={systemUser.id} className="hover:shadow-md transition-shadow w-full min-w-0">
+                    <CardContent className="p-3 sm:p-4 overflow-hidden">
+                      <div className="flex flex-col gap-3 w-full min-w-0">
+                        <div className="flex items-start gap-3 sm:gap-4 flex-1">
                           <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-medium text-primary">
                               {systemUser.name.split(' ').map(n => n[0]).join('')}
                             </span>
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{systemUser.name}</h3>
                               <Badge className={roleColors[systemUser.role]}>
                                 {roleLabels[systemUser.role]}
@@ -685,25 +687,25 @@ export function Settings({ onAddUser }: SettingsProps) {
                             <div className="space-y-1 mb-3">
                               {editingUserId === systemUser.id ? (
                                 <div className="space-y-2 p-2 bg-muted/50 rounded-lg">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
                                     <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                     <Input
                                       value={editEmail}
                                       onChange={(e) => setEditEmail(e.target.value)}
                                       placeholder="Email"
-                                      className="h-7 text-sm"
+                                      className="h-7 text-sm min-w-0"
                                     />
                                   </div>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
                                     <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                     <Input
                                       value={editPhone}
                                       onChange={(e) => setEditPhone(e.target.value)}
                                       placeholder="Phone (e.g. +233...)"
-                                      className="h-7 text-sm"
+                                      className="h-7 text-sm min-w-0"
                                     />
                                   </div>
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-col sm:flex-row gap-2">
                                     <Button size="sm" className="h-7 text-xs" onClick={() => handleSaveContact(systemUser.id)} disabled={isSavingContact}>
                                       <Save className="w-3 h-3 mr-1" />
                                       {isSavingContact ? 'Saving...' : 'Save'}
@@ -715,14 +717,14 @@ export function Settings({ onAddUser }: SettingsProps) {
                                 </div>
                               ) : (
                                 <>
-                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Mail className="w-4 h-4" />
-                                    {systemUser.email}
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                                    <Mail className="w-4 h-4 flex-shrink-0" />
+                                    <span className="truncate">{systemUser.email}</span>
                                   </div>
                                   {systemUser.phone && (
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                      <Phone className="w-4 h-4" />
-                                      {systemUser.phone}
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                                      <Phone className="w-4 h-4 flex-shrink-0" />
+                                      <span className="truncate">{systemUser.phone}</span>
                                     </div>
                                   )}
                                   {isDev && systemUser.id !== user?.id && (
@@ -734,14 +736,14 @@ export function Settings({ onAddUser }: SettingsProps) {
                                 </>
                               )}
                               {isDev && systemUser.approvalStatus === 'approved' && systemUser.id !== user?.id && (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <Shield className="w-4 h-4 text-muted-foreground" />
-                                  <span className="text-xs text-muted-foreground">Change Role:</span>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2 min-w-0">
+                                  <Shield className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1.5" />
+                                  <span className="text-xs text-muted-foreground flex-shrink-0">Change Role:</span>
                                   <Select
                                     value={systemUser.role}
                                     onValueChange={(newRole) => handleChangeUserRole(systemUser.id, newRole as UserRole)}
                                   >
-                                    <SelectTrigger className="h-7 text-xs w-32">
+                                    <SelectTrigger className="h-7 text-xs w-full sm:w-40 min-w-0">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -758,21 +760,21 @@ export function Settings({ onAddUser }: SettingsProps) {
 
                             {/* Temporary Permissions */}
                             {tempPerms.length > 0 && (
-                              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg overflow-hidden">
+                                <div className="flex items-center gap-2 mb-2 min-w-0">
+                                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">
                                     Temporary Permissions
                                   </span>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-2 min-w-0">
                                   {tempPerms.map((tp) => (
-                                    <div key={tp.permission} className="flex items-center justify-between text-sm">
-                                      <span className="text-blue-700 dark:text-blue-300">
+                                    <div key={tp.permission} className="flex flex-col sm:flex-row items-start gap-2 text-sm min-w-0">
+                                      <span className="text-blue-700 dark:text-blue-300 truncate flex-shrink-0 sm:flex-shrink">
                                         {tp.permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                       </span>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-2 flex-shrink-0">
+                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
                                           Expires in {formatExpiration(tp.expires_at || tp.expiresAt)}
                                         </span>
                                         {(isAdmin || isDev) && (
@@ -807,7 +809,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                     {(systemUser.tabAccess || []).length} of 7 tabs
                                   </span>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
                                   {[
                                     { id: 'members', label: 'Members', icon: Users },
                                     { id: 'visitors', label: 'Visitors', icon: UserPlus },
@@ -834,14 +836,14 @@ export function Settings({ onAddUser }: SettingsProps) {
                                             toast.error('Failed to update tab access');
                                           }
                                         }}
-                                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                                        className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border-2 text-xs font-medium transition-all min-w-0 ${
                                           hasAccess
                                             ? 'bg-secondary text-white border-secondary shadow-sm shadow-secondary/25'
                                             : 'bg-card text-muted-foreground border-border/50 hover:border-secondary/50 hover:bg-secondary/5'
                                         }`}
                                       >
-                                        <tab.icon className="w-4 h-4" />
-                                        {tab.label}
+                                        <tab.icon className="w-4 h-4 flex-shrink-0" />
+                                        <span className="line-clamp-1">{tab.label}</span>
                                       </button>
                                     );
                                   })}
@@ -853,7 +855,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                             {canGrantPermissions && (systemUser.role === 'pastor' || systemUser.role === 'elder') && (
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button size="sm" variant="outline" className="mt-3">
+                                  <Button size="sm" variant="outline" className="mt-3 w-full">
                                     <Plus className="w-3 h-3 mr-1" />
                                     Grant Permission
                                   </Button>
@@ -872,7 +874,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         value={permissionToGrant}
                                         onValueChange={setPermissionToGrant}
                                       >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                           <SelectValue placeholder="Select permission" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -890,7 +892,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         value={permissionDuration}
                                         onValueChange={setPermissionDuration}
                                       >
-                                        <SelectTrigger>
+                                        <SelectTrigger className="w-full">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -928,15 +930,16 @@ export function Settings({ onAddUser }: SettingsProps) {
                           </div>
                         </div>
                         
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 pt-2 border-t w-full">
                           {systemUser.id !== user?.id && isDev && (
                             <Button 
                               variant="outline" 
                               size="sm"
                               onClick={() => handleDeleteUser(systemUser.id)}
-                              className="text-destructive hover:text-destructive"
+                              className="text-destructive hover:text-destructive w-full"
                             >
                               <Trash2 className="w-4 h-4" />
+                              Delete User
                             </Button>
                           )}
                         </div>
@@ -951,7 +954,7 @@ export function Settings({ onAddUser }: SettingsProps) {
         </TabsContent>
 
         {/* Role Permissions Tab */}
-        <TabsContent value="roles" className="space-y-6">
+        <TabsContent value="roles" className="space-y-6 w-full overflow-hidden">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -987,7 +990,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                         </span>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
                       {allPermissions.map(permission => {
                         const hasPermission = rolePermissions[role]?.includes(permission) || false;
                         const isDevRole = role === 'dev';
@@ -995,7 +998,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                         return (
                           <div
                             key={permission}
-                            className={`flex items-center space-x-2 p-2 rounded border ${
+                            className={`flex items-center space-x-2 p-2 rounded border min-w-0 ${
                               isDev && !isDevRole ? 'cursor-pointer hover:bg-muted/50' : ''
                             } ${
                               hasPermission ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 
@@ -1010,13 +1013,13 @@ export function Settings({ onAddUser }: SettingsProps) {
                                 disabled={isDevRole}
                               />
                             )}
-                            <span className={`text-xs ${
+                            <span className={`text-xs truncate ${
                               hasPermission ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'
                             }`}>
                               {permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </span>
                             {isDevRole && (
-                              <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto" />
+                              <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />
                             )}
                           </div>
                         );
@@ -1051,7 +1054,7 @@ export function Settings({ onAddUser }: SettingsProps) {
 
         {/* Theme Tab (Dev Only) */}
         {canManageTheme && (
-          <TabsContent value="theme" className="space-y-6">
+          <TabsContent value="theme" className="space-y-6 w-full overflow-hidden">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1062,61 +1065,61 @@ export function Settings({ onAddUser }: SettingsProps) {
                   Customize the color scheme of the entire system. Changes apply to both light and dark modes.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
+              <CardContent className="space-y-6 overflow-x-hidden">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-6">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="primary-color">Primary Color</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 min-w-0">
                       <Input
                         id="primary-color"
                         type="color"
                         value={themeColorInputs.primary}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, primary: e.target.value })}
-                        className="w-20 h-10"
+                        className="w-16 h-10 flex-shrink-0"
                       />
                       <Input
                         type="text"
                         value={themeColorInputs.primary}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, primary: e.target.value })}
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="secondary-color">Secondary Color</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 min-w-0">
                       <Input
                         id="secondary-color"
                         type="color"
                         value={themeColorInputs.secondary}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, secondary: e.target.value })}
-                        className="w-20 h-10"
+                        className="w-16 h-10 flex-shrink-0"
                       />
                       <Input
                         type="text"
                         value={themeColorInputs.secondary}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, secondary: e.target.value })}
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <Label htmlFor="accent-color">Accent Color</Label>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 min-w-0">
                       <Input
                         id="accent-color"
                         type="color"
                         value={themeColorInputs.accent}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, accent: e.target.value })}
-                        className="w-20 h-10"
+                        className="w-16 h-10 flex-shrink-0"
                       />
                       <Input
                         type="text"
                         value={themeColorInputs.accent}
                         onChange={(e) => setThemeColorInputs({ ...themeColorInputs, accent: e.target.value })}
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                       />
                     </div>
                   </div>
@@ -1143,7 +1146,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             </Card>
           </TabsContent>
         )}
-        <TabsContent value="security" className="space-y-6">
+        <TabsContent value="security" className="space-y-6 w-full overflow-hidden">
           <SecuritySettings />
         </TabsContent>
       </Tabs>
@@ -1344,9 +1347,9 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                   formData.role && formData.password;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden w-full">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 overflow-hidden w-full min-w-0">
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
@@ -1363,8 +1366,8 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
           <CardTitle>User Information</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-6 w-full overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name *</Label>
                 <Input
@@ -1389,7 +1392,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number *</Label>
                 <Input
@@ -1405,7 +1408,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
               <div className="space-y-2">
                 <Label>Role *</Label>
                 <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select user role" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1459,13 +1462,13 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                 />
               </div>
               {formData.twoFaMethod !== 'none' && (
-                <div className="flex gap-2 ml-6">
+                <div className="flex flex-col gap-3 sm:gap-2">
                   <Button
                     type="button"
                     variant={formData.twoFaMethod === 'email' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => handleInputChange('twoFaMethod', 'email')}
-                    className="gap-1"
+                    className="gap-1 w-full sm:w-auto"
                   >
                     <Mail className="w-3 h-3" />
                     Email
@@ -1476,7 +1479,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                     size="sm"
                     onClick={() => handleInputChange('twoFaMethod', 'phone')}
                     disabled={!formData.phone}
-                    className="gap-1"
+                    className="gap-1 w-full sm:w-auto"
                   >
                     <Phone className="w-3 h-3" />
                     Phone SMS

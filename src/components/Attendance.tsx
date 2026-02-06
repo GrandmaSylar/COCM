@@ -213,7 +213,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
             Track and manage service attendance
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {canManageServices && (
             <Button variant="outline" onClick={() => setShowServiceManager(true)}>
               <Settings className="w-4 h-4 mr-2" />
@@ -249,7 +249,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       </Alert>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -663,7 +663,7 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: S
             ) : (
               customServices.map((service) => (
                 <div key={service.id} className="flex items-start justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="font-medium">{service.name}</h3>
                       <Badge variant={service.isActive ? 'default' : 'secondary'}>
@@ -690,7 +690,7 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: S
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1120,7 +1120,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     min="0"
                   />
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button onClick={handleSave} disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>
@@ -1146,7 +1146,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
       {record.attendanceType === 'individual' && (
         <>
           {/* Summary */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
             <Card>
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-green-600">
@@ -1210,7 +1210,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     );
                   })}
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-col sm:flex-row gap-2 pt-2">
                   <Button onClick={handleSave} disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save Changes'}
                   </Button>

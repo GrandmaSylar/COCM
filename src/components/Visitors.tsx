@@ -126,7 +126,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="text-center">
@@ -155,7 +155,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
 
       {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search visitors by name, phone, email, or location..."
@@ -165,9 +165,9 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
           />
         </div>
         <Select value={selectedMembershipInterest} onValueChange={setSelectedMembershipInterest}>
-          <SelectTrigger className="w-full lg:w-48">
-            <SelectValue placeholder="Membership interest" />
-          </SelectTrigger>
+          <SelectTrigger className="w-full lg:max-w-xs lg:flex-shrink-0">
+              <SelectValue placeholder="Membership interest" />
+            </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="interested">Interested</SelectItem>
@@ -209,7 +209,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
             <Card key={visitor.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
                         <span className="text-sm font-medium text-primary">
@@ -440,7 +440,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gender">Gender</Label>
                   <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}>
@@ -468,7 +468,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
             {/* Contact Information */}
             <div className="space-y-4">
               <h3 className="font-medium">Contact Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number *</Label>
                   <Input
@@ -490,7 +490,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input
@@ -573,7 +573,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="potentialZone">Potential Zone Assignment</Label>
                   <Select value={formData.potentialZone} onValueChange={(value: Zone) => setFormData(prev => ({ ...prev, potentialZone: value }))}>
@@ -749,7 +749,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-gender">Gender</Label>
                   <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}>
@@ -882,7 +882,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-potentialZone">Potential Zone Assignment</Label>
                   <Select value={formData.potentialZone} onValueChange={(value: Zone) => setFormData(prev => ({ ...prev, potentialZone: value }))}>
@@ -966,7 +966,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
         <Button variant="ghost" size="sm" onClick={onBack}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <h1>Visitor Profile</h1>
           <p className="text-muted-foreground">
             View and manage visitor information
@@ -1015,7 +1015,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
           {/* Personal Information */}
           <div>
             <h3 className="font-medium mb-3">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Gender</Label>
                 <p className="text-sm">{visitor.gender ? visitor.gender.charAt(0).toUpperCase() + visitor.gender.slice(1) : 'Not specified'}</p>

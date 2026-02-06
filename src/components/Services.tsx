@@ -92,7 +92,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-8 w-48 mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i}><CardContent className="p-4"><Skeleton className="h-20" /></CardContent></Card>
           ))}
@@ -120,7 +120,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
         </div>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 stagger-children">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 stagger-children">
           <Card className="border-t-4 border-t-secondary">
             <CardContent className="p-4 text-center">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-secondary/10 flex items-center justify-center">
@@ -177,7 +177,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 text-sm">
                     <div><span className="text-muted-foreground">Offering:</span> {formatGhanaCedis(svc.giving.offeringAmount || svc.giving.offering_amount || 0)}</div>
                     <div><span className="text-muted-foreground">Donation:</span> {formatGhanaCedis(svc.giving.donationAmount || svc.giving.donation_amount || 0)}</div>
                     <div><span className="text-muted-foreground">Thanksgiving:</span> {formatGhanaCedis(svc.giving.thanksgivingAmount || svc.giving.thanksgiving_amount || 0)}</div>
@@ -313,7 +313,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                     onClick={() => openDetail(sr.serviceDate)}
                     className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors text-left"
                   >
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{formatDate(sr.serviceDate)}</div>
                       <div className="text-xs text-muted-foreground">{sr.serviceType}</div>
                     </div>
