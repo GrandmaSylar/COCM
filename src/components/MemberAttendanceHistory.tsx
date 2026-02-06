@@ -211,14 +211,14 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
 
   if (loading && !data) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
+      <div className="space-y-6 overflow-x-hidden w-full">
+        <div className="flex items-center gap-4 overflow-hidden w-full min-w-0">
+          <Button variant="ghost" size="sm" onClick={onBack} className="flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div>
-            <h1>Attendance History</h1>
-            <p className="text-muted-foreground">{memberName}</p>
+          <div className="min-w-0">
+            <h1 className="truncate">Attendance History</h1>
+            <p className="text-muted-foreground truncate">{memberName}</p>
           </div>
         </div>
         <div className="flex items-center justify-center py-12">
@@ -241,16 +241,16 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden w-full">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full overflow-hidden">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <Button variant="ghost" size="sm" onClick={onBack} className="flex-shrink-0">
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <div>
-            <h1>Attendance History</h1>
-            <p className="text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="truncate">Attendance History</h1>
+            <p className="text-muted-foreground truncate">
               {memberName} {data?.joinDate && <>— Member since {formatShortDate(data.joinDate)}</>}
             </p>
           </div>
@@ -273,58 +273,58 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 w-full">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <Calendar className="w-5 h-5 text-blue-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{summary.totalServices}</p>
-                <p className="text-xs text-muted-foreground">Total Services</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold truncate">{summary.totalServices}</p>
+                <p className="text-xs text-muted-foreground truncate">Total Services</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <CheckCircle2 className="w-5 h-5 text-green-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{summary.totalPresent}</p>
-                <p className="text-xs text-muted-foreground">Present</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold truncate">{summary.totalPresent}</p>
+                <p className="text-xs text-muted-foreground truncate">Present</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <XCircle className="w-5 h-5 text-red-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{summary.totalAbsent}</p>
-                <p className="text-xs text-muted-foreground">Absent</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold truncate">{summary.totalAbsent}</p>
+                <p className="text-xs text-muted-foreground truncate">Absent</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+        <Card className="min-w-0">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <BarChart3 className="w-5 h-5 text-purple-600" />
               </div>
-              <div>
-                <p className="text-2xl font-bold">{summary.percentage}%</p>
-                <p className="text-xs text-muted-foreground">Attendance Rate</p>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold truncate">{summary.percentage}%</p>
+                <p className="text-xs text-muted-foreground truncate">Attendance Rate</p>
               </div>
             </div>
             <div className="mt-2 w-full bg-muted rounded-full h-2">
@@ -338,15 +338,15 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
       </div>
 
       {/* Date Range Filters */}
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Filter className="w-4 h-4 text-muted-foreground" />
+      <Card className="w-full">
+        <CardContent className="p-3 sm:p-4 space-y-4 overflow-hidden">
+          <div className="flex items-center gap-2 mb-2 min-w-0">
+            <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             <span className="text-sm font-medium">Date Range</span>
           </div>
 
           {/* Presets */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 w-full">
             {presets.map(p => (
               <Button
                 key={p.key}
@@ -354,6 +354,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                 size="sm"
                 onClick={() => handlePreset(p.key)}
                 disabled={loading}
+                className="text-xs"
               >
                 {p.label}
               </Button>
@@ -361,27 +362,30 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
           </div>
 
           {/* Custom range */}
-          <div className="flex flex-col sm:flex-row items-end gap-3">
-            <div className="space-y-1 flex-1">
+          <div className="flex flex-col gap-2 w-full">
+            <div className="space-y-1 flex-1 min-w-0">
               <Label className="text-xs">From</Label>
               <Input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
+                className="text-sm"
               />
             </div>
-            <div className="space-y-1 flex-1">
+            <div className="space-y-1 flex-1 min-w-0">
               <Label className="text-xs">To</Label>
               <Input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
+                className="text-sm"
               />
             </div>
             <Button
               variant="outline"
               onClick={handleCustomRange}
               disabled={!fromDate || !toDate || loading}
+              className="w-full sm:w-auto"
             >
               Apply
             </Button>
@@ -390,7 +394,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
       </Card>
 
       {/* Records */}
-      <div className="space-y-2">
+      <div className="space-y-2 w-full overflow-hidden">
         <h2 className="text-lg font-semibold">
           Records {records.length > 0 && <span className="text-muted-foreground font-normal text-sm">({records.length})</span>}
         </h2>
@@ -406,7 +410,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full overflow-hidden">
             {records.map((record, idx) => {
               const recordKey = `${record.date}-${record.serviceType}-${idx}`;
               const isExpanded = expandedRecord === recordKey;
@@ -419,26 +423,26 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
               return (
                 <Card
                   key={recordKey}
-                  className={`transition-shadow ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer hover:shadow-md' : ''}`}
+                  className={`transition-shadow w-full ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer hover:shadow-md' : ''}`}
                   onClick={() => {
                     if (record.status === 'absent' && hasAbsenceInfo) {
                       setExpandedRecord(isExpanded ? null : recordKey);
                     }
                   }}
                 >
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                  <CardContent className="p-2 sm:p-3 overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
                         {record.status === 'present' ? (
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <XCircle className="w-4 h-4 text-red-600" />
                           </div>
                         )}
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium">{formatDate(record.date)}</span>
                             <Badge className={`text-xs ${serviceTypeColors[record.serviceType] || 'bg-gray-100 text-gray-800'}`}>
@@ -451,7 +455,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         <Badge variant={record.status === 'present' ? 'default' : 'destructive'}>
                           {record.status === 'present' ? 'Present' : 'Absent'}
                         </Badge>
@@ -469,7 +473,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
 
                     {/* Expanded absence details */}
                     {isExpanded && record.absenceInfo && (
-                      <div className="mt-3 pt-3 border-t space-y-2 ml-11">
+                      <div className="mt-3 pt-3 border-t space-y-2 ml-6 sm:ml-11 min-w-0">
                         {record.absenceInfo.requestedPermission && (
                           <div className="flex items-center gap-2 text-sm">
                             <Shield className="w-4 h-4 text-yellow-600" />
