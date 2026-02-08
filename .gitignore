@@ -4,3 +4,4 @@ build/
 .vite/
 
 .vercel
+.claude/
