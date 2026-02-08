@@ -375,7 +375,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
       try {
         const [membersData, servicesData] = await Promise.all([
           api.members.getAll(),
-          api.customServices.getAll()
+          api.services.getAll()
         ]);
         setMembers(membersData || []);
         setCustomServices((servicesData || []).filter((s: any) => s.isActive));
@@ -700,7 +700,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
       try {
         const [membersData, servicesData] = await Promise.all([
           api.members.getAll(),
-          api.customServices.getAll()
+          api.services.getAll()
         ]);
         setMembers(membersData || []);
         setCustomServices((servicesData || []).filter((s: any) => s.isActive));

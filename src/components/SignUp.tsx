@@ -108,7 +108,8 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                <ChurchIcon className="w-8 h-8 text-primary-foreground" />
+                <img src="/newlogo.png" alt="Church of Christ, Ma
+         +taheko" className="w-32 h-32 object-contain" />
               </div>
             </div>
             <div>
