@@ -107,7 +107,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain bg-white rounded-full p-1" />
+              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain" />
             </div>
             <div>
               <CardTitle className="text-2xl">Create Account</CardTitle>

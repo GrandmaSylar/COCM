@@ -76,7 +76,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
         <Card className="shadow-lg">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain bg-white rounded-full p-1" />
+              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain" />
             </div>
             <div>
               <CardTitle className="text-2xl">Church Management System</CardTitle>
