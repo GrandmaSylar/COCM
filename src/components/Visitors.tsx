@@ -9,7 +9,7 @@ import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import {
   Search, Plus, Phone, Mail, MapPin, Eye, Users, UserPlus,
-  ArrowLeft, Calendar, Clock, UserCheck
+  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
@@ -51,6 +51,7 @@ interface VisitorsProps {
 export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: VisitorsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMembershipInterest, setSelectedMembershipInterest] = useState('all');
+  const [refreshing, setRefreshing] = useState(false);
 
   const { canAccess } = useAuth();
   const canManageVisitors = canAccess('manage_members'); // Same permission as managing members
@@ -93,6 +94,16 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
     return visitDate.getMonth() === now.getMonth() && visitDate.getFullYear() === now.getFullYear();
   }).length;
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([refreshVisitors(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -108,7 +119,27 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing visitors...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -117,12 +148,18 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
             Manage church visitors and potential members
           </p>
         </div>
-        {canManageVisitors && (
-          <Button onClick={onAddVisitor}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Visitor
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        )}
+          {canManageVisitors && (
+            <Button onClick={onAddVisitor}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Visitor
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Statistics */}
@@ -299,18 +336,6 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
         )}
       </div>
 
-      {/* Mobile Floating Action Button */}
-      {canManageVisitors && (
-        <div className="lg:hidden fixed bottom-20 right-4">
-          <Button
-            onClick={onAddVisitor}
-            size="lg"
-            className="rounded-full w-14 h-14 shadow-lg"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock } from 'lucide-react';
+import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
-import { useCachedData } from '../hooks/useCachedData';
+import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
 
 interface AttendanceRecord {
   id: string;
@@ -68,6 +68,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [selectedAttendanceType, setSelectedAttendanceType] = useState('all');
   const [showServiceManager, setShowServiceManager] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { user, canAccess } = useAuth();
 
   const { data: cachedAttendance, loading: loadingAttendance, refresh: refreshAttendance } = useCachedData<any[]>(
@@ -75,7 +76,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
     () => api.attendance.getAll(),
     { duration: 2 * 60 * 1000 }
   );
-  const { data: cachedServices, loading: loadingServices } = useCachedData<any[]>(
+  const { data: cachedServices, loading: loadingServices, refresh: refreshServices } = useCachedData<any[]>(
     'custom-services',
     () => api.services.getAll(),
     { duration: 5 * 60 * 1000 }
@@ -94,6 +95,16 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   const canRecordAttendance = canAccess('record_attendance');
   const canManageServices = canAccess('manage_services');
   const isDev = user?.role === 'dev';
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([refreshAttendance(), refreshServices(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const [, setTick] = useState(0);
   // Update every minute to refresh edit window timers
@@ -158,16 +169,35 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
     return `${displayHour}:${minutes} ${period}`;
   };
 
-  const handleDeleteService = (serviceId: string) => {
+  const handleDeleteService = async (serviceId: string) => {
     if (confirm('Are you sure you want to delete this custom service? This action cannot be undone.')) {
-      setCustomServices(prev => prev.filter(service => service.id !== serviceId));
+      try {
+        await api.services.delete(serviceId);
+        clearCacheByPattern('custom-services');
+        setCustomServices(prev => prev.filter(service => service.id !== serviceId));
+        toast.success('Service deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete service:', error);
+        toast.error('Failed to delete service');
+      }
     }
   };
 
-  const handleToggleService = (serviceId: string) => {
-    setCustomServices(prev => prev.map(service => 
-      service.id === serviceId ? { ...service, isActive: !service.isActive } : service
-    ));
+  const handleToggleService = async (serviceId: string) => {
+    const service = customServices.find(s => s.id === serviceId);
+    if (!service) return;
+
+    try {
+      await api.services.update(serviceId, { is_active: !service.isActive });
+      clearCacheByPattern('custom-services');
+      setCustomServices(prev => prev.map(s =>
+        s.id === serviceId ? { ...s, isActive: !s.isActive } : s
+      ));
+      toast.success(`Service ${service.isActive ? 'deactivated' : 'activated'}`);
+    } catch (error) {
+      console.error('Failed to toggle service:', error);
+      toast.error('Failed to update service');
+    }
   };
 
   if (loading) {
@@ -190,21 +220,67 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       onBack={() => setShowServiceManager(false)}
       onDelete={handleDeleteService}
       onToggle={handleToggleService}
-      onAdd={(newService) => {
-        const service: CustomService = {
-          id: (customServices.length + 1).toString(),
-          ...newService,
-          isActive: true,
-          createdBy: user?.name || 'Unknown',
-          createdAt: new Date().toISOString().split('T')[0]
-        };
-        setCustomServices(prev => [...prev, service]);
+      onAdd={async (newService) => {
+        try {
+          const serviceData = {
+            name: newService.name,
+            description: newService.description,
+            start_date: newService.startDate,
+            end_date: newService.endDate,
+            start_time: newService.startTime,
+            end_time: newService.endTime,
+            days_of_week: newService.daysOfWeek,
+            is_active: true
+          };
+          const createdService = await api.services.create(serviceData);
+          clearCacheByPattern('custom-services');
+          // Convert response to camelCase for local state
+          const service: CustomService = {
+            id: createdService.id,
+            name: createdService.name,
+            description: createdService.description,
+            startDate: createdService.start_date || createdService.startDate,
+            endDate: createdService.end_date || createdService.endDate,
+            startTime: createdService.start_time || createdService.startTime,
+            endTime: createdService.end_time || createdService.endTime,
+            daysOfWeek: createdService.days_of_week || createdService.daysOfWeek,
+            isActive: createdService.is_active ?? createdService.isActive ?? true,
+            createdBy: user?.name || 'Unknown',
+            createdAt: createdService.created_at || new Date().toISOString()
+          };
+          setCustomServices(prev => [...prev, service]);
+          toast.success('Service created successfully');
+        } catch (error) {
+          console.error('Failed to create service:', error);
+          toast.error('Failed to create service');
+        }
       }}
+      onRefresh={refreshServices}
     />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing attendance...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -213,22 +289,29 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
             Track and manage service attendance
           </p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
           {canManageServices && (
-            <Button variant="outline" onClick={() => setShowServiceManager(true)}>
-              <Settings className="w-4 h-4 mr-2" />
-              Manage Services
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowServiceManager(true)}>
+              <Settings className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Manage Services</span>
+              <span className="sm:hidden">Services</span>
             </Button>
           )}
           {canRecordAttendance && (
             <>
-              <Button variant="outline" onClick={onMarkAttendance}>
-                <UserCheck className="w-4 h-4 mr-2" />
-                Mark Individual Attendance
+              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={onMarkAttendance}>
+                <UserCheck className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Mark Individual</span>
+                <span className="sm:hidden">Individual</span>
               </Button>
-              <Button onClick={onRecordAttendance}>
-                <Plus className="w-4 h-4 mr-2" />
-                Record Head Count
+              <Button size="sm" className="text-xs sm:text-sm" onClick={onRecordAttendance}>
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Record Head Count</span>
+                <span className="sm:hidden">Head Count</span>
               </Button>
             </>
           )}
@@ -364,71 +447,71 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </Card>
         ) : (
           filteredRecords.map((record) => (
-            <Card key={record.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                      <Calendar className="w-6 h-6 text-primary" />
+            <Card key={record.id} className="hover:shadow-md transition-shadow overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium">{record.serviceType}</h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceType}</h3>
+                      <div className="flex flex-wrap items-center gap-1 mt-1">
                         {record.attendanceType === 'general' ? (
-                          <Badge variant="outline" className="text-xs bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
                         )}
                         {record.isCustomService && (
-                          <Badge variant="outline" className="text-xs">Custom</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">Custom</Badge>
                         )}
                         {!record.isCustomService && (
-                          <Badge variant="default" className="text-xs bg-green-100 text-green-800">Permanent</Badge>
+                          <Badge variant="default" className="text-[10px] sm:text-xs bg-green-100 text-green-800">Permanent</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                         {formatDate(record.date)}
                         {record.startTime && record.endTime && (
-                          <span className="ml-2">
+                          <span className="ml-1 sm:ml-2">
                             {formatTime(record.startTime)} - {formatTime(record.endTime)}
                           </span>
                         )}
                       </p>
                     </div>
                   </div>
-                  
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">
+
+                  <div className="text-left sm:text-right flex sm:block items-center gap-2 ml-13 sm:ml-0">
+                    <div className="text-xl sm:text-2xl font-bold text-primary">
                       {record.totalCount}
                     </div>
                     <p className="text-xs text-muted-foreground">attendees</p>
                   </div>
                 </div>
                 
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {record.attendanceType === 'individual'
                         ? `Recorded members: ${record.attendees.length}`
                         : 'Head count record'}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {(() => {
                         const editInfo = getEditWindowInfo(record.createdAt);
                         return (
                           <>
                             {(editInfo.canEdit || isDev) ? (
-                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-50 text-green-700 border-green-200">
                                 <Unlock className="w-3 h-3 mr-1" />
-                                {isDev && !editInfo.canEdit ? 'Dev Access' : editInfo.label}
+                                {isDev && !editInfo.canEdit ? 'Dev' : editInfo.label}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-500 border-gray-200">
+                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-gray-50 text-gray-500 border-gray-200">
                                 <Lock className="w-3 h-3 mr-1" />
                                 {editInfo.label}
                               </Badge>
                             )}
-                            <Button variant="outline" size="sm" onClick={() => onViewRecord(record.id)}>
+                            <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => onViewRecord(record.id)}>
                               {(editInfo.canEdit || isDev) && canRecordAttendance ? (
                                 <><Edit className="w-3 h-3 mr-1" /> Edit</>
                               ) : (
@@ -447,18 +530,6 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
         )}
       </div>
 
-      {/* Mobile Floating Action Button */}
-      {canRecordAttendance && (
-        <div className="lg:hidden fixed bottom-20 right-4">
-          <Button
-            onClick={onRecordAttendance}
-            size="lg"
-            className="rounded-full w-14 h-14 shadow-lg"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -470,10 +541,12 @@ interface ServiceManagerProps {
   onDelete: (serviceId: string) => void;
   onToggle: (serviceId: string) => void;
   onAdd: (service: Omit<CustomService, 'id' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>) => void;
+  onRefresh: () => Promise<void>;
 }
 
-function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: ServiceManagerProps) {
+function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onRefresh }: ServiceManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -522,22 +595,58 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd }: S
     }));
   };
 
-  const isFormValid = formData.name.trim() && formData.startDate && formData.endDate && 
+  const isFormValid = formData.name.trim() && formData.startDate && formData.endDate &&
                      formData.startTime && formData.endTime && formData.daysOfWeek.length > 0;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([onRefresh(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1>Manage Service Types</h1>
-          <p className="text-muted-foreground">
-            Add, edit, or remove custom service types
-          </p>
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing service types...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1>Manage Service Types</h1>
+            <p className="text-muted-foreground">
+              Add, edit, or remove custom service types
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Permanent Service Info */}

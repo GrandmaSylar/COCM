@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, DollarSign, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity } from 'lucide-react';
+import { Users, Calendar, DollarSign, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { formatGhanaCedis } from './ui/utils';
 import {
@@ -78,6 +78,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 export function Reports() {
   const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [givingData, setGivingData] = useState<any[]>([]);
   const [membershipData, setMembershipData] = useState<any[]>([]);
@@ -102,28 +103,38 @@ export function Reports() {
     activeMembers: 0,
   });
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        const data = await api.reports.getReports(selectedPeriod);
-        setAttendanceData(data.attendanceData || []);
-        setGivingData(data.givingData || []);
-        setMembershipData(data.membershipData || []);
-        setMembersByStatus(data.membersByStatus || []);
-        setMembersByZone(data.membersByZone || []);
-        setGivingByType(data.givingByType || []);
-        setGivingByPaymentMethod(data.givingByPaymentMethod || []);
-        setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
-      } catch (error) {
-        console.error('Failed to fetch reports:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchReports = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      const data = await api.reports.getReports(selectedPeriod);
+      setAttendanceData(data.attendanceData || []);
+      setGivingData(data.givingData || []);
+      setMembershipData(data.membershipData || []);
+      setMembersByStatus(data.membersByStatus || []);
+      setMembersByZone(data.membersByZone || []);
+      setGivingByType(data.givingByType || []);
+      setGivingByPaymentMethod(data.givingByPaymentMethod || []);
+      setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
+    } catch (error) {
+      console.error('Failed to fetch reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchReports();
   }, [selectedPeriod]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([fetchReports(false), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleExport = (format: 'csv' | 'pdf' | 'xlsx') => {
     const exportData = attendanceData.map((item, i) => ({
@@ -204,7 +215,27 @@ export function Reports() {
   const hasData = (arr: any[], key: string) => arr.some(d => d[key] > 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing reports...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -214,6 +245,10 @@ export function Reports() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -482,10 +517,10 @@ export function Reports() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={membersByZone} layout="vertical" margin={{ left: 20 }}>
+                <BarChart data={membersByZone} layout="vertical" margin={{ left: 0, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis dataKey="zone" type="category" tick={{ fontSize: 12 }} width={60} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="zone" type="category" tick={{ fontSize: 10 }} width={50} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="count" name="Members" radius={[0, 4, 4, 0]}>
                     {membersByZone.map((_, i) => (
@@ -509,10 +544,10 @@ export function Reports() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={givingByType} layout="vertical" margin={{ left: 30 }}>
+                <BarChart data={givingByType} layout="vertical" margin={{ left: 0, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis dataKey="type" type="category" tick={{ fontSize: 12 }} width={100} />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={70} />
                   <Tooltip content={<CustomTooltip isCurrency />} />
                   <Bar dataKey="amount" name="Amount" radius={[0, 4, 4, 0]}>
                     {givingByType.map((_, i) => (

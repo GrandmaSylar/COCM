@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
-import { Download, LogIn, LogOut, Plus, Pencil, Trash2, CheckCircle, XCircle, Shield, ShieldOff, ClipboardList } from 'lucide-react';
+import { Download, LogIn, LogOut, Plus, Pencil, Trash2, CheckCircle, XCircle, Shield, ShieldOff, ClipboardList, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
 import { exportToCSV, exportToPDF, exportToXLSX } from '../utils/export';
@@ -57,13 +57,14 @@ export function ActivityLog() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchLogs();
   }, [page, actionFilter, entityFilter, startDate, endDate]);
 
-  const fetchLogs = async () => {
-    setLoading(true);
+  const fetchLogs = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const params: any = { page, limit: 30 };
       if (actionFilter !== 'all') params.action = actionFilter;
@@ -78,6 +79,16 @@ export function ActivityLog() {
       console.error('Failed to fetch activity log:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([fetchLogs(false), minDelay]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -136,7 +147,27 @@ export function ActivityLog() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing activity log...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -144,8 +175,12 @@ export function ActivityLog() {
           </div>
           <h1>Activity Log</h1>
         </div>
-        {/* Export buttons */}
+        {/* Refresh and Export buttons */}
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button variant="outline" size="sm" className="border-secondary/30 text-secondary hover:bg-secondary/10 hover:text-secondary" onClick={() => handleExport('csv')} disabled={exporting}>
             <Download className="w-3 h-3 mr-1" />CSV
           </Button>
@@ -159,9 +194,9 @@ export function ActivityLog() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 sm:gap-3">
         <Select value={actionFilter} onValueChange={(v) => { setActionFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Action" /></SelectTrigger>
+          <SelectTrigger className="w-[calc(50%-4px)] sm:w-[140px]"><SelectValue placeholder="Action" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Actions</SelectItem>
             <SelectItem value="create">Create</SelectItem>
@@ -177,7 +212,7 @@ export function ActivityLog() {
         </Select>
 
         <Select value={entityFilter} onValueChange={(v) => { setEntityFilter(v); setPage(1); }}>
-          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
+          <SelectTrigger className="w-[calc(50%-4px)] sm:w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="member">Member</SelectItem>
@@ -193,14 +228,14 @@ export function ActivityLog() {
           type="date"
           value={startDate}
           onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-          className="w-[150px]"
+          className="w-[calc(50%-4px)] sm:w-[140px]"
           placeholder="From"
         />
         <Input
           type="date"
           value={endDate}
           onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-          className="w-[150px]"
+          className="w-[calc(50%-4px)] sm:w-[140px]"
           placeholder="To"
         />
         {(actionFilter !== 'all' || entityFilter !== 'all' || startDate || endDate) && (

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download, RefreshCw } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -144,6 +144,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Filter and sort state
   const [zoneFilter, setZoneFilter] = useState<string>('all');
@@ -274,6 +275,16 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
 
   const canAddMembers = canAccess('manage_members');
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([refresh(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Loading skeleton
   if (loading) {
     return (
@@ -382,7 +393,27 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing members...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -392,6 +423,11 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {/* Refresh Button */}
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           {/* Export Button */}
           {members.length > 0 && (
             <DropdownMenu>
@@ -723,7 +759,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 stagger-children">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
         <Card className="shadow-sm hover:shadow-md transition-shadow">
           <CardContent className="p-3">
             <div className="text-center">
@@ -890,18 +926,6 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
         )}
       </div>
 
-      {/* Mobile Floating Action Button */}
-      {canAddMembers && (
-        <div className="lg:hidden fixed bottom-20 right-4">
-          <Button
-            onClick={onAddMember}
-            size="lg"
-            className="rounded-full w-14 h-14 shadow-lg"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

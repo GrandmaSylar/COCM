@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Calendar, Users, DollarSign, UserMinus, UserPlus, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Calendar, Users, DollarSign, UserMinus, UserPlus, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { formatGhanaCedis } from './ui/utils';
 
@@ -54,13 +54,14 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [page]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const [todayData, allData] = await Promise.all([
         api.serviceRecords.getToday(),
@@ -73,6 +74,16 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
       console.error('Failed to fetch service records:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([fetchData(false), minDelay]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -253,8 +264,34 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 
   return (
-    <div className="space-y-6">
-      <h1>Services</h1>
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing services...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <h1>Services</h1>
+        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
       {/* Today / Latest Services */}
       {todayRecords.length > 0 && (
@@ -262,7 +299,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">
             {todayRecords[0]?.serviceDate === new Date().toISOString().split('T')[0] ? "Today's Service" : 'Latest Service'}
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-children">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 stagger-children">
             {todayRecords.map((sr) => (
               <Card key={sr.serviceDate} className="cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all border-l-4 border-l-secondary" onClick={() => openDetail(sr.serviceDate)}>
                 <CardContent className="p-4">

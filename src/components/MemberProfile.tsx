@@ -245,9 +245,9 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {/* Member Information */}
-        <div className="lg:col-span-2 space-y-6 stagger-children">
+        <div className="md:col-span-2 space-y-4 md:space-y-6 stagger-children">
           {/* Basic Info Card */}
           <Card className="shadow-sm">
             <CardHeader>
@@ -471,10 +471,10 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               </CardHeader>
               <CardContent>
                 {/* Visual Family Tree */}
-                <div className="relative py-6">
+                <div className="relative py-4 sm:py-6 overflow-x-auto">
                   {/* Parents Row */}
                   {member.familyMembers.filter(f => f.relationship === 'father' || f.relationship === 'mother').length > 0 && (
-                    <div className="flex justify-center gap-8 mb-4">
+                    <div className="flex justify-center gap-4 sm:gap-8 mb-4">
                       {member.familyMembers
                         .filter(f => f.relationship === 'father' || f.relationship === 'mother')
                         .map((parent) => (
@@ -604,7 +604,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
 
                   {/* Children Row */}
                   {member.familyMembers.filter(f => f.relationship === 'child').length > 0 && (
-                    <div className="flex justify-center gap-6">
+                    <div className="flex justify-center gap-3 sm:gap-6 flex-wrap">
                       {member.familyMembers
                         .filter(f => f.relationship === 'child')
                         .map((child) => (

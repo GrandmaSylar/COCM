@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase/client';
+import { clearAllCache } from '../hooks/useCachedData';
+import { invalidateApiCache } from '../services/api';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
@@ -331,8 +333,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    // Set user to null first to stop all API calls immediately
     setUser(null);
+
+    // Clear all caches
+    clearAllCache();
+    invalidateApiCache();
+
+    // Clear localStorage items
+    localStorage.removeItem('customThemeColors');
+
+    // Clear Supabase session from storage directly to ensure clean logout
+    const storageKey = `sb-szligatlxwpcknwkhdyp-auth-token`;
+    localStorage.removeItem(storageKey);
+    sessionStorage.removeItem(storageKey);
+
+    // Clear app state from sessionStorage so login page renders
+    sessionStorage.removeItem('currentPage');
+    sessionStorage.removeItem('selectedMemberId');
+    sessionStorage.removeItem('selectedVisitorId');
+    sessionStorage.removeItem('selectedAttendanceId');
+    sessionStorage.removeItem('selectedGivingId');
+
+    // Sign out from Supabase and wait for completion
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore errors, session is already cleared
+    }
+
     // Force redirect to login page
     window.location.href = '/';
   };

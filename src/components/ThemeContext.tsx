@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { api } from '../services/api';
+import { supabase } from '../utils/supabase/client';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -6,8 +8,17 @@ export interface ThemeColors {
   primary: string;
   secondary: string;
   accent: string;
-  background: string;
-  foreground: string;
+  success: string;
+  warning: string;
+  error: string;
+  info: string;
+  muted: string;
+  border: string;
+  chart1: string;
+  chart2: string;
+  chart3: string;
+  chart4: string;
+  chart5: string;
 }
 
 interface ThemeContextType {
@@ -17,21 +28,31 @@ interface ThemeContextType {
   customColors: ThemeColors | null;
   setCustomColors: (colors: ThemeColors) => void;
   resetColors: () => void;
+  isSyncing: boolean;
+  lastSyncedAt: Date | null;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const defaultColors: ThemeColors = {
+export const defaultColors: ThemeColors = {
   primary: '#dc2626',    // Red
   secondary: '#3b82f6',  // Blue
-  accent: '#ffffff',     // White
-  background: '#ffffff',
-  foreground: '#0f172a'
+  accent: '#8b5cf6',     // Purple
+  success: '#22c55e',    // Green
+  warning: '#f59e0b',    // Amber
+  error: '#ef4444',      // Red
+  info: '#0ea5e9',       // Sky blue
+  muted: '#6b7280',      // Gray
+  border: '#e5e7eb',     // Light gray
+  chart1: '#dc2626',     // Red
+  chart2: '#3b82f6',     // Blue
+  chart3: '#22c55e',     // Green
+  chart4: '#f59e0b',     // Amber
+  chart5: '#8b5cf6',     // Purple
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Check localStorage first
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('theme');
       if (stored === 'light' || stored === 'dark' || stored === 'system') {
@@ -42,7 +63,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   });
 
   const [isDark, setIsDark] = useState(false);
-  
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
   const [customColors, setCustomColorsState] = useState<ThemeColors | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('customThemeColors');
@@ -57,14 +80,76 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  // Fetch theme from server on mount
+  const fetchThemeFromServer = useCallback(async () => {
+    // Only fetch if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    try {
+      const data = await api.theme.get();
+      if (data?.colors) {
+        setCustomColorsState(data.colors);
+        localStorage.setItem('customThemeColors', JSON.stringify(data.colors));
+        setLastSyncedAt(new Date());
+      }
+      if (data?.mode) {
+        setTheme(data.mode);
+        localStorage.setItem('theme', data.mode);
+      }
+    } catch (err) {
+      // Silent fail - use local storage as fallback
+      console.log('Theme sync: using local settings');
+    }
+  }, []);
+
+  // Sync theme to server
+  const syncThemeToServer = useCallback(async (colors: ThemeColors | null, mode: Theme) => {
+    // Only sync if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    setIsSyncing(true);
+    try {
+      await api.theme.save({ colors, mode });
+      setLastSyncedAt(new Date());
+    } catch (err) {
+      console.error('Failed to sync theme to server:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // Initial fetch from server
+  useEffect(() => {
+    fetchThemeFromServer();
+  }, [fetchThemeFromServer]);
+
+  // Poll for theme updates every 30 seconds (for cross-device sync)
+  useEffect(() => {
+    const pollInterval = setInterval(() => {
+      fetchThemeFromServer();
+    }, 30000);
+    return () => clearInterval(pollInterval);
+  }, [fetchThemeFromServer]);
+
   const setCustomColors = (colors: ThemeColors) => {
     setCustomColorsState(colors);
     localStorage.setItem('customThemeColors', JSON.stringify(colors));
+    syncThemeToServer(colors, theme);
   };
 
   const resetColors = () => {
     setCustomColorsState(null);
     localStorage.removeItem('customThemeColors');
+    syncThemeToServer(null, theme);
+  };
+
+  // Sync theme mode changes to server
+  const handleSetTheme = (newTheme: Theme) => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    syncThemeToServer(customColors, newTheme);
   };
 
   useEffect(() => {
@@ -84,19 +169,43 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       
       // Apply custom colors if set
       if (customColors) {
+        // Main colors
         root.style.setProperty('--primary', customColors.primary);
         root.style.setProperty('--secondary', customColors.secondary);
         root.style.setProperty('--accent', customColors.accent);
-        
+
+        // Status colors
+        root.style.setProperty('--success', customColors.success);
+        root.style.setProperty('--warning', customColors.warning);
+        root.style.setProperty('--error', customColors.error);
+        root.style.setProperty('--info', customColors.info);
+
+        // UI colors
+        root.style.setProperty('--muted-custom', customColors.muted);
+        root.style.setProperty('--border-custom', customColors.border);
+
+        // Chart colors
+        root.style.setProperty('--chart-1', customColors.chart1);
+        root.style.setProperty('--chart-2', customColors.chart2);
+        root.style.setProperty('--chart-3', customColors.chart3);
+        root.style.setProperty('--chart-4', customColors.chart4);
+        root.style.setProperty('--chart-5', customColors.chart5);
+
         // Convert hex to HSL for better theme integration
         const primaryHSL = hexToHSL(customColors.primary);
+        const secondaryHSL = hexToHSL(customColors.secondary);
         root.style.setProperty('--primary-hsl', primaryHSL);
+        root.style.setProperty('--secondary-hsl', secondaryHSL);
       } else {
-        // Reset to default
-        root.style.removeProperty('--primary');
-        root.style.removeProperty('--secondary');
-        root.style.removeProperty('--accent');
-        root.style.removeProperty('--primary-hsl');
+        // Reset all custom properties
+        const props = [
+          '--primary', '--secondary', '--accent',
+          '--success', '--warning', '--error', '--info',
+          '--muted-custom', '--border-custom',
+          '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5',
+          '--primary-hsl', '--secondary-hsl'
+        ];
+        props.forEach(prop => root.style.removeProperty(prop));
       }
     };
 
@@ -120,11 +229,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const value = {
     theme,
-    setTheme,
+    setTheme: handleSetTheme,
     isDark,
     customColors,
     setCustomColors,
     resetColors,
+    isSyncing,
+    lastSyncedAt,
   };
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

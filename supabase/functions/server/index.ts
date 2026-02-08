@@ -2482,6 +2482,67 @@ app.post("/services", async (c)=>{
     }, 500);
   }
 });
+
+// Update a service
+app.put("/services/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const serviceId = c.req.param('id');
+    const updateData = await c.req.json();
+
+    const { data: service, error } = await supabase
+      .from('custom_services')
+      .update({
+        ...updateData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', serviceId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating service:', error);
+      return c.json({ error: 'Failed to update service' }, 500);
+    }
+
+    return c.json(toCamelCase(service));
+  } catch (error) {
+    console.error('Update service error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Delete a service
+app.delete("/services/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const serviceId = c.req.param('id');
+
+    const { error } = await supabase
+      .from('custom_services')
+      .delete()
+      .eq('id', serviceId);
+
+    if (error) {
+      console.error('Error deleting service:', error);
+      return c.json({ error: 'Failed to delete service' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Delete service error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 app.get("/giving", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -2821,7 +2882,7 @@ app.patch("/giving/types/:id/toggle", async (c) => {
       return c.json({ error: 'Failed to toggle giving type' }, 500);
     }
 
-    return c.json(type);
+    return c.json(toCamelCase(type));
   } catch (error) {
     console.error('Toggle giving type error:', error);
     return c.json({ error: 'Internal server error' }, 500);
@@ -4905,6 +4966,652 @@ app.patch("/notifications/read-all", async (c) => {
     return c.json({ success: true });
   } catch (error) {
     console.error('Mark all read error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// THEME SETTINGS
+// ============================================================================
+
+// Get user's theme settings
+app.get("/theme", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data, error } = await supabase.from('user_settings')
+      .select('theme_colors, theme_mode')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('Error fetching theme:', error);
+      return c.json({ error: 'Failed to fetch theme' }, 500);
+    }
+
+    return c.json({
+      colors: data?.theme_colors || null,
+      mode: data?.theme_mode || 'system'
+    });
+  } catch (error) {
+    console.error('Theme fetch error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Save user's theme settings
+app.put("/theme", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { colors, mode } = await c.req.json();
+
+    // Upsert the user settings
+    const { error } = await supabase.from('user_settings')
+      .upsert({
+        user_id: user.id,
+        theme_colors: colors,
+        theme_mode: mode,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      console.error('Error saving theme:', error);
+      return c.json({ error: 'Failed to save theme' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Theme save error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// BACKUP & RESTORE
+// ============================================================================
+
+// Helper to check if user is admin/dev
+async function isAdminOrDev(userId: string): Promise<boolean> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', userId)
+    .single();
+  return profile?.role === 'dev' || profile?.role === 'admin';
+}
+
+// Get backup history
+app.get("/backups", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const { data: backups, error } = await supabase
+      .from('backup_history')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching backups:', error);
+      return c.json({ error: 'Failed to fetch backups' }, 500);
+    }
+
+    return c.json(backups.map(b => toCamelCase(b)));
+  } catch (error) {
+    console.error('Get backups error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get last full backup info (for differential backups)
+app.get("/backups/last-full", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const { data: lastFull, error } = await supabase
+      .from('backup_history')
+      .select('*')
+      .eq('type', 'full')
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('Error fetching last full backup:', error);
+      return c.json({ error: 'Failed to fetch last full backup' }, 500);
+    }
+
+    return c.json(lastFull ? toCamelCase(lastFull) : null);
+  } catch (error) {
+    console.error('Get last full backup error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Create a backup (full or differential)
+app.post("/backups", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const body = await c.req.json();
+    const backupType = body.type || 'full'; // 'full' or 'differential'
+    const selectedTables = body.selectedTables || []; // Empty = all tables
+
+    // All available tables for backup
+    const allTables = [
+      'members',
+      'family_members',
+      'visitors',
+      'attendance_records',
+      'attendance_entries',
+      'absentee_records',
+      'member_status_log',
+      'giving_records',
+      'custom_services',
+      'custom_giving_types',
+      'custom_roles',
+      'profiles',
+      'temporary_permissions',
+      'user_tab_access',
+      'user_settings',
+      'service_records',
+      'notifications',
+      'activity_log'
+    ];
+
+    // Determine which tables to backup
+    const tablesToBackup = selectedTables.length > 0 ? selectedTables : allTables;
+
+    // For differential backup, we need a reference to the last full backup
+    let basedOnBackupId = null;
+    let basedOnBackupDate = null;
+
+    if (backupType === 'differential') {
+      const { data: lastFull } = await supabase
+        .from('backup_history')
+        .select('id, created_at')
+        .eq('type', 'full')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!lastFull) {
+        return c.json({ error: 'No full backup exists. Please create a full backup first.' }, 400);
+      }
+
+      basedOnBackupId = lastFull.id;
+      basedOnBackupDate = lastFull.created_at;
+    }
+
+    // Generate filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `backup_${backupType}_${timestamp}.json`;
+
+    // Get user profile for activity log
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('name, email')
+      .eq('id', user.id)
+      .single();
+
+    // Create backup record with 'in_progress' status
+    const { data: backupRecord, error: createError } = await supabase
+      .from('backup_history')
+      .insert({
+        type: backupType,
+        status: 'in_progress',
+        file_name: fileName,
+        based_on_backup_id: basedOnBackupId,
+        based_on_backup_date: basedOnBackupDate,
+        storage_locations: body.storageLocations || ['device'],
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      console.error('Error creating backup record:', createError);
+      return c.json({ error: 'Failed to create backup record' }, 500);
+    }
+
+    try {
+      // Collect all data for backup
+      const backupData: any = {
+        metadata: {
+          id: backupRecord.id,
+          type: backupType,
+          createdAt: new Date().toISOString(),
+          basedOnFullBackup: basedOnBackupDate,
+          version: '1.0',
+          selectedTables: tablesToBackup,
+          recordCounts: {}
+        },
+        data: {},
+        deletions: {} // For differential - track deleted IDs (future enhancement)
+      };
+
+      // Table configurations - use '*' to get all existing columns
+      const tableConfigs: { [key: string]: string } = {
+        'members': '*',
+        'family_members': '*',
+        'visitors': '*',
+        'attendance_records': '*',
+        'attendance_entries': '*',
+        'absentee_records': '*',
+        'member_status_log': '*',
+        'giving_records': '*',
+        'custom_services': '*',
+        'custom_giving_types': '*',
+        'custom_roles': '*',
+        'profiles': '*',
+        'temporary_permissions': '*',
+        'user_tab_access': '*',
+        'user_settings': '*',
+        'service_records': '*',
+        'notifications': '*',
+        'activity_log': '*'
+      };
+
+      // Helper function to fetch all records with pagination (Supabase default limit is 1000)
+      async function fetchAllRecords(tableName: string, selectFields: string, filterDate?: string) {
+        const allRecords: any[] = [];
+        const pageSize = 1000;
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          let query = supabase
+            .from(tableName)
+            .select(selectFields)
+            .range(offset, offset + pageSize - 1);
+
+          // For differential backup, only get records modified since last full backup
+          if (filterDate) {
+            query = supabase
+              .from(tableName)
+              .select(selectFields)
+              .or(`created_at.gte.${filterDate},updated_at.gte.${filterDate}`)
+              .range(offset, offset + pageSize - 1);
+          }
+
+          const { data, error } = await query;
+
+          if (error) {
+            console.error(`Error fetching ${tableName} (offset ${offset}):`, error);
+            throw error;
+          }
+
+          if (data && data.length > 0) {
+            allRecords.push(...data);
+            offset += pageSize;
+            hasMore = data.length === pageSize;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return allRecords;
+      }
+
+      for (const tableName of tablesToBackup) {
+        const selectFields = tableConfigs[tableName] || '*';
+        const filterDate = backupType === 'differential' && basedOnBackupDate ? basedOnBackupDate : undefined;
+
+        try {
+          const data = await fetchAllRecords(tableName, selectFields, filterDate);
+          backupData.data[tableName] = data;
+          backupData.metadata.recordCounts[tableName] = data.length;
+          console.log(`Fetched ${data.length} records from ${tableName}`);
+        } catch (error) {
+          console.error(`Error fetching ${tableName}:`, error);
+          // Continue with other tables even if one fails
+          backupData.data[tableName] = [];
+          backupData.metadata.recordCounts[tableName] = 0;
+        }
+      }
+
+      // Calculate file size (approximate)
+      const jsonString = JSON.stringify(backupData);
+      const fileSize = new Blob([jsonString]).size;
+
+      // Update backup record with success
+      const { error: updateError } = await supabase
+        .from('backup_history')
+        .update({
+          status: 'completed',
+          file_size: fileSize,
+          record_counts: backupData.metadata.recordCounts,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', backupRecord.id);
+
+      if (updateError) {
+        console.error('Error updating backup record:', updateError);
+      }
+
+      // Log backup creation to activity log
+      const totalRecords = Object.values(backupData.metadata.recordCounts).reduce((a: number, b: any) => a + (b || 0), 0);
+      await supabase.from('activity_log').insert({
+        user_id: user.id,
+        user_name: userProfile?.name || 'Unknown',
+        user_email: userProfile?.email || '',
+        action: 'backup_created',
+        entity_type: 'backup',
+        entity_id: backupRecord.id,
+        details: {
+          backupType,
+          fileName,
+          selectedTables: tablesToBackup,
+          totalRecords,
+          fileSize
+        }
+      });
+
+      // Return the backup data for download
+      return c.json({
+        backup: toCamelCase(backupRecord),
+        data: backupData
+      });
+
+    } catch (backupError) {
+      // Update backup record with failure
+      await supabase
+        .from('backup_history')
+        .update({
+          status: 'failed',
+          error_message: backupError.message || 'Unknown error during backup'
+        })
+        .eq('id', backupRecord.id);
+
+      throw backupError;
+    }
+
+  } catch (error) {
+    console.error('Create backup error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Restore from backup
+app.post("/backups/restore", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const body = await c.req.json();
+    const { backupData, restoreMode, selectedTables } = body;
+
+    if (!backupData || !backupData.data) {
+      return c.json({ error: 'Invalid backup data' }, 400);
+    }
+
+    const mode = restoreMode || 'merge'; // 'replace', 'merge', 'update'
+
+    // Validate backup structure
+    if (!backupData.metadata || !backupData.metadata.version) {
+      return c.json({ error: 'Invalid backup format - missing metadata' }, 400);
+    }
+
+    // Get user profile for activity log
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('name, email')
+      .eq('id', user.id)
+      .single();
+
+    const results: any = {
+      success: true,
+      mode,
+      tables: {}
+    };
+
+    // Define restore order (respects foreign key relationships)
+    const restoreOrder = [
+      'profiles',
+      'custom_roles',
+      'members',
+      'family_members',
+      'visitors',
+      'custom_services',
+      'custom_giving_types',
+      'attendance_records',
+      'attendance_entries',
+      'absentee_records',
+      'member_status_log',
+      'giving_records',
+      'service_records',
+      'temporary_permissions',
+      'user_tab_access',
+      'user_settings',
+      'notifications',
+      'activity_log'
+    ];
+
+    // Filter to only selected tables if specified
+    const tablesToRestore = selectedTables && selectedTables.length > 0
+      ? restoreOrder.filter(t => selectedTables.includes(t))
+      : restoreOrder;
+
+    for (const tableName of tablesToRestore) {
+      const tableData = backupData.data[tableName];
+      if (!tableData || tableData.length === 0) {
+        results.tables[tableName] = { skipped: true, reason: 'No data' };
+        continue;
+      }
+
+      try {
+        if (mode === 'replace') {
+          // Delete all existing data first (careful with foreign keys!)
+          if (tableName !== 'profiles' && tableName !== 'activity_log') { // Don't delete profiles or activity logs
+            const { error: deleteError } = await supabase
+              .from(tableName)
+              .delete()
+              .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+            if (deleteError) {
+              console.error(`Error clearing ${tableName}:`, deleteError);
+              results.tables[tableName] = { error: deleteError.message };
+              continue;
+            }
+          }
+        }
+
+        // Insert/upsert data
+        if (mode === 'replace' || mode === 'update') {
+          // Upsert - insert or update on conflict
+          const { data, error } = await supabase
+            .from(tableName)
+            .upsert(tableData, { onConflict: 'id' })
+            .select();
+
+          if (error) {
+            console.error(`Error restoring ${tableName}:`, error);
+            results.tables[tableName] = { error: error.message };
+          } else {
+            results.tables[tableName] = { restored: (data || []).length };
+          }
+        } else {
+          // Merge mode - only insert new records (skip existing)
+          let inserted = 0;
+          let skipped = 0;
+
+          for (const record of tableData) {
+            const { data: existing } = await supabase
+              .from(tableName)
+              .select('id')
+              .eq('id', record.id)
+              .single();
+
+            if (!existing) {
+              const { error } = await supabase
+                .from(tableName)
+                .insert(record);
+
+              if (error) {
+                console.error(`Error inserting into ${tableName}:`, error);
+                skipped++;
+              } else {
+                inserted++;
+              }
+            } else {
+              skipped++;
+            }
+          }
+
+          results.tables[tableName] = { inserted, skipped };
+        }
+
+      } catch (tableError) {
+        console.error(`Error processing ${tableName}:`, tableError);
+        results.tables[tableName] = { error: tableError.message };
+      }
+    }
+
+    // Log restore to activity log
+    const restoredTables = Object.entries(results.tables)
+      .filter(([_, info]: [string, any]) => info.restored || info.inserted)
+      .map(([name]) => name);
+
+    await supabase.from('activity_log').insert({
+      user_id: user.id,
+      user_name: userProfile?.name || 'Unknown',
+      user_email: userProfile?.email || '',
+      action: 'backup_restored',
+      entity_type: 'backup',
+      entity_id: backupData.metadata?.id || null,
+      details: {
+        restoreMode: mode,
+        backupType: backupData.metadata?.type,
+        backupDate: backupData.metadata?.createdAt,
+        restoredTables,
+        results: results.tables
+      }
+    });
+
+    return c.json(results);
+
+  } catch (error) {
+    console.error('Restore backup error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Delete a backup record
+app.delete("/backups/:id", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const backupId = c.req.param('id');
+
+    const { error } = await supabase
+      .from('backup_history')
+      .delete()
+      .eq('id', backupId);
+
+    if (error) {
+      console.error('Error deleting backup:', error);
+      return c.json({ error: 'Failed to delete backup' }, 500);
+    }
+
+    return c.json({ message: 'Backup deleted successfully' });
+  } catch (error) {
+    console.error('Delete backup error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Preview restore (show what would change)
+app.post("/backups/preview", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const body = await c.req.json();
+    const { backupData, restoreMode } = body;
+
+    if (!backupData || !backupData.data) {
+      return c.json({ error: 'Invalid backup data' }, 400);
+    }
+
+    const mode = restoreMode || 'merge';
+    const preview: any = {
+      mode,
+      backupInfo: backupData.metadata,
+      tables: {}
+    };
+
+    // For each table, count current records and backup records
+    const tables = [
+      'members', 'family_members', 'visitors', 'attendance_records', 'attendance_entries',
+      'absentee_records', 'member_status_log', 'giving_records', 'custom_services', 'custom_giving_types',
+      'custom_roles', 'profiles', 'temporary_permissions', 'user_tab_access', 'user_settings',
+      'service_records', 'notifications', 'activity_log'
+    ];
+
+    for (const tableName of tables) {
+      const backupCount = (backupData.data[tableName] || []).length;
+
+      const { count, error } = await supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true });
+
+      preview.tables[tableName] = {
+        currentCount: error ? 0 : count,
+        backupCount,
+        action: mode === 'replace' ? 'Replace all' : mode === 'merge' ? 'Add new only' : 'Update & add'
+      };
+    }
+
+    return c.json(preview);
+
+  } catch (error) {
+    console.error('Preview restore error:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });

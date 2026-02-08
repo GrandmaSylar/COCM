@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Bell, CheckCheck, Users, Calendar, DollarSign, Cake, AlertCircle, Eye, ChevronRight, UserPlus } from 'lucide-react';
+import { Bell, CheckCheck, Users, Calendar, DollarSign, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 
 interface Notification {
@@ -54,13 +54,14 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchNotifications();
   }, [page, showUnreadOnly]);
 
-  const fetchNotifications = async () => {
-    setLoading(true);
+  const fetchNotifications = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const data = await api.notifications.getAll({ page, limit: 20, unreadOnly: showUnreadOnly });
       setNotifications(data?.notifications || []);
@@ -69,6 +70,16 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
       console.error('Failed to fetch notifications:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([fetchNotifications(false), minDelay]);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -114,7 +125,27 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing notifications...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center shadow-sm">
@@ -126,6 +157,10 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button
             variant={showUnreadOnly ? 'default' : 'outline'}
             size="sm"

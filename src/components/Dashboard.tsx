@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, DollarSign, Plus, TrendingUp, UserPlus, ChevronRight } from 'lucide-react';
+import { Users, Calendar, DollarSign, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useState } from 'react';
@@ -16,11 +16,22 @@ interface DashboardProps {
 export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   const { user, canAccess, hasTabAccess } = useAuth();
 
-  const { data: statsData, loading } = useCachedData(
+  const { data: statsData, loading, refresh } = useCachedData(
     'dashboard-stats',
     () => api.stats.getDashboard(),
     { duration: 2 * 60 * 1000 } // 2 minutes
   );
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([refresh(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const stats = {
     totalMembers: statsData?.totalMembers || 0,
@@ -146,13 +157,39 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing data...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Header */}
-      <div className="mb-2">
-        <h1 className="text-2xl font-semibold mb-1">Welcome back, {user?.name}!</h1>
-        <p className="text-muted-foreground">
-          Here's what's happening in your church today.
-        </p>
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-semibold mb-1">Welcome back, {user?.name}!</h1>
+          <p className="text-muted-foreground">
+            Here's what's happening in your church today.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Summary Cards */}

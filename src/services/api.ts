@@ -516,4 +516,48 @@ export const api = {
     markAllAsRead: () =>
       fetchApi('/notifications/read-all', { method: 'PATCH' }),
   },
+
+  // ============================================================================
+  // THEME SETTINGS
+  // ============================================================================
+
+  theme: {
+    get: () => fetchApi('/theme'),
+
+    save: (data: { colors: any; mode: string }) =>
+      fetchApi('/theme', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }),
+  },
+
+  // ============================================================================
+  // BACKUP & RESTORE
+  // ============================================================================
+
+  backups: {
+    getAll: () => fetchApi('/backups'),
+
+    getLastFull: () => fetchApi('/backups/last-full'),
+
+    create: (type: 'full' | 'differential', storageLocations: string[] = ['device'], selectedTables: string[] = []) =>
+      fetchApi('/backups', {
+        method: 'POST',
+        body: JSON.stringify({ type, storageLocations, selectedTables })
+      }),
+
+    preview: (backupData: any, restoreMode: 'replace' | 'merge' | 'update', selectedTables: string[] = []) =>
+      fetchApi('/backups/preview', {
+        method: 'POST',
+        body: JSON.stringify({ backupData, restoreMode, selectedTables })
+      }),
+
+    restore: (backupData: any, restoreMode: 'replace' | 'merge' | 'update', selectedTables: string[] = []) =>
+      fetchApi('/backups/restore', {
+        method: 'POST',
+        body: JSON.stringify({ backupData, restoreMode, selectedTables })
+      }),
+
+    delete: (id: string) => fetchApi(`/backups/${id}`, { method: 'DELETE' }),
+  },
 };

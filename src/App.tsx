@@ -166,9 +166,13 @@ function AppContent() {
 
   // Show authentication pages when not authenticated
   if (!isAuthenticated) {
+    // Default to login page if current page is not an auth page
+    const authPages = ['login', 'otp-verification', 'signup', 'forgot-password'];
+    const effectivePage = authPages.includes(currentPage) ? currentPage : 'login';
+
     return (
       <>
-        {currentPage === 'login' && (
+        {effectivePage === 'login' && (
           <Login
             onForgotPassword={() => setCurrentPage('forgot-password')}
             onSignUp={() => setCurrentPage('signup')}
@@ -178,7 +182,7 @@ function AppContent() {
             }}
           />
         )}
-        {currentPage === 'otp-verification' && twoFAData && (
+        {effectivePage === 'otp-verification' && twoFAData && (
           <OtpVerification
             userId={twoFAData.userId}
             tempToken={twoFAData.tempToken}
@@ -195,10 +199,10 @@ function AppContent() {
             }}
           />
         )}
-        {currentPage === 'signup' && (
+        {effectivePage === 'signup' && (
           <SignUp onBackToLogin={() => setCurrentPage('login')} />
         )}
-        {currentPage === 'forgot-password' && (
+        {effectivePage === 'forgot-password' && (
           <ForgotPassword onBackToLogin={() => setCurrentPage('login')} />
         )}
       </>
@@ -678,7 +682,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <div className="min-h-screen bg-background">
+        <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
           <AppContent />
           <Toaster position="top-right" />
         </div>

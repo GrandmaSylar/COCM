@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { invalidateApiCache } from '../services/api';
 
 interface CacheEntry<T> {
   data: T;
@@ -74,6 +75,10 @@ export function useCachedData<T>(
   }, [cacheKey, options.refetch, cacheDuration]);
 
   const refresh = useCallback(async () => {
+    // Clear both local cache and API cache to force fresh data
+    dataCache.delete(cacheKey);
+    invalidateApiCache();
+
     isFetching.current = true;
     setLoading(true);
     setError(null);

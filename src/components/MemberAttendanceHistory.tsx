@@ -423,16 +423,16 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
               return (
                 <Card
                   key={recordKey}
-                  className={`transition-shadow w-full ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer hover:shadow-md' : ''}`}
+                  className={`transition-shadow w-full overflow-hidden ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer hover:shadow-md' : ''}`}
                   onClick={() => {
                     if (record.status === 'absent' && hasAbsenceInfo) {
                       setExpandedRecord(isExpanded ? null : recordKey);
                     }
                   }}
                 >
-                  <CardContent className="p-2 sm:p-3 overflow-hidden">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
-                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
+                  <CardContent className="p-2 sm:p-3 overflow-hidden max-w-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0 max-w-full">
+                      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1 max-w-full overflow-hidden">
                         {record.status === 'present' ? (
                           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -442,10 +442,10 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                             <XCircle className="w-4 h-4 text-red-600" />
                           </div>
                         )}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-sm font-medium">{formatDate(record.date)}</span>
-                            <Badge className={`text-xs ${serviceTypeColors[record.serviceType] || 'bg-gray-100 text-gray-800'}`}>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap max-w-full">
+                            <span className="text-sm font-medium whitespace-nowrap">{formatDate(record.date)}</span>
+                            <Badge className={`text-xs truncate max-w-[120px] sm:max-w-none ${serviceTypeColors[record.serviceType] || 'bg-gray-100 text-gray-800'}`}>
                               {serviceTypeLabels[record.serviceType] || record.serviceType}
                             </Badge>
                           </div>
@@ -455,46 +455,47 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <Badge variant={record.status === 'present' ? 'default' : 'destructive'}>
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 flex-wrap ml-10 sm:ml-0">
+                        <Badge variant={record.status === 'present' ? 'default' : 'destructive'} className="text-xs">
                           {record.status === 'present' ? 'Present' : 'Absent'}
                         </Badge>
                         {record.status === 'absent' && record.absenceInfo?.requestedPermission && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-800 text-xs">
-                            <Shield className="w-3 h-3 mr-1" />
-                            Permission
+                          <Badge variant="outline" className="bg-yellow-50 text-yellow-800 text-xs whitespace-nowrap">
+                            <Shield className="w-3 h-3 mr-1 flex-shrink-0" />
+                            <span className="hidden sm:inline">Permission</span>
+                            <span className="sm:hidden">Perm.</span>
                           </Badge>
                         )}
                         {record.status === 'absent' && hasAbsenceInfo && (
-                          <span className="text-xs text-muted-foreground">{isExpanded ? 'Hide' : 'Details'}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{isExpanded ? 'Hide' : 'Details'}</span>
                         )}
                       </div>
                     </div>
 
                     {/* Expanded absence details */}
                     {isExpanded && record.absenceInfo && (
-                      <div className="mt-3 pt-3 border-t space-y-2 ml-6 sm:ml-11 min-w-0">
+                      <div className="mt-3 pt-3 border-t space-y-2 ml-10 sm:ml-11 min-w-0 overflow-hidden">
                         {record.absenceInfo.requestedPermission && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Shield className="w-4 h-4 text-yellow-600" />
-                            <span className="font-medium">Permission was requested before absence</span>
+                          <div className="flex items-start gap-2 text-sm">
+                            <Shield className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                            <span className="font-medium break-words">Permission was requested before absence</span>
                           </div>
                         )}
                         {record.absenceInfo.reason && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                            <span><strong>Reason:</strong> {record.absenceInfo.reason}</span>
+                          <div className="flex items-start gap-2 text-sm">
+                            <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <span className="break-words"><strong>Reason:</strong> {record.absenceInfo.reason}</span>
                           </div>
                         )}
                         {record.absenceInfo.reasonNotes && (
-                          <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                          <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded break-words">
                             {record.absenceInfo.reasonNotes}
                           </div>
                         )}
                         {(record.absenceInfo.absenceStartDate || record.absenceInfo.absenceEndDate) && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Clock className="w-4 h-4 text-muted-foreground" />
-                            <span>
+                          <div className="flex items-start gap-2 text-sm">
+                            <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <span className="break-words">
                               <strong>Absence period:</strong>{' '}
                               {record.absenceInfo.absenceStartDate && formatShortDate(record.absenceInfo.absenceStartDate)}
                               {record.absenceInfo.absenceEndDate && ` — ${formatShortDate(record.absenceInfo.absenceEndDate)}`}
@@ -503,9 +504,9 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                           </div>
                         )}
                         {record.absenceInfo.untilFurtherNotice && !record.absenceInfo.absenceStartDate && (
-                          <div className="flex items-center gap-2 text-sm">
-                            <Clock className="w-4 h-4 text-muted-foreground" />
-                            <span><strong>Until further notice</strong></span>
+                          <div className="flex items-start gap-2 text-sm">
+                            <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                            <span className="break-words"><strong>Until further notice</strong></span>
                           </div>
                         )}
                       </div>

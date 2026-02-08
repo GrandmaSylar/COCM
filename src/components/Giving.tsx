@@ -6,13 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock } from 'lucide-react';
+import { DollarSign, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport, formatCurrencyForExport } from '../utils/export';
-import { useCachedData } from '../hooks/useCachedData';
+import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -106,6 +106,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [showCustomTypeManager, setShowCustomTypeManager] = useState(initialShowTypeManager);
+  const [refreshing, setRefreshing] = useState(false);
   const { user, canAccess } = useAuth();
 
   const { data: cachedGiving, loading: loadingGiving, refresh: refreshGiving } = useCachedData<any[]>(
@@ -113,7 +114,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     () => api.giving.getAll(),
     { duration: 2 * 60 * 1000 }
   );
-  const { data: cachedTypes, loading: loadingTypes } = useCachedData<CustomGivingType[]>(
+  const { data: cachedTypes, loading: loadingTypes, refresh: refreshTypes } = useCachedData<CustomGivingType[]>(
     'giving-types',
     () => api.giving.types.getAll(),
     { duration: 5 * 60 * 1000 }
@@ -131,6 +132,16 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
 
   const canRecordGiving = canAccess('record_giving');
   const canManageCustomTypes = canAccess('manage_giving_types');
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([refreshGiving(), refreshTypes(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = record.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -198,6 +209,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     if (confirm('Are you sure you want to delete this custom giving type?')) {
       try {
         await api.giving.types.delete(typeId);
+        clearCacheByPattern('giving-types');
         setCustomTypes(prev => prev.filter(type => type.id !== typeId));
         toast.success('Giving type deleted successfully');
       } catch (error) {
@@ -210,6 +222,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   const handleToggleCustomType = async (typeId: string) => {
     try {
       await api.giving.types.toggle(typeId);
+      clearCacheByPattern('giving-types');
       setCustomTypes(prev => prev.map(type =>
         type.id === typeId ? { ...type, isActive: !type.isActive } : type
       ));
@@ -297,18 +310,40 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
             name: newType.name,
             description: newType.description
           });
+          clearCacheByPattern('giving-types');
           setCustomTypes(prev => [...prev, createdType]);
           toast.success('Giving type created successfully');
-        } catch (error) {
+        } catch (error: any) {
           console.error('Failed to create giving type:', error);
-          toast.error('Failed to create giving type');
+          toast.error(error?.message || 'Failed to create giving type');
         }
       }}
+      onRefresh={refreshTypes}
     />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing giving records...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -317,14 +352,19 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
             Track offerings, donations, and thanksgiving per service
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap w-full sm:w-auto">
+          {/* Refresh Button */}
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
           {/* Export Button */}
           {records.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
+                <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+                  <Download className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Export</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -341,22 +381,24 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
             </DropdownMenu>
           )}
           {canManageCustomTypes && (
-            <Button variant="outline" onClick={() => setShowCustomTypeManager(true)}>
-              <Settings className="w-4 h-4 mr-2" />
-              Manage Types
+            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowCustomTypeManager(true)}>
+              <Settings className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Manage Types</span>
+              <span className="sm:hidden">Types</span>
             </Button>
           )}
           {canRecordGiving && (
-            <Button onClick={onRecordGiving}>
-              <Plus className="w-4 h-4 mr-2" />
-              Record Service Giving
+            <Button size="sm" className="text-xs sm:text-sm" onClick={onRecordGiving}>
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Record Giving</span>
+              <span className="sm:hidden">Record</span>
             </Button>
           )}
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 stagger-children">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -456,30 +498,30 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </Card>
         ) : (
           filteredRecords.map((record) => (
-            <Card key={record.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="space-y-4">
+            <Card key={record.id} className="hover:shadow-md transition-shadow overflow-hidden">
+              <CardContent className="p-3 sm:p-4">
+                <div className="space-y-3 sm:space-y-4">
                   {/* Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                        <Church className="w-6 h-6 text-primary" />
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Church className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium">{record.serviceName}</h3>
-                          <Badge className={getServiceTypeColor(record.serviceType)}>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceName}</h3>
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          <Badge className={`text-[10px] sm:text-xs ${getServiceTypeColor(record.serviceType)}`}>
                             {serviceTypeLabels[record.serviceType]}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           {formatDate(record.serviceDate)}
                         </p>
                       </div>
                     </div>
-                    
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
+
+                    <div className="text-left sm:text-right flex sm:block items-center gap-2 ml-13 sm:ml-0">
+                      <div className="text-xl sm:text-2xl font-bold text-primary">
                         {formatAmount(record.totalAmount)}
                       </div>
                       <p className="text-xs text-muted-foreground">Total</p>
@@ -487,7 +529,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   </div>
 
                   {/* Breakdown */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 sm:p-3 bg-muted/50 rounded-lg">
                     <div>
                       <p className="text-xs text-muted-foreground">Offering</p>
                       <p className="font-medium">{formatAmount(record.offerings.offering)}</p>
@@ -512,9 +554,9 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
 
                   {/* Custom Types */}
                   {Object.entries(record.offerings.customTypes).length > 0 && (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1 sm:gap-2">
                       {Object.entries(record.offerings.customTypes).map(([type, amount]) => (
-                        <Badge key={type} variant="outline" className="bg-purple-50">
+                        <Badge key={type} variant="outline" className="bg-purple-50 text-[10px] sm:text-xs">
                           {type}: {formatAmount(amount)}
                         </Badge>
                       ))}
@@ -522,38 +564,36 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   )}
 
                   {/* Payment Breakdown */}
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     {Object.entries(record.paymentBreakdown)
                       .filter(([key, value]) => key !== 'foreign_currency' && (value as number) > 0)
                       .map(([method, amount]) => (
-                        <Badge key={method} variant="outline">
+                        <Badge key={method} variant="outline" className="text-[10px] sm:text-xs">
                           {paymentMethodLabels[method as keyof typeof paymentMethodLabels]}: {formatAmount(amount as number)}
                         </Badge>
                       ))}
                     {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
-                      <Badge variant="outline" className="bg-yellow-50">
-                        Foreign ({record.paymentBreakdown.foreign_currency.currency}): {
-                          CURRENCIES.find(c => c.code === record.paymentBreakdown.foreign_currency?.currency)?.symbol || ''
-                        }{record.paymentBreakdown.foreign_currency.amount.toFixed(2)} (GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)})
+                      <Badge variant="outline" className="bg-yellow-50 text-[10px] sm:text-xs">
+                        Foreign: GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)}
                       </Badge>
                     )}
                   </div>
 
                   {/* Notes */}
                   {record.notes && (
-                    <p className="text-sm text-muted-foreground italic">
+                    <p className="text-xs sm:text-sm text-muted-foreground italic truncate">
                       Note: {record.notes}
                     </p>
                   )}
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between border-t pt-2">
-                    <div className="text-xs text-muted-foreground space-y-0.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-2">
+                    <div className="text-xs text-muted-foreground space-y-0.5 min-w-0">
                       {record.createdBy && record.createdAt && (
-                        <div>Recorded by {record.createdBy}{record.createdByEmail && ` (${record.createdByEmail})`} on {formatDate(record.createdAt)}</div>
+                        <div className="truncate">Recorded by {record.createdBy} on {formatDate(record.createdAt)}</div>
                       )}
                       {record.editedBy && record.editedAt && (
-                        <div>Edited by {record.editedBy}{record.editedByEmail && ` (${record.editedByEmail})`} on {formatDate(record.editedAt)}</div>
+                        <div className="truncate">Edited by {record.editedBy} on {formatDate(record.editedAt)}</div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -587,18 +627,6 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         )}
       </div>
 
-      {/* Mobile Floating Action Button */}
-      {canRecordGiving && (
-        <div className="lg:hidden fixed bottom-20 right-4">
-          <Button
-            onClick={onRecordGiving}
-            size="lg"
-            className="rounded-full w-14 h-14 shadow-lg"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -610,10 +638,12 @@ interface CustomTypeManagerProps {
   onDelete: (typeId: string) => void;
   onToggle: (typeId: string) => void;
   onAdd: (type: Omit<CustomGivingType, 'id' | 'isActive' | 'createdBy' | 'createdAt' | 'updatedAt'>) => void;
+  onRefresh: () => Promise<void>;
 }
 
-export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd }: CustomTypeManagerProps) {
+export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onAdd, onRefresh }: CustomTypeManagerProps) {
   const [showAddForm, setShowAddForm] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeDescription, setNewTypeDescription] = useState('');
 
@@ -631,19 +661,55 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
     setShowAddForm(false);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([onRefresh(), minDelay]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1>Manage Custom Giving Types</h1>
-          <p className="text-muted-foreground">
-            Add, edit, or remove custom giving types
-          </p>
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing giving types...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1>Manage Custom Giving Types</h1>
+            <p className="text-muted-foreground">
+              Add, edit, or remove custom giving types
+            </p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Add New Type */}
@@ -745,8 +811,16 @@ interface RecordGivingProps {
   onManageTypes?: () => void;
 }
 
+// Service type interface for attendance services
+interface AttendanceService {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
 export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProps) {
-  // Service type is fixed to Sunday Main Service for now
+  // Service selection
+  const [selectedServiceId, setSelectedServiceId] = useState('sunday_main');
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Offering amounts
@@ -772,6 +846,21 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
 
+  // Fetch active services from attendance
+  const { data: cachedServices } = useCachedData<AttendanceService[]>(
+    'custom-services',
+    () => api.services.getAll(),
+    { duration: 5 * 60 * 1000 }
+  );
+  const [availableServices, setAvailableServices] = useState<AttendanceService[]>([]);
+
+  useEffect(() => {
+    if (cachedServices) {
+      // Filter only active services
+      setAvailableServices(cachedServices.filter((s: any) => s.isActive));
+    }
+  }, [cachedServices]);
+
   const { data: cachedGivingTypes } = useCachedData<CustomGivingType[]>(
     'giving-types',
     () => api.giving.types.getAll(),
@@ -782,6 +871,18 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
   useEffect(() => {
     if (cachedGivingTypes) setCustomTypes(cachedGivingTypes.filter(type => type.isActive));
   }, [cachedGivingTypes]);
+
+  // Get the selected service name and type
+  const getSelectedServiceInfo = () => {
+    if (selectedServiceId === 'sunday_main') {
+      return { name: 'Sunday Main Service', type: 'sunday_morning' as const };
+    }
+    const service = availableServices.find(s => s.id === selectedServiceId);
+    if (service) {
+      return { name: service.name, type: 'other' as const };
+    }
+    return { name: 'Sunday Main Service', type: 'sunday_morning' as const };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -814,10 +915,11 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
         };
       }
 
+      const serviceInfo = getSelectedServiceInfo();
       const givingData = {
-        serviceName: 'Sunday Main Service',
+        serviceName: serviceInfo.name,
         serviceDate,
-        serviceType: 'sunday_morning' as const,
+        serviceType: serviceInfo.type,
         offerings: {
           offering: parseFloat(offeringAmount) || 0,
           donation: parseFloat(donationAmount) || 0,
@@ -884,10 +986,20 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
             {/* Service Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Service Type</Label>
-                <div className="p-3 bg-muted rounded-md">
-                  <span className="font-medium">Sunday Main Service</span>
-                </div>
+                <Label htmlFor="serviceType">Service Type *</Label>
+                <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select service type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sunday_main">Sunday Main Service</SelectItem>
+                    {availableServices.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

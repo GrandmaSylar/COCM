@@ -21,7 +21,9 @@ import {
   HelpCircle,
   ClipboardList,
   Bell,
-  Church
+  Church,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
@@ -75,7 +77,8 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+    <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
       {/* Mobile Header */}
       <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-medium">CoC.M</h1>
@@ -204,8 +207,14 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 z-50 bg-black/50 animate-fade-in">
-            <div className="fixed inset-y-0 left-0 w-64 bg-card shadow-xl animate-slide-in-left">
+          <div
+            className="lg:hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <div
+              className="fixed inset-y-0 left-0 w-64 bg-card shadow-xl animate-slide-in-left"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-4 py-3 border-b">
                   <h1 className="text-lg">Church of Christ, Mataheko</h1>
@@ -258,41 +267,34 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
         )}
 
         {/* Main Content */}
-        <div className="flex-1 lg:ml-64">
-          <main className="p-3 sm:p-4 lg:p-6 pb-24 lg:pb-6">
-            <div key={currentPage} className="page-transition">
+        <div className="flex-1 lg:ml-64 overflow-x-hidden">
+          <main className="p-3 sm:p-4 lg:p-6 pb-24 lg:pb-6 overflow-x-hidden max-w-full">
+            <div key={currentPage} className="page-transition overflow-x-hidden">
               {children}
             </div>
           </main>
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t safe-bottom z-40 animate-slide-in-bottom">
-        <div className="flex">
-          {filteredNavItems.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onNavigate(item.id)}
-                className={`flex-1 flex flex-col items-center py-2.5 px-1 transition-colors ${
-                  isActive
-                    ? 'text-primary'
-                    : 'text-muted-foreground active:text-primary'
-                }`}
-              >
-                <div className={`transition-transform ${isActive ? 'scale-110' : ''}`}>
-                  <Icon className="w-5 h-5 mb-0.5" />
-                </div>
-                <span className={`text-[10px] ${isActive ? 'font-semibold' : ''}`}>{item.label}</span>
-                {isActive && <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />}
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
+
+    {/* Mobile FAB - Opens/Closes Left Nav (outside main container for proper fixed positioning) */}
+    <button
+      onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      className={`lg:hidden w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${
+        mobileMenuOpen
+          ? 'bg-card text-foreground border-2'
+          : 'bg-primary text-primary-foreground hover:scale-110 hover:shadow-2xl'
+      }`}
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '16px',
+        zIndex: 9999,
+      }}
+    >
+      {mobileMenuOpen ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
+    </button>
+    </>
   );
 }

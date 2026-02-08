@@ -9,9 +9,9 @@ import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, DollarSign, BarChart3, Church, ClipboardList } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, DollarSign, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
-import { useTheme, ThemeColors } from './ThemeContext';
+import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
 import { api } from '../services/api';
 
@@ -70,7 +70,7 @@ export function Settings({ onAddUser }: SettingsProps) {
     allUsers
   } = useAuth();
 
-  const { customColors, setCustomColors, resetColors } = useTheme();
+  const { customColors, setCustomColors, resetColors, isSyncing } = useTheme();
 
   const [selectedUserForPermission, setSelectedUserForPermission] = useState<string | null>(null);
   const [permissionToGrant, setPermissionToGrant] = useState('');
@@ -95,14 +95,15 @@ export function Settings({ onAddUser }: SettingsProps) {
   
   // Theme customization state
   const [themeColorInputs, setThemeColorInputs] = useState<ThemeColors>(
-    customColors || {
-      primary: '#dc2626',    // Red
-      secondary: '#3b82f6',  // Blue
-      accent: '#ffffff',     // White
-      background: '#ffffff',
-      foreground: '#0f172a'
-    }
+    customColors || defaultColors
   );
+
+  // Sync theme inputs when customColors changes from server
+  useEffect(() => {
+    if (customColors) {
+      setThemeColorInputs(customColors);
+    }
+  }, [customColors]);
 
   const canManageUsers = canAccess('manage_users');
   const canManageSettings = canAccess('manage_settings');
@@ -253,13 +254,7 @@ export function Settings({ onAddUser }: SettingsProps) {
 
   const handleResetThemeColors = () => {
     resetColors();
-    setThemeColorInputs({
-      primary: '#dc2626',    // Red
-      secondary: '#3b82f6',  // Blue
-      accent: '#ffffff',     // White
-      background: '#ffffff',
-      foreground: '#0f172a'
-    });
+    setThemeColorInputs(defaultColors);
     toast.success('Theme colors reset to default');
   };
 
@@ -376,6 +371,7 @@ export function Settings({ onAddUser }: SettingsProps) {
           {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
           {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
           {canManageTheme && <TabsTrigger value="theme">Theme</TabsTrigger>}
+          {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
 
@@ -450,7 +446,7 @@ export function Settings({ onAddUser }: SettingsProps) {
           )}
 
           {/* System Overview */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 w-full">
             <Card className="min-w-0">
               <CardContent className="p-4">
                 <div className="flex flex-col items-center text-center gap-2">
@@ -1060,75 +1056,160 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="w-5 h-5" />
                   Theme Customization
+                  {isSyncing && (
+                    <Badge variant="outline" className="ml-2 text-xs animate-pulse">
+                      Syncing...
+                    </Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
-                  Customize the color scheme of the entire system. Changes apply to both light and dark modes.
+                  Customize the color scheme of the entire system. Changes sync across all devices logged into this account.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6 overflow-x-hidden">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-6">
-                  <div className="space-y-2 min-w-0">
-                    <Label htmlFor="primary-color">Primary Color</Label>
-                    <div className="flex gap-2 min-w-0">
-                      <Input
-                        id="primary-color"
-                        type="color"
-                        value={themeColorInputs.primary}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, primary: e.target.value })}
-                        className="w-16 h-10 flex-shrink-0"
-                      />
-                      <Input
-                        type="text"
-                        value={themeColorInputs.primary}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, primary: e.target.value })}
-                        className="flex-1 min-w-0"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 min-w-0">
-                    <Label htmlFor="secondary-color">Secondary Color</Label>
-                    <div className="flex gap-2 min-w-0">
-                      <Input
-                        id="secondary-color"
-                        type="color"
-                        value={themeColorInputs.secondary}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, secondary: e.target.value })}
-                        className="w-16 h-10 flex-shrink-0"
-                      />
-                      <Input
-                        type="text"
-                        value={themeColorInputs.secondary}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, secondary: e.target.value })}
-                        className="flex-1 min-w-0"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 min-w-0">
-                    <Label htmlFor="accent-color">Accent Color</Label>
-                    <div className="flex gap-2 min-w-0">
-                      <Input
-                        id="accent-color"
-                        type="color"
-                        value={themeColorInputs.accent}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, accent: e.target.value })}
-                        className="w-16 h-10 flex-shrink-0"
-                      />
-                      <Input
-                        type="text"
-                        value={themeColorInputs.accent}
-                        onChange={(e) => setThemeColorInputs({ ...themeColorInputs, accent: e.target.value })}
-                        className="flex-1 min-w-0"
-                      />
-                    </div>
+              <CardContent className="space-y-8 overflow-x-hidden">
+                {/* Main Colors */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-primary" />
+                    Main Colors
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <ColorPicker
+                      label="Primary"
+                      description="Main brand color, buttons, links"
+                      value={themeColorInputs.primary}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, primary: v })}
+                    />
+                    <ColorPicker
+                      label="Secondary"
+                      description="Secondary actions, badges"
+                      value={themeColorInputs.secondary}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, secondary: v })}
+                    />
+                    <ColorPicker
+                      label="Accent"
+                      description="Highlights, special elements"
+                      value={themeColorInputs.accent}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, accent: v })}
+                    />
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                {/* Status Colors */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    Status Colors
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <ColorPicker
+                      label="Success"
+                      description="Success states, completed"
+                      value={themeColorInputs.success}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, success: v })}
+                    />
+                    <ColorPicker
+                      label="Warning"
+                      description="Warnings, pending states"
+                      value={themeColorInputs.warning}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, warning: v })}
+                    />
+                    <ColorPicker
+                      label="Error"
+                      description="Errors, destructive actions"
+                      value={themeColorInputs.error}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, error: v })}
+                    />
+                    <ColorPicker
+                      label="Info"
+                      description="Information, help"
+                      value={themeColorInputs.info}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, info: v })}
+                    />
+                  </div>
+                </div>
+
+                {/* UI Colors */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-400" />
+                    UI Colors
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <ColorPicker
+                      label="Muted"
+                      description="Muted text, disabled states"
+                      value={themeColorInputs.muted}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, muted: v })}
+                    />
+                    <ColorPicker
+                      label="Border"
+                      description="Borders, dividers"
+                      value={themeColorInputs.border}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, border: v })}
+                    />
+                  </div>
+                </div>
+
+                {/* Chart Colors */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    Chart Colors
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <ColorPicker
+                      label="Chart 1"
+                      value={themeColorInputs.chart1}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, chart1: v })}
+                      compact
+                    />
+                    <ColorPicker
+                      label="Chart 2"
+                      value={themeColorInputs.chart2}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, chart2: v })}
+                      compact
+                    />
+                    <ColorPicker
+                      label="Chart 3"
+                      value={themeColorInputs.chart3}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, chart3: v })}
+                      compact
+                    />
+                    <ColorPicker
+                      label="Chart 4"
+                      value={themeColorInputs.chart4}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, chart4: v })}
+                      compact
+                    />
+                    <ColorPicker
+                      label="Chart 5"
+                      value={themeColorInputs.chart5}
+                      onChange={(v) => setThemeColorInputs({ ...themeColorInputs, chart5: v })}
+                      compact
+                    />
+                  </div>
+                </div>
+
+                {/* Color Preview */}
+                <div className="p-4 rounded-xl bg-muted/30 border">
+                  <h3 className="text-sm font-semibold mb-3">Preview</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(themeColorInputs).map(([key, color]) => (
+                      <div
+                        key={key}
+                        className="w-10 h-10 rounded-lg shadow-sm border"
+                        style={{ backgroundColor: color }}
+                        title={`${key}: ${color}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 pt-4">
                   <Button onClick={handleApplyThemeColors}>
                     <Save className="w-4 h-4 mr-2" />
-                    Apply Colors
+                    Apply & Sync Colors
                   </Button>
                   <Button variant="outline" onClick={handleResetThemeColors}>
                     <Trash className="w-4 h-4 mr-2" />
@@ -1139,17 +1220,786 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Alert>
                   <Palette className="h-4 w-4" />
                   <AlertDescription>
-                    Theme colors are applied globally to both light and dark modes. The system automatically adjusts contrast and brightness for optimal visibility.
+                    Theme colors sync across all devices where this account is logged in. Changes may take up to 30 seconds to appear on other devices.
                   </AlertDescription>
                 </Alert>
               </CardContent>
             </Card>
           </TabsContent>
         )}
+        {/* Backup & Restore Tab */}
+        {hasAdminAccess && (
+          <TabsContent value="backup" className="space-y-6 w-full overflow-hidden">
+            <BackupRestore />
+          </TabsContent>
+        )}
+
         <TabsContent value="security" className="space-y-6 w-full overflow-hidden">
           <SecuritySettings />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Color Picker Component
+function ColorPicker({
+  label,
+  description,
+  value,
+  onChange,
+  compact = false
+}: {
+  label: string;
+  description?: string;
+  value: string;
+  onChange: (value: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`space-y-1.5 ${compact ? '' : 'min-w-0'}`}>
+      <Label className="text-xs font-medium">{label}</Label>
+      {description && !compact && (
+        <p className="text-xs text-muted-foreground">{description}</p>
+      )}
+      <div className="flex gap-2 items-center">
+        <div className="relative">
+          <Input
+            type="color"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-10 h-10 p-1 cursor-pointer border-2 rounded-lg"
+          />
+        </div>
+        <Input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${compact ? 'w-20' : 'flex-1'} h-10 font-mono text-xs`}
+          placeholder="#000000"
+        />
+      </div>
+    </div>
+  );
+}
+
+// Backup & Restore Component
+// Available tables for backup/restore
+const BACKUP_TABLES = [
+  { id: 'members', label: 'Members', description: 'Church member records' },
+  { id: 'family_members', label: 'Family Links', description: 'Family relationships between members' },
+  { id: 'visitors', label: 'Visitors', description: 'Visitor records' },
+  { id: 'attendance_records', label: 'Attendance Records', description: 'Service attendance summaries' },
+  { id: 'attendance_entries', label: 'Attendance Entries', description: 'Individual attendance entries' },
+  { id: 'absentee_records', label: 'Absentee Records', description: 'Absent member tracking' },
+  { id: 'member_status_log', label: 'Status History', description: 'Member status change history' },
+  { id: 'giving_records', label: 'Giving Records', description: 'Offering and donation records' },
+  { id: 'custom_services', label: 'Custom Services', description: 'Custom service types' },
+  { id: 'custom_giving_types', label: 'Giving Types', description: 'Custom giving categories' },
+  { id: 'custom_roles', label: 'Custom Roles', description: 'Custom role definitions' },
+  { id: 'profiles', label: 'User Accounts', description: 'User profiles and settings' },
+  { id: 'temporary_permissions', label: 'Temp Permissions', description: 'Temporary user permissions' },
+  { id: 'user_tab_access', label: 'Tab Access', description: 'User tab access settings' },
+  { id: 'user_settings', label: 'User Settings', description: 'User preferences and themes' },
+  { id: 'service_records', label: 'Service Records', description: 'Service records' },
+  { id: 'notifications', label: 'Notifications', description: 'User notifications' },
+  { id: 'activity_log', label: 'Activity Logs', description: 'System activity history' },
+];
+
+function BackupRestore() {
+  const [backupHistory, setBackupHistory] = useState<any[]>([]);
+  const [lastFullBackup, setLastFullBackup] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [backupType, setBackupType] = useState<'full' | 'differential'>('full');
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge' | 'update'>('merge');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedBackupData, setUploadedBackupData] = useState<any>(null);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Table selection for backup
+  const [selectedBackupTables, setSelectedBackupTables] = useState<string[]>(BACKUP_TABLES.map(t => t.id));
+  const [selectAllBackup, setSelectAllBackup] = useState(true);
+
+  // Table selection for restore
+  const [selectedRestoreTables, setSelectedRestoreTables] = useState<string[]>([]);
+  const [selectAllRestore, setSelectAllRestore] = useState(true);
+
+  const toggleBackupTable = (tableId: string) => {
+    setSelectedBackupTables(prev => {
+      const newSelection = prev.includes(tableId)
+        ? prev.filter(t => t !== tableId)
+        : [...prev, tableId];
+      setSelectAllBackup(newSelection.length === BACKUP_TABLES.length);
+      return newSelection;
+    });
+  };
+
+  const toggleAllBackupTables = () => {
+    if (selectAllBackup) {
+      setSelectedBackupTables([]);
+      setSelectAllBackup(false);
+    } else {
+      setSelectedBackupTables(BACKUP_TABLES.map(t => t.id));
+      setSelectAllBackup(true);
+    }
+  };
+
+  const toggleRestoreTable = (tableId: string) => {
+    setSelectedRestoreTables(prev => {
+      const availableTables = Object.keys(uploadedBackupData?.data || {});
+      const newSelection = prev.includes(tableId)
+        ? prev.filter(t => t !== tableId)
+        : [...prev, tableId];
+      setSelectAllRestore(newSelection.length === availableTables.length);
+      return newSelection;
+    });
+  };
+
+  const toggleAllRestoreTables = () => {
+    const availableTables = Object.keys(uploadedBackupData?.data || {});
+    if (selectAllRestore) {
+      setSelectedRestoreTables([]);
+      setSelectAllRestore(false);
+    } else {
+      setSelectedRestoreTables(availableTables);
+      setSelectAllRestore(true);
+    }
+  };
+
+  // Load backup history and last full backup
+  const loadBackupData = async () => {
+    try {
+      const [history, lastFull] = await Promise.all([
+        api.backups.getAll(),
+        api.backups.getLastFull()
+      ]);
+      setBackupHistory(history || []);
+      setLastFullBackup(lastFull);
+    } catch (error) {
+      console.error('Failed to load backup data:', error);
+      toast.error('Failed to load backup history');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBackupData();
+  }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadBackupData();
+    setRefreshing(false);
+    toast.success('Backup history refreshed');
+  };
+
+  const handleCreateBackup = async () => {
+    if (backupType === 'differential' && !lastFullBackup) {
+      toast.error('Please create a full backup first before creating a differential backup');
+      return;
+    }
+
+    if (selectedBackupTables.length === 0) {
+      toast.error('Please select at least one table to backup');
+      return;
+    }
+
+    setIsCreatingBackup(true);
+    try {
+      const result = await api.backups.create(backupType, ['device'], selectedBackupTables);
+
+      if (result && result.data) {
+        // Download the backup file
+        const jsonString = JSON.stringify(result.data, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = result.data.metadata.type === 'full'
+          ? `backup_full_${new Date().toISOString().split('T')[0]}.json`
+          : `backup_diff_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        toast.success(`${backupType === 'full' ? 'Full' : 'Differential'} backup created and downloaded`);
+        loadBackupData(); // Refresh history
+      }
+    } catch (error: any) {
+      console.error('Failed to create backup:', error);
+      toast.error(error?.message || 'Failed to create backup');
+    } finally {
+      setIsCreatingBackup(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string);
+          if (data.metadata && data.data) {
+            setUploadedBackupData(data);
+            // Set available restore tables based on backup content
+            const availableTables = Object.keys(data.data).filter(t => (data.data[t] || []).length > 0);
+            setSelectedRestoreTables(availableTables);
+            setSelectAllRestore(true);
+            toast.success('Backup file loaded successfully');
+          } else {
+            toast.error('Invalid backup file format');
+            setSelectedFile(null);
+          }
+        } catch {
+          toast.error('Failed to parse backup file');
+          setSelectedFile(null);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!uploadedBackupData) {
+      toast.error('Please select a backup file first');
+      return;
+    }
+
+    if (selectedRestoreTables.length === 0) {
+      toast.error('Please select at least one table to restore');
+      return;
+    }
+
+    try {
+      const preview = await api.backups.preview(uploadedBackupData, restoreMode, selectedRestoreTables);
+      setPreviewData(preview);
+      setShowPreview(true);
+    } catch (error: any) {
+      console.error('Failed to preview restore:', error);
+      toast.error(error?.message || 'Failed to preview restore');
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!uploadedBackupData) {
+      toast.error('Please select a backup file first');
+      return;
+    }
+
+    if (selectedRestoreTables.length === 0) {
+      toast.error('Please select at least one table to restore');
+      return;
+    }
+
+    const tableList = selectedRestoreTables.join(', ');
+    if (!confirm(`Are you sure you want to restore the following tables using "${restoreMode}" mode?\n\n${tableList}\n\nThis action may modify your data.`)) {
+      return;
+    }
+
+    setIsRestoring(true);
+    try {
+      const result = await api.backups.restore(uploadedBackupData, restoreMode, selectedRestoreTables);
+      if (result.success) {
+        toast.success('Backup restored successfully');
+        setUploadedBackupData(null);
+        setSelectedFile(null);
+        setPreviewData(null);
+        setShowPreview(false);
+      } else {
+        toast.error('Some tables failed to restore. Check console for details.');
+        console.error('Restore results:', result);
+      }
+    } catch (error: any) {
+      console.error('Failed to restore backup:', error);
+      toast.error(error?.message || 'Failed to restore backup');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
+  const handleDeleteBackup = async (backupId: string) => {
+    if (!confirm('Are you sure you want to delete this backup record?')) {
+      return;
+    }
+
+    try {
+      await api.backups.delete(backupId);
+      toast.success('Backup record deleted');
+      loadBackupData();
+    } catch (error: any) {
+      console.error('Failed to delete backup:', error);
+      toast.error(error?.message || 'Failed to delete backup');
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (!bytes) return 'Unknown';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="flex items-center gap-2">
+            <Database className="w-5 h-5" />
+            Backup & Restore
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Create backups and restore your data
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Create Backup Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="w-5 h-5" />
+            Create Backup
+          </CardTitle>
+          <CardDescription>
+            Create a full or differential backup of your data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Full Backup */}
+            <div
+              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                backupType === 'full' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => setBackupType('full')}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center ${
+                  backupType === 'full' ? 'border-primary' : 'border-muted-foreground'
+                }`}>
+                  {backupType === 'full' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <h3 className="font-medium flex items-center gap-2">
+                    <Database className="w-4 h-4" />
+                    Full Backup
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Complete snapshot of all data. Recommended weekly/monthly.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Differential Backup */}
+            <div
+              className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                backupType === 'differential' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+              } ${!lastFullBackup ? 'opacity-50' : ''}`}
+              onClick={() => lastFullBackup && setBackupType('differential')}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-4 h-4 mt-0.5 rounded-full border-2 flex items-center justify-center ${
+                  backupType === 'differential' ? 'border-primary' : 'border-muted-foreground'
+                }`}>
+                  {backupType === 'differential' && <div className="w-2 h-2 rounded-full bg-primary" />}
+                </div>
+                <div>
+                  <h3 className="font-medium flex items-center gap-2">
+                    <FileJson className="w-4 h-4" />
+                    Differential Backup
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Only changes since last full backup. Smaller & faster.
+                  </p>
+                  {lastFullBackup ? (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Based on: {formatDate(lastFullBackup.createdAt)}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-orange-500 mt-2">
+                      Requires a full backup first
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Table Selection for Backup */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Select Tables to Backup</Label>
+              <Button variant="ghost" size="sm" onClick={toggleAllBackupTables}>
+                {selectAllBackup ? 'Deselect All' : 'Select All'}
+              </Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {BACKUP_TABLES.map((table) => (
+                <div
+                  key={table.id}
+                  className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
+                    selectedBackupTables.includes(table.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                  onClick={() => toggleBackupTable(table.id)}
+                >
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                    selectedBackupTables.includes(table.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                  }`}>
+                    {selectedBackupTables.includes(table.id) && (
+                      <CheckCircle className="w-3 h-3 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{table.label}</p>
+                    <p className="text-xs text-muted-foreground truncate">{table.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedBackupTables.length} of {BACKUP_TABLES.length} tables selected
+            </p>
+          </div>
+
+          <Button
+            onClick={handleCreateBackup}
+            disabled={isCreatingBackup || selectedBackupTables.length === 0}
+            className="w-full sm:w-auto"
+          >
+            {isCreatingBackup ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                Creating Backup...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 mr-2" />
+                Create & Download {backupType === 'full' ? 'Full' : 'Differential'} Backup
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Restore Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Upload className="w-5 h-5" />
+            Restore from Backup
+          </CardTitle>
+          <CardDescription>
+            Upload a backup file to restore your data
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* File Upload */}
+          <div className="space-y-2">
+            <Label>Select Backup File</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="file"
+                accept=".json"
+                onChange={handleFileSelect}
+                className="flex-1"
+              />
+            </div>
+            {selectedFile && (
+              <p className="text-sm text-muted-foreground">
+                Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+              </p>
+            )}
+          </div>
+
+          {/* Backup Info */}
+          {uploadedBackupData && (
+            <Alert>
+              <FileJson className="w-4 h-4" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <p><strong>Type:</strong> {uploadedBackupData.metadata.type === 'full' ? 'Full Backup' : 'Differential Backup'}</p>
+                  <p><strong>Created:</strong> {formatDate(uploadedBackupData.metadata.createdAt)}</p>
+                  <p><strong>Records:</strong> {Object.entries(uploadedBackupData.metadata.recordCounts || {}).map(([k, v]) => `${k}: ${v}`).join(', ')}</p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Restore Mode */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Restore Mode</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Merge Mode */}
+              <div
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  restoreMode === 'merge'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30 shadow-md'
+                    : 'border-border hover:border-green-300 hover:bg-green-50/50 dark:hover:bg-green-950/10'
+                }`}
+                onClick={() => setRestoreMode('merge')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    restoreMode === 'merge' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'
+                  }`}>
+                    {restoreMode === 'merge' && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base flex items-center gap-2">
+                      <Plus className="w-4 h-4 text-green-600" />
+                      Merge
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Add new records only. Existing records are kept unchanged.
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-green-600 border-green-300">Safest Option</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Update Mode */}
+              <div
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  restoreMode === 'update'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-md'
+                    : 'border-border hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
+                }`}
+                onClick={() => setRestoreMode('update')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    restoreMode === 'update' ? 'border-blue-500 bg-blue-500' : 'border-muted-foreground'
+                  }`}>
+                    {restoreMode === 'update' && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-blue-600" />
+                      Update
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Update existing records and add new ones.
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-blue-600 border-blue-300">Recommended</Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Replace Mode */}
+              <div
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  restoreMode === 'replace'
+                    ? 'border-red-500 bg-red-50 dark:bg-red-950/30 shadow-md'
+                    : 'border-border hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/10'
+                }`}
+                onClick={() => setRestoreMode('replace')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    restoreMode === 'replace' ? 'border-red-500 bg-red-500' : 'border-muted-foreground'
+                  }`}>
+                    {restoreMode === 'replace' && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base flex items-center gap-2">
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                      Replace
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Delete all existing data and import from backup.
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-red-600 border-red-300">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Destructive
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Table Selection for Restore */}
+          {uploadedBackupData && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Select Tables to Restore</Label>
+                <Button variant="ghost" size="sm" onClick={toggleAllRestoreTables}>
+                  {selectAllRestore ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {Object.entries(uploadedBackupData.data || {}).map(([tableId, tableData]: [string, any]) => {
+                  const tableInfo = BACKUP_TABLES.find(t => t.id === tableId);
+                  const recordCount = (tableData || []).length;
+                  if (recordCount === 0) return null;
+                  return (
+                    <div
+                      key={tableId}
+                      className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
+                        selectedRestoreTables.includes(tableId)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={() => toggleRestoreTable(tableId)}
+                    >
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                        selectedRestoreTables.includes(tableId) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                      }`}>
+                        {selectedRestoreTables.includes(tableId) && (
+                          <CheckCircle className="w-3 h-3 text-primary-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{tableInfo?.label || tableId}</p>
+                        <p className="text-xs text-muted-foreground">{recordCount} records</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedRestoreTables.length} tables selected for restore
+              </p>
+            </div>
+          )}
+
+          {/* Preview */}
+          {showPreview && previewData && (
+            <Alert>
+              <AlertDescription>
+                <h4 className="font-medium mb-2">Restore Preview ({previewData.mode} mode)</h4>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  {Object.entries(previewData.tables || {}).map(([table, info]: [string, any]) => (
+                    <div key={table} className="p-2 bg-muted rounded">
+                      <p className="font-medium">{table}</p>
+                      <p>Current: {info.currentCount}</p>
+                      <p>Backup: {info.backupCount}</p>
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePreview}
+              disabled={!uploadedBackupData}
+            >
+              Preview Changes
+            </Button>
+            <Button
+              onClick={handleRestore}
+              disabled={!uploadedBackupData || isRestoring}
+              variant={restoreMode === 'replace' ? 'destructive' : 'default'}
+            >
+              {isRestoring ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Restore Now
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Backup History */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Backup History
+          </CardTitle>
+          <CardDescription>
+            Recent backup operations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {backupHistory.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No backups created yet. Create your first backup above.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {backupHistory.map((backup) => (
+                <div key={backup.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    {backup.type === 'full' ? (
+                      <Database className="w-5 h-5 text-blue-500" />
+                    ) : (
+                      <FileJson className="w-5 h-5 text-green-500" />
+                    )}
+                    <div>
+                      <p className="font-medium flex items-center gap-2">
+                        {backup.type === 'full' ? 'Full Backup' : 'Differential Backup'}
+                        {backup.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
+                        {backup.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
+                        {backup.status === 'in_progress' && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(backup.createdAt)} • {formatFileSize(backup.fileSize)}
+                      </p>
+                      {backup.recordCounts && (
+                        <p className="text-xs text-muted-foreground">
+                          {Object.values(backup.recordCounts).reduce((a: number, b: any) => a + (b || 0), 0)} total records
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={backup.status === 'completed' ? 'default' : backup.status === 'failed' ? 'destructive' : 'secondary'}>
+                      {backup.status}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteBackup(backup.id)}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
