@@ -366,19 +366,24 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
+  const [customServices, setCustomServices] = useState<any[]>([]);
   const [referrerSearchQuery, setReferrerSearchQuery] = useState('');
   const [showReferrerSuggestions, setShowReferrerSuggestions] = useState(false);
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchData = async () => {
       try {
-        const data = await api.members.getAll();
-        setMembers(data || []);
+        const [membersData, servicesData] = await Promise.all([
+          api.members.getAll(),
+          api.customServices.getAll()
+        ]);
+        setMembers(membersData || []);
+        setCustomServices((servicesData || []).filter((s: any) => s.isActive));
       } catch (error) {
-        console.error('Failed to fetch members:', error);
+        console.error('Failed to fetch data:', error);
       }
     };
-    fetchMembers();
+    fetchData();
   }, []);
 
   const filteredMembers = members.filter(member =>
@@ -558,6 +563,11 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
+                      {customServices.map((service) => (
+                        <SelectItem key={service.id} value={service.name}>
+                          {service.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -681,19 +691,24 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [members, setMembers] = useState<any[]>([]);
+  const [customServices, setCustomServices] = useState<any[]>([]);
   const [referrerSearchQuery, setReferrerSearchQuery] = useState(visitor.referredBy || '');
   const [showReferrerSuggestions, setShowReferrerSuggestions] = useState(false);
 
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchData = async () => {
       try {
-        const data = await api.members.getAll();
-        setMembers(data || []);
+        const [membersData, servicesData] = await Promise.all([
+          api.members.getAll(),
+          api.customServices.getAll()
+        ]);
+        setMembers(membersData || []);
+        setCustomServices((servicesData || []).filter((s: any) => s.isActive));
       } catch (error) {
-        console.error('Failed to fetch members:', error);
+        console.error('Failed to fetch data:', error);
       }
     };
-    fetchMembers();
+    fetchData();
   }, []);
 
   const filteredMembers = members.filter(member =>
@@ -867,6 +882,11 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
+                      {customServices.map((service) => (
+                        <SelectItem key={service.id} value={service.name}>
+                          {service.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
