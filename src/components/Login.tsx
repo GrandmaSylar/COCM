@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert, AlertDescription } from './ui/alert';
 import { useAuth, TwoFAData } from './AuthContext';
 import { useTheme } from './ThemeContext';
-import { Moon, Sun, Monitor, Eye, EyeOff } from 'lucide-react';
+import { ChurchIcon, Moon, Sun, Monitor, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   onForgotPassword: () => void;
@@ -76,7 +76,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
         <Card className="shadow-lg">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain" />
+              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain bg-white rounded-full p-1" />
             </div>
             <div>
               <CardTitle className="text-2xl">Church Management System</CardTitle>
@@ -162,7 +162,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
               
               <div className="text-center text-xs text-muted-foreground border-t pt-3">
                 <p>Church of Christ, Mataheko Congregation (CoC.M)</p>
-                <p>© 2024 Church Management System</p>
+                <p>© 2026 Church Management System</p>
               </div>
             </div>
           </CardContent>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
 import { useTheme } from './ThemeContext';
-import { ChurchIcon, ArrowLeft, Eye, EyeOff, Info } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Info } from 'lucide-react';
 import { api } from '../services/api';
 
 interface SignUpProps {
@@ -107,10 +107,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-lg">
-                <img src="/newlogo.png" alt="Church of Christ, Ma
-         +taheko" className="w-32 h-32 object-contain" />
-              </div>
+              <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-32 h-32 object-contain bg-white rounded-full p-1" />
             </div>
             <div>
               <CardTitle className="text-2xl">Create Account</CardTitle>
