@@ -9,7 +9,8 @@ import { Switch } from './ui/switch';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, DollarSign, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
@@ -97,6 +98,10 @@ export function Settings({ onAddUser }: SettingsProps) {
   const [themeColorInputs, setThemeColorInputs] = useState<ThemeColors>(
     customColors || defaultColors
   );
+
+  // Collapsible state
+  const [userStatsOpen, setUserStatsOpen] = useState(false);
+  const [tabAccessOpen, setTabAccessOpen] = useState<Record<string, boolean>>({});
 
   // Sync theme inputs when customColors changes from server
   useEffect(() => {
@@ -445,78 +450,94 @@ export function Settings({ onAddUser }: SettingsProps) {
             </div>
           )}
 
-          {/* System Overview */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 w-full">
-            <Card className="min-w-0">
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allSystemUsers.length}</p>
-                    <p className="text-xs text-muted-foreground">Total Users</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* System Overview - Collapsible */}
+          <Collapsible open={userStatsOpen} onOpenChange={setUserStatsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full justify-between">
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  User Statistics ({allSystemUsers.length} Total)
+                </span>
+                <ChevronDown
+                  className="h-4 w-4 transition-transform duration-300 ease-in-out"
+                  style={{ transform: userStatsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-4 w-full">
+                <Card className="min-w-0">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allSystemUsers.length}</p>
+                        <p className="text-xs text-muted-foreground">Total Users</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                    <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'dev').length}</p>
-                    <p className="text-xs text-muted-foreground">Developers</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                        <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'dev').length}</p>
+                        <p className="text-xs text-muted-foreground">Developers</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'admin').length}</p>
-                    <p className="text-xs text-muted-foreground">Admins</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'admin').length}</p>
+                        <p className="text-xs text-muted-foreground">Admins</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'pastor').length}</p>
-                    <p className="text-xs text-muted-foreground">Pastors</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'pastor').length}</p>
+                        <p className="text-xs text-muted-foreground">Pastors</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center gap-2">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                    <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'elder').length}</p>
-                    <p className="text-xs text-muted-foreground">Elders</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'elder').length}</p>
+                        <p className="text-xs text-muted-foreground">Elders</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           {/* User List */}
           <div className="w-full overflow-hidden">
@@ -789,62 +810,78 @@ export function Settings({ onAddUser }: SettingsProps) {
                               </div>
                             )}
 
-                            {/* Tab Access (Dev Only) */}
+                            {/* Tab Access (Dev Only) - Collapsible */}
                             {isDev && systemUser.role !== 'dev' && (
-                              <div className="mt-4 p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
-                                      <Shield className="w-4 h-4 text-white" />
+                              <Collapsible
+                                className="mt-4"
+                                open={tabAccessOpen[systemUser.id] || false}
+                                onOpenChange={(open) => setTabAccessOpen(prev => ({ ...prev, [systemUser.id]: open }))}
+                              >
+                                <div className="p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl">
+                                  <CollapsibleTrigger asChild>
+                                    <button className="flex items-center justify-between w-full">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
+                                          <Shield className="w-4 h-4 text-white" />
+                                        </div>
+                                        <span className="text-sm font-semibold text-secondary dark:text-blue-300">
+                                          Tab Access
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-muted-foreground">
+                                          {(systemUser.tabAccess || []).length} of 7 tabs
+                                        </span>
+                                        <ChevronDown
+                                          className="h-4 w-4 text-muted-foreground transition-transform duration-300 ease-in-out"
+                                          style={{ transform: tabAccessOpen[systemUser.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                                        />
+                                      </div>
+                                    </button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="mt-3">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
+                                      {[
+                                        { id: 'members', label: 'Members', icon: Users },
+                                        { id: 'visitors', label: 'Visitors', icon: UserPlus },
+                                        { id: 'attendance', label: 'Attendance', icon: Calendar },
+                                        { id: 'giving', label: 'Giving', icon: Banknote },
+                                        { id: 'reports', label: 'Reports', icon: BarChart3 },
+                                        { id: 'services', label: 'Services', icon: Church },
+                                        { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
+                                      ].map(tab => {
+                                        const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
+                                        return (
+                                          <button
+                                            key={tab.id}
+                                            onClick={async () => {
+                                              const currentTabs = systemUser.tabAccess || [];
+                                              const newTabs = hasAccess
+                                                ? currentTabs.filter((t: string) => t !== tab.id)
+                                                : [...currentTabs, tab.id];
+                                              try {
+                                                await api.users.setTabAccess(systemUser.id, newTabs);
+                                                toast.success(`Updated tab access for ${systemUser.name}`);
+                                                fetchUsers();
+                                              } catch (err) {
+                                                toast.error('Failed to update tab access');
+                                              }
+                                            }}
+                                            className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border-2 text-xs font-medium transition-all min-w-0 ${
+                                              hasAccess
+                                                ? 'bg-secondary text-white border-secondary shadow-sm shadow-secondary/25'
+                                                : 'bg-card text-muted-foreground border-border/50 hover:border-secondary/50 hover:bg-secondary/5'
+                                            }`}
+                                          >
+                                            <tab.icon className="w-4 h-4 flex-shrink-0" />
+                                            <span className="line-clamp-1">{tab.label}</span>
+                                          </button>
+                                        );
+                                      })}
                                     </div>
-                                    <span className="text-sm font-semibold text-secondary dark:text-blue-300">
-                                      Tab Access
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-muted-foreground">
-                                    {(systemUser.tabAccess || []).length} of 7 tabs
-                                  </span>
+                                  </CollapsibleContent>
                                 </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
-                                  {[
-                                    { id: 'members', label: 'Members', icon: Users },
-                                    { id: 'visitors', label: 'Visitors', icon: UserPlus },
-                                    { id: 'attendance', label: 'Attendance', icon: Calendar },
-                                    { id: 'giving', label: 'Giving', icon: DollarSign },
-                                    { id: 'reports', label: 'Reports', icon: BarChart3 },
-                                    { id: 'services', label: 'Services', icon: Church },
-                                    { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
-                                  ].map(tab => {
-                                    const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
-                                    return (
-                                      <button
-                                        key={tab.id}
-                                        onClick={async () => {
-                                          const currentTabs = systemUser.tabAccess || [];
-                                          const newTabs = hasAccess
-                                            ? currentTabs.filter((t: string) => t !== tab.id)
-                                            : [...currentTabs, tab.id];
-                                          try {
-                                            await api.users.setTabAccess(systemUser.id, newTabs);
-                                            toast.success(`Updated tab access for ${systemUser.name}`);
-                                            fetchUsers();
-                                          } catch (err) {
-                                            toast.error('Failed to update tab access');
-                                          }
-                                        }}
-                                        className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border-2 text-xs font-medium transition-all min-w-0 ${
-                                          hasAccess
-                                            ? 'bg-secondary text-white border-secondary shadow-sm shadow-secondary/25'
-                                            : 'bg-card text-muted-foreground border-border/50 hover:border-secondary/50 hover:bg-secondary/5'
-                                        }`}
-                                      >
-                                        <tab.icon className="w-4 h-4 flex-shrink-0" />
-                                        <span className="line-clamp-1">{tab.label}</span>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
+                              </Collapsible>
                             )}
 
                             {/* Grant Permission Button */}

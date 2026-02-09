@@ -3,7 +3,7 @@ import { Badge } from './ui/badge';
 import { 
   Users, 
   Calendar, 
-  DollarSign, 
+  Banknote, 
   BarChart3, 
   Settings, 
   Shield,
@@ -49,7 +49,7 @@ export function DemoGuide() {
     },
     {
       module: 'Giving',
-      icon: DollarSign,
+      icon: Banknote,
       description: 'Financial contributions management',
       demoPoints: [
         'Record tithes, offerings, and donations',

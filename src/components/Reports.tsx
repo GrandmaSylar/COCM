@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, DollarSign, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw } from 'lucide-react';
+import { Users, Calendar, Banknote, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { formatGhanaCedis } from './ui/utils';
 import {
@@ -316,7 +316,7 @@ export function Reports() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center shrink-0">
-                <DollarSign className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <Banknote className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold truncate">{formatGhanaCedis(summary.totalGiving)}</p>
@@ -397,7 +397,7 @@ export function Reports() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <DollarSign className="w-4 h-4" />
+              <Banknote className="w-4 h-4" />
               Giving Trends
             </CardTitle>
           </CardHeader>
@@ -473,7 +473,7 @@ export function Reports() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="w-4 h-4" />
+                <Banknote className="w-4 h-4" />
                 Giving by Payment Method
               </CardTitle>
             </CardHeader>
@@ -538,7 +538,7 @@ export function Reports() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <DollarSign className="w-4 h-4" />
+                <Banknote className="w-4 h-4" />
                 Giving by Type
               </CardTitle>
             </CardHeader>

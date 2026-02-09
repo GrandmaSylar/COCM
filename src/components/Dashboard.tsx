@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, DollarSign, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
+import { Users, Calendar, Banknote, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useState } from 'react';
@@ -60,7 +60,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
     {
       id: 'record-giving',
       label: 'Record Giving',
-      icon: DollarSign,
+      icon: Banknote,
       description: 'Add offering or donation record',
       permission: 'record_giving',
       tab: 'giving'
@@ -242,7 +242,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-medium text-muted-foreground">Monthly Giving</span>
                   <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-emerald-500" />
+                    <Banknote className="w-5 h-5 text-emerald-500" />
                   </div>
                 </div>
                 <div className="text-3xl font-bold tracking-tight">{formatGhanaCedis(stats.givingThisMonth)}</div>

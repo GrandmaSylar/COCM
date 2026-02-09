@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Bell, CheckCheck, Users, Calendar, DollarSign, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
+import { Bell, CheckCheck, Users, Calendar, Banknote, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 
 interface Notification {
@@ -24,7 +24,7 @@ interface NotificationsProps {
 const typeIcons: Record<string, any> = {
   member_status_change: Users,
   member_registered: UserPlus,
-  giving_record: DollarSign,
+  giving_record: Banknote,
   attendance_record: Calendar,
   birthday: Cake,
   system: AlertCircle,

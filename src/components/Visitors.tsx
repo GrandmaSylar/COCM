@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import {
   Search, Plus, Phone, Mail, MapPin, Eye, Users, UserPlus,
-  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw
+  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw, ChevronDown
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
@@ -52,6 +53,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMembershipInterest, setSelectedMembershipInterest] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const { canAccess } = useAuth();
   const canManageVisitors = canAccess('manage_members'); // Same permission as managing members
@@ -162,33 +164,49 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
         </div>
       </div>
 
-      {/* Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{totalVisitors}</div>
-              <p className="text-xs text-muted-foreground">Total Visitors</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{interestedInMembership}</div>
-              <p className="text-xs text-muted-foreground">Interested in Membership</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{thisMonthVisitors}</div>
-              <p className="text-xs text-muted-foreground">This Month</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Statistics - Collapsible */}
+      <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Visitor Statistics ({totalVisitors} Total)
+            </span>
+            <ChevronDown
+              className="h-4 w-4 transition-transform duration-300 ease-in-out"
+              style={{ transform: statsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{totalVisitors}</div>
+                  <p className="text-xs text-muted-foreground">Total Visitors</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{interestedInMembership}</div>
+                  <p className="text-xs text-muted-foreground">Interested in Membership</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{thisMonthVisitors}</div>
+                  <p className="text-xs text-muted-foreground">This Month</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Filters */}
       <div className="flex flex-col lg:flex-row gap-4">

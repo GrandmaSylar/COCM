@@ -139,8 +139,9 @@
 .stagger-children > *:nth-child(10) { animation-delay: 450ms; }
 
 /* Page transition wrapper — wraps each page's content */
+/* Note: Using fade-in instead of fade-in-up to avoid transform which breaks fixed positioning */
 .page-transition {
-  animation: fade-in-up 0.3s ease-out both;
+  animation: fade-in 0.3s ease-out both;
 }
 
 /* Respect reduced motion preference */

@@ -8,7 +8,7 @@ import {
   Users,
   UserPlus,
   Calendar,
-  DollarSign,
+  Banknote,
   BarChart3,
   Settings as SettingsIcon,
   Eye,
@@ -241,7 +241,7 @@ const featureGuides: FeatureGuide[] = [
   {
     id: 'giving',
     title: 'Giving & Offerings',
-    icon: DollarSign,
+    icon: Banknote,
     description: 'Record service giving with detailed breakdowns by giving type and payment method. Supports custom giving types and foreign currency.',
     permissions: ['view_giving', 'record_giving'],
     availableFor: ['dev', 'admin', 'pastor', 'elder'],
@@ -273,7 +273,7 @@ const featureGuides: FeatureGuide[] = [
       {
         title: 'Foreign Currency',
         description: 'When recording or editing giving, expand the Foreign Currency section. Select the currency (USD, EUR, GBP, CAD, AUD, CHF, NGN, ZAR, CNY, JPY), enter the amount, and enter the GHS equivalent. The GHS equivalent counts toward the payment total.',
-        icon: DollarSign,
+        icon: Banknote,
         note: 'Foreign currency amounts are displayed with the currency symbol and GHS conversion on record cards.'
       },
       {
@@ -312,7 +312,7 @@ const featureGuides: FeatureGuide[] = [
       {
         title: 'Giving Trends',
         description: 'A bar chart shows giving amounts over time, helping identify patterns in church contributions.',
-        icon: DollarSign
+        icon: Banknote
       },
       {
         title: 'Membership Growth',
@@ -621,7 +621,7 @@ export function Help() {
 
             <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-green-600" />
+                <Banknote className="w-4 h-4 text-green-600" />
                 <h4 className="font-medium text-sm">Giving Records</h4>
               </div>
               <div className="flex items-center gap-2 mb-2">

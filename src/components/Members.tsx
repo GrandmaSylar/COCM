@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download, RefreshCw } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -156,6 +157,10 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
   const [ageRangeFilter, setAgeRangeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'name' | 'zone' | 'status' | 'joinDate' | 'baptismDate' | 'baptismYear'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Collapsible state
+  const [statusInfoOpen, setStatusInfoOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
 
   // Use cached data hook (Option A)
   const { data: cachedMembers, loading: cachedLoading, error: cachedError, refresh } = useCachedData<Member[]>(
@@ -474,19 +479,111 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
         </Alert>
       )}
 
-      {/* Member Status Info */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Member Status Definitions:</strong><br />
-          <strong>New:</strong> Recently registered, awaiting 4 Sunday Main Service records<br />
-          <strong>Active:</strong> Present in 3-4 of last 4 Sunday Main Services<br />
-          <strong>Semi-Active:</strong> Present in 1-2 of last 4 Sunday Main Services<br />
-          <strong>Inactive:</strong> Absent from all last 4 Sunday Main Services<br />
-          <strong>Sabbatical:</strong> Absent for a long period but with permission<br />
-          <strong>Blacklisted:</strong> Sacked or removed
-        </AlertDescription>
-      </Alert>
+      {/* Member Status Info - Collapsible */}
+      <Collapsible open={statusInfoOpen} onOpenChange={setStatusInfoOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Member Status Definitions
+            </span>
+            <ChevronDown
+              className="h-4 w-4 transition-transform duration-300 ease-in-out"
+              style={{ transform: statusInfoOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <Alert>
+            <AlertDescription>
+              <strong>New:</strong> Recently registered, awaiting 4 Sunday Main Service records<br />
+              <strong>Active:</strong> Present in 3-4 of last 4 Sunday Main Services<br />
+              <strong>Semi-Active:</strong> Present in 1-2 of last 4 Sunday Main Services<br />
+              <strong>Inactive:</strong> Absent from all last 4 Sunday Main Services<br />
+              <strong>Sabbatical:</strong> Absent for a long period but with permission<br />
+              <strong>Blacklisted:</strong> Sacked or removed
+            </AlertDescription>
+          </Alert>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Stats - Collapsible */}
+      <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full justify-between">
+            <span className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Member Statistics ({members.length} Total)
+            </span>
+            <ChevronDown
+              className="h-4 w-4 transition-transform duration-300 ease-in-out"
+              style={{ transform: statsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{members.length}</div>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                    {members.filter(m => m.status === 'new').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">New</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                    {members.filter(m => m.status === 'active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Active</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    {members.filter(m => m.status === 'semi-active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Semi-Active</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    {members.filter(m => m.status === 'inactive').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Inactive</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {members.filter(m => m.status === 'sabbatical').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Sabbatical</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* Search and Filters */}
       <div className="space-y-3">
@@ -756,68 +853,6 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
             </div>
           )}
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold">{members.length}</div>
-              <p className="text-xs text-muted-foreground">Total</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                {members.filter(m => m.status === 'new').length}
-              </div>
-              <p className="text-xs text-muted-foreground">New</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {members.filter(m => m.status === 'active').length}
-              </div>
-              <p className="text-xs text-muted-foreground">Active</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {members.filter(m => m.status === 'semi-active').length}
-              </div>
-              <p className="text-xs text-muted-foreground">Semi-Active</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                {members.filter(m => m.status === 'inactive').length}
-              </div>
-              <p className="text-xs text-muted-foreground">Inactive</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
-          <CardContent className="p-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                {members.filter(m => m.status === 'sabbatical').length}
-              </div>
-              <p className="text-xs text-muted-foreground">Sabbatical</p>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Members List */}

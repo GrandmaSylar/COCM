@@ -764,9 +764,11 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               <div className="flex justify-center">
                 <div className="relative w-28 h-28">
                   <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8" className="text-muted/30" />
-                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="8"
-                      className={attendanceStats.percentage >= 75 ? 'text-emerald-500' : attendanceStats.percentage >= 50 ? 'text-amber-500' : 'text-red-500'}
+                    {/* Background track */}
+                    <circle cx="50" cy="50" r="42" fill="none" strokeWidth="8" stroke="#e5e7eb" />
+                    {/* Progress arc */}
+                    <circle cx="50" cy="50" r="42" fill="none" strokeWidth="8"
+                      stroke={attendanceStats.percentage >= 75 ? '#10b981' : attendanceStats.percentage >= 50 ? '#f59e0b' : '#ef4444'}
                       strokeDasharray={`${attendanceStats.percentage * 2.64} ${264 - attendanceStats.percentage * 2.64}`}
                       strokeLinecap="round"
                     />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Calendar, Users, DollarSign, UserMinus, UserPlus, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Calendar, Users, Banknote, UserMinus, UserPlus, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { formatGhanaCedis } from './ui/utils';
 
@@ -144,7 +144,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           <Card className="border-t-4 border-t-emerald-500">
             <CardContent className="p-4 text-center">
               <div className="w-10 h-10 mx-auto mb-2 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-500" />
+                <Banknote className="w-5 h-5 text-emerald-500" />
               </div>
               <div className="text-2xl font-bold">{formatGhanaCedis(sr.totalGivingAmount)}</div>
               <div className="text-xs text-muted-foreground">Total Giving</div>
@@ -316,7 +316,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                       <span>{sr.totalAttendance} attended</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <DollarSign className="w-4 h-4 text-emerald-500" />
+                      <Banknote className="w-4 h-4 text-emerald-500" />
                       <span>{formatGhanaCedis(sr.totalGiving)}</span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -356,7 +356,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{sr.totalAttendance}</span>
-                      <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{formatGhanaCedis(sr.totalGiving)}</span>
+                      <span className="flex items-center gap-1"><Banknote className="w-3 h-3" />{formatGhanaCedis(sr.totalGiving)}</span>
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </button>

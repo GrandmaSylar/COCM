@@ -88,7 +88,7 @@ function generateMembers() {
     const zone = zones[i % 6]; // Distribute evenly-ish across zones
 
     let zoneNum;
-    do { zoneNum = `${zone}-${String(randInt(1, 999)).padStart(3, '0')}`; } while (usedZoneNumbers.has(zoneNum));
+    do { zoneNum = `${zone}${String(randInt(1, 999)).padStart(3, '0')}`; } while (usedZoneNumbers.has(zoneNum));
     usedZoneNumbers.add(zoneNum);
 
     // Join dates: spread from Nov 2024 backward to simulate existing congregation
