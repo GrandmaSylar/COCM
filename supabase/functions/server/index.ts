@@ -757,6 +757,9 @@ app.post("/auth/signin", async (c)=>{
       });
     }
 
+    // Update last_login timestamp
+    await supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
+
     // Log login activity
     logActivity({
       userId: profile.id, userName: profile.name, userRole: profile.role,
@@ -804,6 +807,9 @@ app.post("/auth/signout", async (c)=>{
       action: 'logout', entityType: 'session', description: `${logProfile.name} logged out`
     });
 
+    // Clear last_login so user immediately shows offline
+    await supabase.from('profiles').update({ last_login: null }).eq('id', user.id);
+
     return c.json({
       message: 'Signed out successfully'
     });
@@ -814,6 +820,22 @@ app.post("/auth/signout", async (c)=>{
     }, 500);
   }
 });
+
+// Heartbeat - updates last_login to keep online status current
+app.post("/auth/heartbeat", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    await supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', user.id);
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error('Heartbeat error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 app.get("/auth/session", async (c)=>{
   try {
     const user = await getUserFromToken(c.req.raw);
@@ -917,6 +939,15 @@ app.post("/auth/verify-otp", async (c) => {
     if (!profile) {
       return c.json({ error: 'User profile not found' }, 404);
     }
+
+    // Update last_login timestamp
+    await supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
+
+    // Log login activity
+    logActivity({
+      userId: profile.id, userName: profile.name, userRole: profile.role,
+      action: 'login', entityType: 'session', description: `${profile.name} logged in`
+    });
 
     return c.json({
       session: sessionData.session,
@@ -3834,6 +3865,66 @@ app.post("/users/:id/reject", async (c)=>{
     }, 500);
   }
 });
+
+// Admin/Dev reset user password
+app.post("/users/:id/reset-password", async (c) => {
+  try {
+    const adminUser = await getUserFromToken(c.req.raw);
+    if (!adminUser) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { data: adminProfile } = await supabase.from('profiles').select('role, name').eq('id', adminUser.id).single();
+    if (!adminProfile || !['dev', 'admin'].includes(adminProfile.role)) {
+      return c.json({ error: 'Forbidden: Only dev and admin can reset user passwords' }, 403);
+    }
+
+    const userId = c.req.param('id');
+    const { newPassword } = await c.req.json();
+
+    if (!newPassword || newPassword.length < 6) {
+      return c.json({ error: 'Password must be at least 6 characters' }, 400);
+    }
+
+    // Get the target user's profile
+    const { data: targetProfile } = await supabase.from('profiles').select('name, role').eq('id', userId).single();
+    if (!targetProfile) {
+      return c.json({ error: 'User not found' }, 404);
+    }
+
+    // Admins cannot reset dev passwords
+    if (adminProfile.role === 'admin' && targetProfile.role === 'dev') {
+      return c.json({ error: 'Admins cannot reset developer passwords' }, 403);
+    }
+
+    // Use admin API to update the user's password
+    const { error: updateError } = await supabase.auth.admin.updateUserById(userId, {
+      password: newPassword
+    });
+
+    if (updateError) {
+      console.error('Error resetting password:', updateError);
+      return c.json({ error: 'Failed to reset password: ' + updateError.message }, 500);
+    }
+
+    // Log the activity
+    logActivity({
+      userId: adminUser.id,
+      userName: adminProfile.name,
+      userRole: adminProfile.role,
+      action: 'update',
+      entityType: 'user',
+      entityId: userId,
+      description: `${adminProfile.name} reset password for ${targetProfile.name}`
+    });
+
+    return c.json({ message: 'Password reset successfully' });
+  } catch (error) {
+    console.error('Reset user password error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // Update user contact info (email/phone) - dev only
 app.patch("/users/:id/contact", async (c) => {
   try {
@@ -4702,8 +4793,9 @@ app.get("/activity-log", async (c) => {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Non-dev users can only see their own logs
-    if (!profile || profile.role !== 'dev') {
+    // Dev and admin can see all logs; others see only their own
+    const isPrivileged = profile && (profile.role === 'dev' || profile.role === 'admin');
+    if (!isPrivileged) {
       query = query.eq('user_id', user.id);
     } else if (userId) {
       query = query.eq('user_id', userId);
@@ -4752,7 +4844,9 @@ app.get("/activity-log/export", async (c) => {
       .order('created_at', { ascending: false })
       .limit(5000);
 
-    if (!profile || profile.role !== 'dev') {
+    // Dev and admin can see all logs; others see only their own
+    const isPrivileged = profile && (profile.role === 'dev' || profile.role === 'admin');
+    if (!isPrivileged) {
       query = query.eq('user_id', user.id);
     } else if (userId) {
       query = query.eq('user_id', userId);

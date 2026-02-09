@@ -197,6 +197,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Heartbeat - keeps online status current while user is active
+  useEffect(() => {
+    if (!user) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const { api } = await import('../services/api');
+        await api.auth.heartbeat();
+      } catch {
+        // Silently ignore heartbeat failures
+      }
+    };
+
+    // Send immediately on mount/login
+    sendHeartbeat();
+
+    // Then every 2 minutes
+    const interval = setInterval(sendHeartbeat, 2 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
   // Refresh current user's temporary permissions periodically
   // This allows users to get newly granted permissions without re-logging
   useEffect(() => {
@@ -333,6 +354,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Log the logout activity via API before clearing session
+    try {
+      const { api } = await import('../services/api');
+      await api.auth.signOut();
+    } catch {
+      // Continue with logout even if API call fails
+    }
+
     // Set user to null first to stop all API calls immediately
     setUser(null);
 

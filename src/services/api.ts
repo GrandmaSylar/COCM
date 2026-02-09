@@ -134,6 +134,9 @@ export const api = {
     signOut: () =>
       fetchApi('/auth/signout', { method: 'POST' }),
 
+    heartbeat: () =>
+      fetchApi('/auth/heartbeat', { method: 'POST' }),
+
     getSession: () =>
       fetchApi('/auth/session'),
 
@@ -437,6 +440,12 @@ export const api = {
       fetchApi(`/users/${userId}/tab-access`, {
         method: 'PUT',
         body: JSON.stringify({ tabs })
+      }),
+
+    resetPassword: (userId: string, newPassword: string) =>
+      fetchApi(`/users/${userId}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword })
       }),
   },
 

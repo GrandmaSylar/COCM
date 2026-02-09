@@ -10,11 +10,11 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner@2.0.3';
-import { api } from '../services/api';
+import { api, invalidateApiCache } from '../services/api';
 
 interface SystemUser {
   id: string;
@@ -87,6 +87,21 @@ export function Settings({ onAddUser }: SettingsProps) {
   const [editPhone, setEditPhone] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
 
+  // Reset password state
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [resetPasswordUserName, setResetPasswordUserName] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState(false);
+
+  // Tick every 60s to keep elapsed time labels fresh
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(t => t + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Search, filter, and sort state for users list
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
@@ -142,9 +157,18 @@ export function Settings({ onAddUser }: SettingsProps) {
     }
   };
 
-  // Fetch all users and pending users
+  // Fetch all users and pending users, refresh every 30s for online status
   useEffect(() => {
     fetchUsers();
+
+    const interval = setInterval(() => {
+      if (canManageUsers) {
+        invalidateApiCache('/users');
+        api.users.getAll().then(data => setAllSystemUsers(data)).catch(() => {});
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [canManageUsers, canGrantPermissions]);
 
   const formatLastLogin = (dateString?: string) => {
@@ -210,6 +234,58 @@ export function Settings({ onAddUser }: SettingsProps) {
     } finally {
       setIsSavingContact(false);
     }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUserId) return;
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsResettingPassword(true);
+    try {
+      await api.users.resetPassword(resetPasswordUserId, newPassword);
+      toast.success(`Password reset successfully for ${resetPasswordUserName}`);
+      setResetPasswordUserId(null);
+      setResetPasswordUserName('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to reset password');
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  // Helper to determine if user is online (heartbeat within last 5 minutes)
+  const isUserOnline = (lastLogin?: string) => {
+    if (!lastLogin) return false;
+    const lastLoginTime = new Date(lastLogin).getTime();
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    return lastLoginTime > fiveMinutesAgo;
+  };
+
+  // Helper to format last seen time
+  const formatLastSeen = (lastLogin?: string) => {
+    if (!lastLogin) return 'Offline';
+    const date = new Date(lastLogin);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) return 'Just now';
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   };
 
   const handleTogglePermission = (role: UserRole, permission: string) => {
@@ -539,9 +615,35 @@ export function Settings({ onAddUser }: SettingsProps) {
             </CollapsibleContent>
           </Collapsible>
 
+          {/* User List Refresh Overlay */}
+          {isRefreshingUsers && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+              <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+                  <div className="relative bg-primary/10 p-4 rounded-full">
+                    <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+                  </div>
+                </div>
+                <p className="text-base font-medium text-foreground">Refreshing users...</p>
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* User List */}
           <div className="w-full overflow-hidden">
-            <h2 className="mb-4">System Users</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2>System Users</h2>
+              <Button variant="outline" size="sm" disabled={isRefreshingUsers} onClick={async () => { setIsRefreshingUsers(true); invalidateApiCache('/users'); const minDelay = new Promise(resolve => setTimeout(resolve, 800)); try { await Promise.all([fetchUsers(), minDelay]); } finally { setIsRefreshingUsers(false); } }} title="Refresh user list">
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
 
             {/* Search, Filter, Sort Controls */}
             <div className="flex flex-col gap-2 sm:gap-3 mb-4 overflow-x-hidden">
@@ -693,6 +795,13 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   {systemUser.isActive ? 'Active' : 'Inactive'}
                                 </Badge>
                               )}
+                              {/* Online/Offline indicator */}
+                              {systemUser.approvalStatus === 'approved' && systemUser.isActive && (
+                                <div className={`flex items-center gap-1 text-xs ${isUserOnline(systemUser.lastLogin) ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} title={systemUser.lastLogin ? `Last login: ${new Date(systemUser.lastLogin).toLocaleString()}` : 'Never logged in'}>
+                                  <Circle className={`w-2 h-2 ${isUserOnline(systemUser.lastLogin) ? 'fill-green-500 text-green-500' : 'fill-gray-400 text-gray-400'}`} />
+                                  {isUserOnline(systemUser.lastLogin) ? 'Online' : formatLastSeen(systemUser.lastLogin)}
+                                </div>
+                              )}
                               {isDev && systemUser.approvalStatus === 'approved' && (
                                 <Switch
                                   checked={systemUser.isActive}
@@ -749,6 +858,23 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       <Edit className="w-3 h-3 mr-1" />
                                       Edit contact
                                     </Button>
+                                  )}
+                                  {/* Reset Password button for admin/dev */}
+                                  {(isDev || isAdmin) && systemUser.id !== user?.id && systemUser.approvalStatus === 'approved' && (
+                                    !(isAdmin && systemUser.role === 'dev') && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 text-xs mt-1 px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                        onClick={() => {
+                                          setResetPasswordUserId(systemUser.id);
+                                          setResetPasswordUserName(systemUser.name);
+                                        }}
+                                      >
+                                        <KeyRound className="w-3 h-3 mr-1" />
+                                        Reset Password
+                                      </Button>
+                                    )
                                   )}
                                 </>
                               )}
@@ -1275,6 +1401,72 @@ export function Settings({ onAddUser }: SettingsProps) {
           <SecuritySettings />
         </TabsContent>
       </Tabs>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetPasswordUserId} onOpenChange={(open) => {
+        if (!open) {
+          setResetPasswordUserId(null);
+          setResetPasswordUserName('');
+          setNewPassword('');
+          setConfirmPassword('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-500" />
+              Reset Password
+            </DialogTitle>
+            <DialogDescription>
+              Set a new password for <strong>{resetPasswordUserName}</strong>. They will need to use this password on their next login.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                minLength={6}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                minLength={6}
+              />
+            </div>
+            {newPassword && confirmPassword && newPassword !== confirmPassword && (
+              <p className="text-sm text-red-500">Passwords do not match</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setResetPasswordUserId(null);
+              setResetPasswordUserName('');
+              setNewPassword('');
+              setConfirmPassword('');
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={isResettingPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {isResettingPassword ? 'Resetting...' : 'Reset Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1430,9 +1622,13 @@ function BackupRestore() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadBackupData();
-    setRefreshing(false);
-    toast.success('Backup history refreshed');
+    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      await Promise.all([loadBackupData(), minDelay]);
+      toast.success('Backup history refreshed');
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleCreateBackup = async () => {
@@ -1597,7 +1793,27 @@ function BackupRestore() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Refresh Overlay */}
+      {refreshing && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
+          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
+              <div className="relative bg-primary/10 p-4 rounded-full">
+                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
+              </div>
+            </div>
+            <p className="text-base font-medium text-foreground">Refreshing backup data...</p>
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
