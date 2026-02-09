@@ -82,8 +82,8 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         members.forEach((member: Member) => {
           if (member.zone && member.zoneNumber) {
-            // Extract the number part from zone number (e.g., "A05" -> 5)
-            const numPart = parseInt(member.zoneNumber.replace(/[A-Z]/g, ''), 10);
+            // Extract the number part from zone number (e.g., "A05" -> 5 or "A-05" -> 5)
+            const numPart = parseInt(member.zoneNumber.replace(/[^0-9]/g, ''), 10);
             if (!isNaN(numPart) && zoneNums[member.zone as Zone]) {
               zoneNums[member.zone as Zone].push(numPart);
             }
