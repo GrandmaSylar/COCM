@@ -84,9 +84,8 @@ export function ActivityLog() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([fetchLogs(false), minDelay]);
+      await fetchLogs();
     } finally {
       setRefreshing(false);
     }
@@ -148,26 +147,6 @@ export function ActivityLog() {
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing activity log...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">

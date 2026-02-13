@@ -12,6 +12,7 @@ import { useAuth } from './AuthContext';
 import { Member, ZONES } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { AbsenteeReview } from './AbsenteeReview';
 import { useCachedData } from '../hooks/useCachedData';
 
@@ -210,7 +211,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
       }
     } catch (error: any) {
       console.error('Failed to save attendance:', error);
-      toast.error(error?.message || 'Failed to save attendance. Please try again.');
+      toast.error(getFriendlyMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -395,7 +396,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                 <Checkbox
                   id="showOnlyUnmarked"
                   checked={showOnlyUnmarked}
-                  onCheckedChange={(checked) => setShowOnlyUnmarked(checked as boolean)}
+                  onCheckedChange={(checked: boolean) => setShowOnlyUnmarked(checked)}
                 />
                 <Label htmlFor="showOnlyUnmarked" className="text-sm">Show only unmarked</Label>
               </div>

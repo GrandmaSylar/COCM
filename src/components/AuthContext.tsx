@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useRe
 import { supabase } from '../utils/supabase/client';
 import { clearAllCache } from '../hooks/useCachedData';
 import { invalidateApiCache } from '../services/api';
+import { getFriendlyMessage } from '../utils/error-handler';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
@@ -167,7 +168,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: profile.role,
       isActive: profile.is_active,
       temporaryPermissions,
-      tabAccess
+      tabAccess,
+      createdAt: profile.created_at
     };
   };
 
@@ -325,8 +327,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Login failed. Please try again.' };
     } catch (error: any) {
       console.error('Login error:', error);
-      // Extract error message from API response
-      const errorMessage = error?.message || 'An unexpected error occurred. Please try again.';
+      // Use the utility to get a friendly message
+      const errorMessage = getFriendlyMessage(error);
       return { success: false, error: errorMessage };
     }
   };

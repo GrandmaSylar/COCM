@@ -16,7 +16,15 @@ if (!supabaseUrl || !serviceRoleKey) {
 }
 // Create Supabase client with fallbacks
 // This ensures the script compiles and runs even if secrets are missing
-const supabase = createClient(supabaseUrl || 'https://missing-url.supabase.co', serviceRoleKey || 'missing-key');
+const supabase = createClient(supabaseUrl || 'https://missing-url.supabase.co', serviceRoleKey || 'missing-key', {
+  auth: { autoRefreshToken: false, persistSession: false }
+});
+// Create a fresh Supabase client for signInWithPassword (so it doesn't pollute the global service role client)
+function createAuthClient() {
+  return createClient(supabaseUrl || 'https://missing-url.supabase.co', serviceRoleKey || 'missing-key', {
+    auth: { autoRefreshToken: false, persistSession: false }
+  });
+}
 // Create Supabase client for auth operations
 function getSupabaseClient(accessToken) {
   if (accessToken) {
@@ -291,7 +299,8 @@ async function logActivity(opts: {
   metadata?: any;
 }) {
   try {
-    await supabase.from('activity_log').insert({
+    console.log('logActivity called:', opts.action, opts.entityType, opts.description);
+    const { error } = await supabase.from('activity_log').insert({
       user_id: opts.userId,
       user_name: opts.userName,
       user_role: opts.userRole,
@@ -301,8 +310,13 @@ async function logActivity(opts: {
       description: opts.description,
       metadata: opts.metadata || {},
     });
+    if (error) {
+      console.error('Activity log insert error:', error.message, error.details, error.hint);
+    } else {
+      console.log('Activity log insert success:', opts.action, opts.description);
+    }
   } catch (err) {
-    console.error('Failed to log activity:', err);
+    console.error('Failed to log activity (exception):', err);
   }
 }
 
@@ -678,7 +692,8 @@ app.post("/auth/signin", async (c)=>{
         error: 'Email/phone and password required'
       }, 400);
     }
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const authClient = createAuthClient();
+    const { data, error } = await authClient.auth.signInWithPassword({
       email: loginEmail,
       password
     });
@@ -761,7 +776,7 @@ app.post("/auth/signin", async (c)=>{
     await supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
 
     // Log login activity
-    logActivity({
+    await logActivity({
       userId: profile.id, userName: profile.name, userRole: profile.role,
       action: 'login', entityType: 'session', description: `${profile.name} logged in`
     });
@@ -802,7 +817,7 @@ app.post("/auth/signout", async (c)=>{
 
     // Log logout activity
     const logProfile = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logProfile.name, userRole: logProfile.role,
       action: 'logout', entityType: 'session', description: `${logProfile.name} logged out`
     });
@@ -944,7 +959,7 @@ app.post("/auth/verify-otp", async (c) => {
     await supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', profile.id);
 
     // Log login activity
-    logActivity({
+    await logActivity({
       userId: profile.id, userName: profile.name, userRole: profile.role,
       action: 'login', entityType: 'session', description: `${profile.name} logged in`
     });
@@ -1656,7 +1671,7 @@ app.post("/members", async (c)=>{
 
     // Log activity
     const logP = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logP.name, userRole: logP.role,
       action: 'create', entityType: 'member', entityId: member.id,
       description: `Registered new member: ${dbMemberData.first_name} ${dbMemberData.last_name}`
@@ -1766,7 +1781,7 @@ app.put("/members/:id", async (c)=>{
 
     // Log activity
     const logP2 = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logP2.name, userRole: logP2.role,
       action: 'update', entityType: 'member', entityId: id,
       description: `Updated member: ${member.first_name} ${member.last_name}`
@@ -1804,7 +1819,7 @@ app.delete("/members/:id", async (c)=>{
     // Log activity
     const logP3 = await getProfileForLog(user.id);
     const delName = memberToDelete ? `${memberToDelete.first_name} ${memberToDelete.last_name}` : id;
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logP3.name, userRole: logP3.role,
       action: 'delete', entityType: 'member', entityId: id,
       description: `Deleted member: ${delName}`
@@ -1964,7 +1979,7 @@ app.post("/attendance", async (c)=>{
     // Log activity
     const logPA = await getProfileForLog(user.id);
     const attTotal = totalCount || attendees?.length || 0;
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logPA.name, userRole: logPA.role,
       action: existingRecord ? 'update' : 'create', entityType: 'attendance', entityId: record.id,
       description: `${existingRecord ? 'Updated' : 'Recorded'} ${recordType} attendance for ${serviceType} on ${dateValue} (${attTotal} ${recordType === 'individual' ? 'members' : 'head count'})`
@@ -2699,7 +2714,7 @@ app.post("/giving", async (c)=>{
 
     // Log activity
     const logPG = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logPG.name, userRole: logPG.role,
       action: 'create', entityType: 'giving', entityId: record.id,
       description: `Recorded giving for ${data.serviceName || data.serviceType} on ${data.serviceDate} — GH₵${data.totalAmount}`
@@ -3168,7 +3183,7 @@ app.post("/visitors", async (c)=>{
     }
     // Log activity
     const logPV = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logPV.name, userRole: logPV.role,
       action: 'create', entityType: 'visitor', entityId: visitor.id,
       description: `Registered visitor: ${data.firstName} ${data.lastName}`
@@ -3768,7 +3783,7 @@ app.post("/users", async (c)=>{
     }
     // Log activity
     const logPU = await getProfileForLog(user.id);
-    logActivity({
+    await logActivity({
       userId: user.id, userName: logPU.name, userRole: logPU.role,
       action: 'create', entityType: 'user', entityId: authData.user.id,
       description: `Created user account: ${name} (${role})`
@@ -3908,7 +3923,7 @@ app.post("/users/:id/reset-password", async (c) => {
     }
 
     // Log the activity
-    logActivity({
+    await logActivity({
       userId: adminUser.id,
       userName: adminProfile.name,
       userRole: adminProfile.role,
@@ -4308,7 +4323,7 @@ app.put("/users/:id/tab-access", async (c) => {
 
     // Log activity
     const { data: targetProfile } = await supabase.from('profiles').select('name').eq('id', userId).single();
-    logActivity({
+    await logActivity({
       userId: user.id, userName: profile.name, userRole: profile.role,
       action: 'update', entityType: 'user', entityId: userId,
       description: `Updated tab access for ${targetProfile?.name || userId}: ${tabs.join(', ') || 'none'}`

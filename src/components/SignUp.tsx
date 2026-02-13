@@ -13,7 +13,12 @@ interface SignUpProps {
   onBackToLogin: () => void;
 }
 
+import { sanitizeInput, validateEmail, validatePasswordStrength } from '../utils/security';
+
+// ... existing imports
+
 export function SignUp({ onBackToLogin }: SignUpProps) {
+  // ... existing state ...
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -38,11 +43,29 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
     setError('');
     setSuccess('');
 
-    // Basic validation
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.password || !formData.role) {
+    // Sanitize all inputs
+    const cleanData = {
+        firstName: sanitizeInput(formData.firstName),
+        lastName: sanitizeInput(formData.lastName),
+        otherNames: sanitizeInput(formData.otherNames),
+        email: sanitizeInput(formData.email),
+        phone: sanitizeInput(formData.phone),
+        role: sanitizeInput(formData.role),
+        ministry: sanitizeInput(formData.ministry),
+        password: formData.password, // Don't sanitize password to allow special chars
+    };
+
+    // Validation
+    if (!cleanData.firstName || !cleanData.lastName || !cleanData.email || !cleanData.phone || !cleanData.role) {
       setError('Please fill in all required fields.');
       setIsLoading(false);
       return;
+    }
+
+    if (!validateEmail(cleanData.email)) {
+        setError('Please enter a valid email address.');
+        setIsLoading(false);
+        return;
     }
 
     if (formData.password !== formData.confirmPassword) {
@@ -51,21 +74,22 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    const passwordCheck = validatePasswordStrength(formData.password);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.message || 'Password is too weak.');
       setIsLoading(false);
       return;
     }
 
     try {
       await api.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        name: formData.otherNames
-          ? `${formData.firstName} ${formData.otherNames} ${formData.lastName}`
-          : `${formData.firstName} ${formData.lastName}`,
-        role: formData.role,
-        phone: formData.phone
+        email: cleanData.email,
+        password: cleanData.password,
+        name: cleanData.otherNames
+          ? `${cleanData.firstName} ${cleanData.otherNames} ${cleanData.lastName}`
+          : `${cleanData.firstName} ${cleanData.lastName}`,
+        role: cleanData.role,
+        phone: cleanData.phone
       });
 
       setSuccess('Account created successfully! Please wait for administrator approval before logging in.');
@@ -199,7 +223,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label>Role *</Label>
-                  <Select value={formData.role} onValueChange={(value) => handleInputChange('role', value)}>
+                  <Select value={formData.role} onValueChange={(value: string) => handleInputChange('role', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>

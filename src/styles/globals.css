@@ -318,4 +318,34 @@ html {
   .border-gradient {
     border-image: linear-gradient(135deg, var(--primary), var(--secondary)) 1;
   }
+
+  /* Logo watermark background */
+  .content-watermark {
+    position: relative;
+  }
+  .content-watermark::before {
+    content: "";
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 650px;
+    height: 650px;
+    background-image: url("/newlogo.png");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.05;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* Shift watermark right on desktop to account for sidebar */
+  @media (min-width: 1024px) {
+    .content-watermark::before {
+      left: calc(50% + 8rem);
+    }
+  }
+  .dark .content-watermark::before {
+    opacity: 0.04;
+  }
 }

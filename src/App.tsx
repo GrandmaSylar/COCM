@@ -678,14 +678,20 @@ function AppContent() {
   );
 }
 
+import { TutorialProvider } from './components/TutorialContext';
+import { TutorialOverlay } from './components/TutorialOverlay';
+
 export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
-          <AppContent />
-          <Toaster position="top-right" />
-        </div>
+        <TutorialProvider>
+          <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
+            <AppContent />
+            <TutorialOverlay />
+            <Toaster position="top-right" />
+          </div>
+        </TutorialProvider>
       </AuthProvider>
     </ThemeProvider>
   );

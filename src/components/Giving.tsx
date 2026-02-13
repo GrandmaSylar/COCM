@@ -11,6 +11,7 @@ import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport, formatCurrencyForExport } from '../utils/export';
 import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
 import {
@@ -135,9 +136,8 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([refreshGiving(), refreshTypes(), minDelay]);
+      await Promise.all([refreshGiving(), refreshTypes()]);
     } finally {
       setRefreshing(false);
     }
@@ -214,7 +214,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         toast.success('Giving type deleted successfully');
       } catch (error) {
         console.error('Failed to delete giving type:', error);
-        toast.error('Failed to delete giving type');
+        toast.error(getFriendlyMessage(error));
       }
     }
   };
@@ -229,7 +229,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
       toast.success('Giving type updated');
     } catch (error) {
       console.error('Failed to toggle giving type:', error);
-      toast.error('Failed to update giving type');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -315,35 +315,15 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           toast.success('Giving type created successfully');
         } catch (error: any) {
           console.error('Failed to create giving type:', error);
-          toast.error(error?.message || 'Failed to create giving type');
+          toast.error(getFriendlyMessage(error));
         }
       }}
-      onRefresh={refreshTypes}
+      onRefresh={async () => { await refreshTypes(); }}
     />;
   }
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing giving records...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -663,9 +643,8 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([onRefresh(), minDelay]);
+      await onRefresh();
     } finally {
       setRefreshing(false);
     }
@@ -673,26 +652,6 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
 
   return (
     <div className="space-y-6">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing giving types...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">

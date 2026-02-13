@@ -12,6 +12,7 @@ import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
 
 interface AttendanceRecord {
@@ -98,9 +99,8 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([refreshAttendance(), refreshServices(), minDelay]);
+      await Promise.all([refreshAttendance(), refreshServices()]);
     } finally {
       setRefreshing(false);
     }
@@ -178,7 +178,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
         toast.success('Service deleted successfully');
       } catch (error) {
         console.error('Failed to delete service:', error);
-        toast.error('Failed to delete service');
+        toast.error(getFriendlyMessage(error));
       }
     }
   };
@@ -196,7 +196,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       toast.success(`Service ${service.isActive ? 'deactivated' : 'activated'}`);
     } catch (error) {
       console.error('Failed to toggle service:', error);
-      toast.error('Failed to update service');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -252,7 +252,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           toast.success('Service created successfully');
         } catch (error) {
           console.error('Failed to create service:', error);
-          toast.error('Failed to create service');
+          toast.error(getFriendlyMessage(error));
         }
       }}
       onRefresh={refreshServices}
@@ -261,26 +261,6 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing attendance...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -600,9 +580,8 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([onRefresh(), minDelay]);
+      await onRefresh();
     } finally {
       setRefreshing(false);
     }
@@ -610,26 +589,6 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
 
   return (
     <div className="space-y-6">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing service types...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">

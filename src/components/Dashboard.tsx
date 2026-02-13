@@ -7,6 +7,8 @@ import { formatGhanaCedis } from './ui/utils';
 import { useState } from 'react';
 import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
+import { useTutorial } from './TutorialContext';
+import { useEffect } from 'react';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -15,6 +17,27 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   const { user, canAccess, hasTabAccess } = useAuth();
+  const { startTutorial, hasSeenTutorial } = useTutorial();
+
+  useEffect(() => {
+    if (!user) return;
+
+    // Check if user is "freshly created" (e.g. within last 24 hours)
+    const isNewUser = user.createdAt 
+        ? (Date.now() - new Date(user.createdAt).getTime()) < 24 * 60 * 60 * 1000 
+        : false;
+
+    // Check if user has access to at least one restricted tab
+    // (Restricted tabs are those explicitly granted in tabAccess)
+    const hasRestrictedAccess = user.tabAccess && user.tabAccess.length > 0;
+
+    const timer = setTimeout(() => {
+        if (isNewUser && hasRestrictedAccess && !hasSeenTutorial('dashboard')) {
+            startTutorial('dashboard');
+        }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [user, hasSeenTutorial, startTutorial]);
 
   const { data: statsData, loading, refresh } = useCachedData(
     'dashboard-stats',
@@ -25,9 +48,8 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([refresh(), minDelay]);
+      await refresh();
     } finally {
       setRefreshing(false);
     }
@@ -158,26 +180,6 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing data...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Welcome Header */}
       <div className="flex items-start justify-between mb-2">
         <div>
@@ -193,7 +195,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger-children">
+      <div id="dashboard-stats" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 stagger-children">
         <Card className="cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all shadow-sm overflow-hidden" onClick={() => onNavigate('members')}>
           <CardContent className="p-0">
             <div className="flex items-stretch">
@@ -253,7 +255,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       </div>
 
       {/* Quick Actions */}
-      <div>
+      <div id="dashboard-quick-actions">
         <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 stagger-children">
           {filteredQuickActions.map((action) => {

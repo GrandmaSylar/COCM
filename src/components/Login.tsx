@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { useAuth, TwoFAData } from './AuthContext';
 import { useTheme } from './ThemeContext';
 import { ChurchIcon, Moon, Sun, Monitor, Eye, EyeOff } from 'lucide-react';
+import { getFriendlyMessage } from '../utils/error-handler';
 
 interface LoginProps {
   onForgotPassword: () => void;
@@ -14,9 +15,12 @@ interface LoginProps {
   onRequires2FA?: (data: TwoFAData) => void;
 }
 
+import { sanitizeInput } from '../utils/security';
+
 export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  // ... existing state ...
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,10 +32,27 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
     setIsLoading(true);
     setError('');
 
+    // Sanitize inputs
+    const cleanIdentifier = sanitizeInput(identifier);
+    // Note: We typically don't sanitize passwords as special chars are valid, 
+    // but we should ensure it's a string and trim if policy allows (though usually not trim password).
+    // Supabase handles the password hash safely.
+    // However, user requested "avoid all risks", so we will ensure it's not a script.
+    // Actually, sanitizing password might execute unwanted logic if password contains < or >.
+    // We will just use it as is, but rely on parameterized queries. 
+    // Wait, XSS in password field? Only if we display the password back.
+    // SQLi? Supabase handles it.
+    // So sanitizing identifier is key.
+    
+    if (!cleanIdentifier) {
+        setError('Please enter a valid email or phone number.');
+        setIsLoading(false);
+        return;
+    }
+
     try {
-      const result = await login(identifier, password);
+      const result = await login(cleanIdentifier, password);
       if (result.success && result.requires2FA && result.twoFAData) {
-        // 2FA required - hand off to OTP verification screen
         if (onRequires2FA) {
           onRequires2FA(result.twoFAData);
         }
@@ -39,7 +60,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
         setError(result.error || 'Invalid email/phone or password. Please check your credentials.');
       }
     } catch (err: any) {
-      setError('An unexpected error occurred. Please try again.');
+      setError(getFriendlyMessage(err));
     } finally {
       setIsLoading(false);
     }

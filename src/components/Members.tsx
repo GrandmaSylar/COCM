@@ -11,6 +11,7 @@ import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport } from '../utils/export';
 import {
   DropdownMenu,
@@ -172,7 +173,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
   useEffect(() => {
     if (cachedMembers) setMembers(cachedMembers);
     if (cachedLoading !== undefined) setLoading(cachedLoading);
-    if (cachedError) setError(cachedError.message || 'Failed to load members.');
+    if (cachedError) setError(getFriendlyMessage(cachedError));
   }, [cachedMembers, cachedLoading, cachedError]);
 
   // Apply filters
@@ -282,9 +283,8 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([refresh(), minDelay]);
+      await refresh();
     } finally {
       setRefreshing(false);
     }
@@ -399,26 +399,6 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing members...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

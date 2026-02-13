@@ -9,6 +9,8 @@ import { Member, ZONES } from './Members';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from './ui/dialog';
+import { getFriendlyMessage } from '../utils/error-handler';
 
 interface MemberProfileProps {
   member: Member;
@@ -53,6 +55,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
         setRecentActivity(data.recentActivity || []);
       } catch (error) {
         console.error('Failed to fetch member data:', error);
+        toast.error(getFriendlyMessage(error));
       } finally {
         setLoading(false);
       }
@@ -197,15 +200,36 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
             <span className="text-sm text-muted-foreground">Member Profile</span>
           </div>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <div className="w-24 h-24 bg-white dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-lg ring-4 ring-white/50 dark:ring-card/50 shrink-0">
-              {member.photo ? (
-                <img src={member.photo} alt={`${member.firstName} ${member.lastName}`} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-3xl font-semibold text-primary">
-                  {member.firstName[0]}{member.lastName[0]}
-                </span>
-              )}
-            </div>
+          <div className="w-32 h-32 md:w-40 md:h-40 bg-white dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-lg ring-4 ring-white/50 dark:ring-card/50 shrink-0">
+            {member.photo ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                   <img 
+                    src={member.photo} 
+                    alt={`${member.firstName} ${member.lastName}`} 
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                  />
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
+                  <DialogTitle className="sr-only">Profile Picture</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Full size profile picture of {member.firstName} {member.lastName}
+                  </DialogDescription>
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <img 
+                      src={member.photo} 
+                      alt={`${member.firstName} ${member.lastName}`} 
+                      className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" 
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            ) : (
+              <span className="text-5xl font-semibold text-primary">
+                {member.firstName[0]}{member.lastName[0]}
+              </span>
+            )}
+          </div>
             <div className="flex-1 text-center sm:text-left">
               <h1 className="text-2xl font-bold">{member.firstName} {member.otherNames && `${member.otherNames} `}{member.lastName}</h1>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">

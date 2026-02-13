@@ -13,8 +13,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { api, invalidateApiCache } from '../services/api';
+import { getFriendlyMessage } from '../utils/error-handler';
+import { THEME_PRESETS } from '../utils/themePresets';
 
 interface SystemUser {
   id: string;
@@ -51,6 +53,73 @@ const allPermissions = [
   'manage_giving', 'view_giving', 'record_giving', 'manage_giving_types',
   'view_reports', 'manage_settings', 'manage_services', 'manage_theme', 'grant_permissions'
 ];
+
+// Helper function to convert hex to HSL (copied from ThemeContext for local use)
+function hexToHSL(hex: string): string {
+  // Handle empty or invalid hex
+  if (!hex) return '0 0% 0%';
+  
+  hex = hex.replace('#', '');
+  // Handle short hex
+  if (hex.length === 3) {
+    hex = hex.split('').map(c => c + c).join('');
+  }
+  
+  const r = parseInt(hex.substring(0, 2), 16) / 255;
+  const g = parseInt(hex.substring(2, 4), 16) / 255;
+  const b = parseInt(hex.substring(4, 6), 16) / 255;
+  
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Helper to apply theme colors to DOM
+function applyThemeToDom(colors: ThemeColors | null) {
+  const root = window.document.documentElement;
+  if (colors) {
+    root.style.setProperty('--primary', colors.primary);
+    root.style.setProperty('--secondary', colors.secondary);
+    root.style.setProperty('--accent', colors.accent);
+    root.style.setProperty('--success', colors.success);
+    root.style.setProperty('--warning', colors.warning);
+    root.style.setProperty('--error', colors.error);
+    root.style.setProperty('--info', colors.info);
+    root.style.setProperty('--muted-custom', colors.muted);
+    root.style.setProperty('--border-custom', colors.border);
+    root.style.setProperty('--chart-1', colors.chart1);
+    root.style.setProperty('--chart-2', colors.chart2);
+    root.style.setProperty('--chart-3', colors.chart3);
+    root.style.setProperty('--chart-4', colors.chart4);
+    root.style.setProperty('--chart-5', colors.chart5);
+    try {
+      root.style.setProperty('--primary-hsl', hexToHSL(colors.primary));
+      root.style.setProperty('--secondary-hsl', hexToHSL(colors.secondary));
+    } catch (e) {
+      console.warn('Failed to convert hex to HSL', e);
+    }
+  } else {
+    // Revert to defaults by removing properties
+    [
+      '--primary', '--secondary', '--accent',
+      '--success', '--warning', '--error', '--info',
+      '--muted-custom', '--border-custom',
+      '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5',
+      '--primary-hsl', '--secondary-hsl'
+    ].forEach(prop => root.style.removeProperty(prop));
+  }
+}
 
 export function Settings({ onAddUser }: SettingsProps) {
   const {
@@ -123,6 +192,21 @@ export function Settings({ onAddUser }: SettingsProps) {
     if (customColors) {
       setThemeColorInputs(customColors);
     }
+  }, [customColors]);
+
+  // Live Preview: Apply theme colors to DOM immediately when inputs change
+  useEffect(() => {
+    applyThemeToDom(themeColorInputs);
+  }, [themeColorInputs]);
+
+  // Cleanup: Restore original ThemeContext colors when component unmounts
+  useEffect(() => {
+    return () => {
+      // Re-apply the actual saved/synced customColors (or null if none)
+      // We read the ref/current value of customColors from the closure if we include it in dependency?
+      // No, we want to restore to whatever 'customColors' is at the moment of unmount.
+      applyThemeToDom(customColors);
+    };
   }, [customColors]);
 
   const canManageUsers = canAccess('manage_users');
@@ -270,22 +354,12 @@ export function Settings({ onAddUser }: SettingsProps) {
     return lastLoginTime > fiveMinutesAgo;
   };
 
-  // Helper to format last seen time
+  // Helper to format last seen time as timestamp
   const formatLastSeen = (lastLogin?: string) => {
     if (!lastLogin) return 'Offline';
     const date = new Date(lastLogin);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    if (diffMs < 0) return 'Just now';
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ' ' + date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   };
 
   const handleTogglePermission = (role: UserRole, permission: string) => {
@@ -451,7 +525,7 @@ export function Settings({ onAddUser }: SettingsProps) {
           {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
           {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
           {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
-          {canManageTheme && <TabsTrigger value="theme">Theme</TabsTrigger>}
+          <TabsTrigger value="theme">Theme</TabsTrigger>
           {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
           <TabsTrigger value="security">Security</TabsTrigger>
         </TabsList>
@@ -615,31 +689,11 @@ export function Settings({ onAddUser }: SettingsProps) {
             </CollapsibleContent>
           </Collapsible>
 
-          {/* User List Refresh Overlay */}
-          {isRefreshingUsers && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-              <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-                  <div className="relative bg-primary/10 p-4 rounded-full">
-                    <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-                  </div>
-                </div>
-                <p className="text-base font-medium text-foreground">Refreshing users...</p>
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* User List */}
           <div className="w-full overflow-hidden">
             <div className="flex items-center justify-between mb-4">
               <h2>System Users</h2>
-              <Button variant="outline" size="sm" disabled={isRefreshingUsers} onClick={async () => { setIsRefreshingUsers(true); invalidateApiCache('/users'); const minDelay = new Promise(resolve => setTimeout(resolve, 800)); try { await Promise.all([fetchUsers(), minDelay]); } finally { setIsRefreshingUsers(false); } }} title="Refresh user list">
+              <Button variant="outline" size="sm" disabled={isRefreshingUsers} onClick={async () => { setIsRefreshingUsers(true); invalidateApiCache('/users'); try { await fetchUsers(); } finally { setIsRefreshingUsers(false); } }} title="Refresh user list">
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshingUsers ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
@@ -790,11 +844,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   Rejected
                                 </Badge>
                               )}
-                              {systemUser.approvalStatus === 'approved' && (
-                                <Badge variant={systemUser.isActive ? 'default' : 'secondary'}>
-                                  {systemUser.isActive ? 'Active' : 'Inactive'}
-                                </Badge>
-                              )}
+
                               {/* Online/Offline indicator */}
                               {systemUser.approvalStatus === 'approved' && systemUser.isActive && (
                                 <div className={`flex items-center gap-1 text-xs ${isUserOnline(systemUser.lastLogin) ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} title={systemUser.lastLogin ? `Last login: ${new Date(systemUser.lastLogin).toLocaleString()}` : 'Never logged in'}>
@@ -802,12 +852,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   {isUserOnline(systemUser.lastLogin) ? 'Online' : formatLastSeen(systemUser.lastLogin)}
                                 </div>
                               )}
-                              {isDev && systemUser.approvalStatus === 'approved' && (
-                                <Switch
-                                  checked={systemUser.isActive}
-                                  onCheckedChange={() => toggleUserStatus(systemUser.id)}
-                                />
-                              )}
+
                             </div>
                             
                             <div className="space-y-1 mb-3">
@@ -1212,7 +1257,6 @@ export function Settings({ onAddUser }: SettingsProps) {
         )}
 
         {/* Theme Tab (Dev Only) */}
-        {canManageTheme && (
           <TabsContent value="theme" className="space-y-6 w-full overflow-hidden">
             <Card>
               <CardHeader>
@@ -1230,6 +1274,41 @@ export function Settings({ onAddUser }: SettingsProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8 overflow-x-hidden">
+                {/* Theme Presets */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
+                    <Palette className="w-4 h-4" />
+                    Theme Presets
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {THEME_PRESETS.map((preset) => (
+                      <div
+                        key={preset.id}
+                        className="cursor-pointer group relative"
+                        onClick={() => {
+                          setThemeColorInputs(preset.fullColors);
+                          toast.success(`${preset.name} preset loaded. Click Apply to save.`);
+                        }}
+                      >
+                        <div className="aspect-video rounded-lg border-2 mb-2 overflow-hidden relative shadow-sm transition-all group-hover:shadow-md group-hover:scale-105"
+                             style={{ borderColor: themeColorInputs.primary === preset.fullColors.primary ? 'var(--primary)' : 'transparent' }}>
+                          <div className="absolute inset-0 flex">
+                            <div className="w-1/3 h-full" style={{ backgroundColor: preset.colors.primary }} />
+                            <div className="w-1/3 h-full" style={{ backgroundColor: preset.colors.secondary }} />
+                            <div className="w-1/3 h-full" style={{ backgroundColor: preset.colors.accent }} />
+                          </div>
+                          {themeColorInputs.primary === preset.fullColors.primary && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                              <CheckCircle className="w-6 h-6 text-white drop-shadow-md" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs font-medium text-center truncate">{preset.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Main Colors */}
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
@@ -1389,7 +1468,6 @@ export function Settings({ onAddUser }: SettingsProps) {
               </CardContent>
             </Card>
           </TabsContent>
-        )}
         {/* Backup & Restore Tab */}
         {hasAdminAccess && (
           <TabsContent value="backup" className="space-y-6 w-full overflow-hidden">
@@ -1622,9 +1700,8 @@ function BackupRestore() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    const minDelay = new Promise(resolve => setTimeout(resolve, 800));
     try {
-      await Promise.all([loadBackupData(), minDelay]);
+      await loadBackupData();
       toast.success('Backup history refreshed');
     } finally {
       setRefreshing(false);
@@ -1717,7 +1794,7 @@ function BackupRestore() {
       setShowPreview(true);
     } catch (error: any) {
       console.error('Failed to preview restore:', error);
-      toast.error(error?.message || 'Failed to preview restore');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -1752,7 +1829,7 @@ function BackupRestore() {
       }
     } catch (error: any) {
       console.error('Failed to restore backup:', error);
-      toast.error(error?.message || 'Failed to restore backup');
+      toast.error(getFriendlyMessage(error));
     } finally {
       setIsRestoring(false);
     }
@@ -1769,7 +1846,7 @@ function BackupRestore() {
       loadBackupData();
     } catch (error: any) {
       console.error('Failed to delete backup:', error);
-      toast.error(error?.message || 'Failed to delete backup');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -1794,26 +1871,6 @@ function BackupRestore() {
 
   return (
     <div className="space-y-6 relative">
-      {/* Refresh Overlay */}
-      {refreshing && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-          <div className="bg-card p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border-2 border-primary/20 animate-refresh-card">
-            <div className="relative">
-              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
-              <div className="relative bg-primary/10 p-4 rounded-full">
-                <RefreshCw className="w-10 h-10 text-primary animate-spin" />
-              </div>
-            </div>
-            <p className="text-base font-medium text-foreground">Refreshing backup data...</p>
-            <div className="flex gap-1">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -2297,7 +2354,7 @@ function SecuritySettings() {
           : `Two-factor authentication enabled via ${twoFAMethod === 'email' ? 'Email' : 'Phone SMS'}`
       );
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to update 2FA preference');
+      toast.error(getFriendlyMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -2437,7 +2494,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
       onBack();
     } catch (error: any) {
       console.error('Failed to create user:', error);
-      toast.error(error.message || 'Failed to create user. Please try again.');
+      toast.error(getFriendlyMessage(error));
       setIsLoading(false);
     }
   };
