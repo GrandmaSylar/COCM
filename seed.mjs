@@ -309,6 +309,14 @@ function generateAttendance(members, sundays) {
     if (Math.random() < 0.6) {
       const eveningId = uuid();
       const eveningCount = Math.round(morningAttendees.length * randFloat(0.35, 0.55));
+      
+      // Distribute eveningCount into denominations
+      const childrenCount = Math.round(eveningCount * randFloat(0.1, 0.25));
+      const visitorsCount = Math.round(eveningCount * randFloat(0.05, 0.15));
+      const remaining = eveningCount - childrenCount - visitorsCount;
+      const menCount = Math.round(remaining * randFloat(0.4, 0.5));
+      const womenCount = remaining - menCount;
+
       records.push({
         id: eveningId,
         date: sundayStr,
@@ -317,6 +325,10 @@ function generateAttendance(members, sundays) {
         start_time: '17:00',
         end_time: '19:00',
         total_count: eveningCount,
+        men_count: menCount,
+        women_count: womenCount,
+        children_count: childrenCount,
+        visitors_count: visitorsCount,
         is_custom_service: false,
         created_at: new Date(sundayStr + 'T17:00:00Z').toISOString(),
       });

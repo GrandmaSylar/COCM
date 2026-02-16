@@ -1882,7 +1882,7 @@ app.post("/attendance", async (c)=>{
       }, 401);
     }
     const data = await c.req.json();
-    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, ...rest } = data;
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, menCount, womenCount, childrenCount, visitorsCount, ...rest } = data;
     const recordType = attendanceType || 'individual';
     const dateValue = rest.date || data.date;
 
@@ -1903,7 +1903,11 @@ app.post("/attendance", async (c)=>{
         end_time: endTime || null,
         is_custom_service: isCustomService || false,
         custom_service_id: customServiceId || null,
-        total_count: totalCount || attendees?.length || 0
+        total_count: totalCount || attendees?.length || 0,
+        men_count: menCount || 0,
+        women_count: womenCount || 0,
+        children_count: childrenCount || 0,
+        visitors_count: visitorsCount || 0
       }).eq('id', existingRecord.id).select().single();
       if (updateError) {
         console.error('Error updating attendance record:', updateError);
@@ -1935,7 +1939,11 @@ app.post("/attendance", async (c)=>{
         custom_service_id: customServiceId || null,
         created_by: user.id,
         total_count: totalCount || attendees?.length || 0,
-        attendance_type: recordType
+        attendance_type: recordType,
+        men_count: menCount || 0,
+        women_count: womenCount || 0,
+        children_count: childrenCount || 0,
+        visitors_count: visitorsCount || 0
       }).select().single();
       if (recordError) {
         console.error('Error creating attendance record:', recordError);
@@ -2078,7 +2086,7 @@ app.put("/attendance/:id", async (c)=>{
     }
 
     const data = await c.req.json();
-    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, ...rest } = data;
+    const { attendees, totalCount, serviceType, startTime, endTime, isCustomService, customServiceId, attendanceType, menCount, womenCount, childrenCount, visitorsCount, ...rest } = data;
     const { data: record, error: recordError } = await supabase.from('attendance_records').update({
       ...rest,
       service_type: serviceType,
@@ -2086,7 +2094,11 @@ app.put("/attendance/:id", async (c)=>{
       end_time: endTime || null,
       is_custom_service: isCustomService || false,
       custom_service_id: customServiceId || null,
-      total_count: totalCount || attendees?.length || 0
+      total_count: totalCount || attendees?.length || 0,
+      men_count: menCount || 0,
+      women_count: womenCount || 0,
+      children_count: childrenCount || 0,
+      visitors_count: visitorsCount || 0
     }).eq('id', id).select().single();
     if (recordError) {
       console.error('Error updating attendance:', recordError);
@@ -3427,12 +3439,14 @@ app.get("/reports", async (c)=>{
       { data: individualAttendance },
       { data: givingRecordsFull },
       { data: allMembers },
+      { data: visitors },
     ] = await Promise.all([
       supabase.from('attendance_records').select('date, total_count, attendance_type').eq('attendance_type', 'general').gte('date', startDateStr).order('date', { ascending: true }),
-      supabase.from('attendance_records').select('date, total_count, attendance_type').gte('date', startDateStr).order('date', { ascending: true }),
+      supabase.from('attendance_records').select('date, total_count, attendance_type, men_count, women_count, children_count, visitors_count').gte('date', startDateStr).order('date', { ascending: true }),
       supabase.from('attendance_records').select('date, total_count').eq('attendance_type', 'individual').gte('date', startDateStr).order('date', { ascending: true }),
       supabase.from('giving_records').select('service_date, total_amount, offering_amount, donation_amount, thanksgiving_amount, custom_types, cash_amount, mobile_money_amount, card_amount, bank_transfer_amount').gte('service_date', startDateStr).order('service_date', { ascending: true }),
-      supabase.from('members').select('created_at, status, zone').order('created_at', { ascending: true }),
+      supabase.from('members').select('created_at, status, zone, gender, marital_status, ministries, date_of_birth').order('created_at', { ascending: true }),
+      supabase.from('visitors').select('visit_date, follow_up_status, converted_to_member'),
     ]);
 
     // Use general attendance for trends, fallback to all
@@ -3552,20 +3566,83 @@ app.get("/reports", async (c)=>{
       { type: 'Custom', amount: Math.round(totalCustom * 100) / 100 },
     ].filter(g => g.amount > 0);
 
-    // ── Giving by payment method ──
-    let totalCash = 0, totalMM = 0, totalCard = 0, totalBT = 0;
-    givingRecordsFull?.forEach((r: any) => {
-      totalCash += parseFloat(r.cash_amount) || 0;
-      totalMM += parseFloat(r.mobile_money_amount) || 0;
-      totalCard += parseFloat(r.card_amount) || 0;
-      totalBT += parseFloat(r.bank_transfer_amount) || 0;
+    // ── Attendance denominations (totals for period) ──
+    let totalMenAtt = 0, totalWomenAtt = 0, totalChildrenAtt = 0, totalVisitorsAtt = 0;
+    allAttendance?.forEach((r: any) => {
+      // Only include denominations if they are from general/headcount records
+      // to avoid double counting if individual records also have these fields (though unlikely based on schema)
+      if (r.attendance_type === 'general') {
+        totalMenAtt += r.men_count || 0;
+        totalWomenAtt += r.women_count || 0;
+        totalChildrenAtt += r.children_count || 0;
+        totalVisitorsAtt += r.visitors_count || 0;
+      }
     });
-    const givingByPaymentMethod = [
-      { method: 'Cash', amount: Math.round(totalCash * 100) / 100 },
-      { method: 'Mobile Money', amount: Math.round(totalMM * 100) / 100 },
-      { method: 'Card', amount: Math.round(totalCard * 100) / 100 },
-      { method: 'Bank Transfer', amount: Math.round(totalBT * 100) / 100 },
-    ].filter(g => g.amount > 0);
+    const attendanceDenominations = [
+      { name: 'Men', count: totalMenAtt },
+      { name: 'Women', count: totalWomenAtt },
+      { name: 'Children', count: totalChildrenAtt },
+      { name: 'Visitors', count: totalVisitorsAtt },
+    ].filter(d => d.count > 0);
+
+    // ── Member Gender Distribution ──
+    const genderCounts: Record<string, number> = {};
+    allMembers?.forEach((m: any) => {
+      const g = (m.gender || 'unknown').toLowerCase();
+      genderCounts[g] = (genderCounts[g] || 0) + 1;
+    });
+    const membersByGender = Object.entries(genderCounts).map(([gender, count]) => ({ gender, count }));
+
+    // ── Member Marital Status Distribution ──
+    const maritalCounts: Record<string, number> = {};
+    allMembers?.forEach((m: any) => {
+      const ms = (m.marital_status || 'unknown').toLowerCase();
+      maritalCounts[ms] = (maritalCounts[ms] || 0) + 1;
+    });
+    const membersByMaritalStatus = Object.entries(maritalCounts).map(([status, count]) => ({ status, count }));
+
+    // ── Ministry Participation ──
+    const ministryCounts: Record<string, number> = {};
+    allMembers?.forEach((m: any) => {
+      const minList = m.ministries || [];
+      minList.forEach((min: string) => {
+        ministryCounts[min] = (ministryCounts[min] || 0) + 1;
+      });
+    });
+    const membersByMinistry = Object.entries(ministryCounts).map(([ministry, count]) => ({ ministry, count })).sort((a, b) => b.count - a.count);
+
+    // ── Age Distribution ──
+    const ageGroups = {
+      'Under 18': 0,
+      '18-35': 0,
+      '36-50': 0,
+      '50+': 0,
+      'Unknown': 0
+    };
+    allMembers?.forEach((m: any) => {
+      if (!m.date_of_birth) {
+        ageGroups['Unknown']++;
+        return;
+      }
+      const age = now.getFullYear() - new Date(m.date_of_birth).getFullYear();
+      if (age < 18) ageGroups['Under 18']++;
+      else if (age <= 35) ageGroups['18-35']++;
+      else if (age <= 50) ageGroups['36-50']++;
+      else ageGroups['50+']++;
+    });
+    const membersByAge = Object.entries(ageGroups).map(([group, count]) => ({ group, count }));
+
+    // ── Visitor Analytics ──
+    const visitorStatusCounts: Record<string, number> = {};
+    let totalConverted = 0;
+    const periodVisitors = visitors?.filter((v: any) => v.visit_date >= startDateStr) || [];
+    periodVisitors.forEach((v: any) => {
+      const s = v.follow_up_status || 'pending';
+      visitorStatusCounts[s] = (visitorStatusCounts[s] || 0) + 1;
+      if (v.converted_to_member) totalConverted++;
+    });
+    const visitorsByStatus = Object.entries(visitorStatusCounts).map(([status, count]) => ({ status, count }));
+    const visitorConversionRate = periodVisitors.length > 0 ? (totalConverted / periodVisitors.length) * 100 : 0;
 
     // ── Member retention ──
     const activeStatuses = new Set(['active', 'semi-active']);
@@ -3594,7 +3671,14 @@ app.get("/reports", async (c)=>{
       membersByStatus,
       membersByZone,
       givingByType,
-      givingByPaymentMethod,
+      givingByPaymentMethod: [], // Keep for backward compatibility if needed, or remove if safe
+      attendanceDenominations,
+      membersByGender,
+      membersByMaritalStatus,
+      membersByMinistry,
+      membersByAge,
+      visitorsByStatus,
+      visitorConversionRate: Math.round(visitorConversionRate * 10) / 10,
       summary: {
         totalMembers,
         avgAttendance,

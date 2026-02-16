@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, Banknote, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw } from 'lucide-react';
+import { Users, Calendar, Banknote, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw, Heart, Smile, Award } from 'lucide-react';
 import { Button } from './ui/button';
 import { formatGhanaCedis } from './ui/utils';
 import {
@@ -28,7 +28,26 @@ const ZONE_COLORS = ['#1B4D3E', '#FFD700', '#3b82f6', '#ef4444', '#a855f7', '#f9
 
 const GIVING_TYPE_COLORS = ['#1B4D3E', '#FFD700', '#f97316', '#a855f7'];
 
-const PAYMENT_METHOD_COLORS = ['#22c55e', '#3b82f6', '#f97316', '#6366f1'];
+const ATTENDANCE_COLORS: Record<string, string> = {
+  Men: '#3b82f6',
+  Women: '#ec4899',
+  Children: '#eab308',
+  Visitors: '#a855f7',
+};
+
+const GENDER_COLORS: Record<string, string> = {
+  male: '#0ea5e9',   // Cyan/Blue
+  female: '#f43f5e', // Rose/Pink
+  unknown: '#94a3b8', // Slate
+};
+
+const MARITAL_COLORS: Record<string, string> = {
+  single: '#6366f1',   // Indigo
+  married: '#10b981',  // Emerald
+  divorced: '#f59e0b', // Amber
+  widowed: '#6b7280',  // Gray
+  unknown: '#94a3b8',  // Slate
+};
 
 const CustomTooltip = ({ active, payload, label, prefix, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
@@ -84,8 +103,14 @@ export function Reports() {
   const [membershipData, setMembershipData] = useState<any[]>([]);
   const [membersByStatus, setMembersByStatus] = useState<any[]>([]);
   const [membersByZone, setMembersByZone] = useState<any[]>([]);
+  const [membersByGender, setMembersByGender] = useState<any[]>([]);
+  const [membersByMaritalStatus, setMembersByMaritalStatus] = useState<any[]>([]);
+  const [membersByMinistry, setMembersByMinistry] = useState<any[]>([]);
+  const [membersByAge, setMembersByAge] = useState<any[]>([]);
   const [givingByType, setGivingByType] = useState<any[]>([]);
-  const [givingByPaymentMethod, setGivingByPaymentMethod] = useState<any[]>([]);
+  const [attendanceDenominations, setAttendanceDenominations] = useState<any[]>([]);
+  const [visitorsByStatus, setVisitorsByStatus] = useState<any[]>([]);
+  const [visitorConversionRate, setVisitorConversionRate] = useState(0);
   const [summary, setSummary] = useState({
     totalMembers: 0,
     avgAttendance: 0,
@@ -112,8 +137,14 @@ export function Reports() {
       setMembershipData(data.membershipData || []);
       setMembersByStatus(data.membersByStatus || []);
       setMembersByZone(data.membersByZone || []);
+      setMembersByGender(data.membersByGender || []);
+      setMembersByMaritalStatus(data.membersByMaritalStatus || []);
+      setMembersByMinistry(data.membersByMinistry || []);
+      setMembersByAge(data.membersByAge || []);
       setGivingByType(data.givingByType || []);
-      setGivingByPaymentMethod(data.givingByPaymentMethod || []);
+      setAttendanceDenominations(data.attendanceDenominations || []);
+      setVisitorsByStatus(data.visitorsByStatus || []);
+      setVisitorConversionRate(data.visitorConversionRate || 0);
       setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
     } catch (error) {
       console.error('Failed to fetch reports:', error);
@@ -324,6 +355,21 @@ export function Reports() {
             </div>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/30 rounded-full flex items-center justify-center shrink-0">
+                <Smile className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold">{visitorConversionRate}%</p>
+                <p className="text-xs text-muted-foreground">Visitor Conversion</p>
+                <p className="text-xs text-muted-foreground">Growth efficiency</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Row 1: Attendance + Giving Trends */}
@@ -447,35 +493,197 @@ export function Reports() {
           </Card>
         )}
 
-        {/* Giving by Payment Method */}
-        {givingByPaymentMethod.length > 0 && (
+        {/* Attendance Breakdown by Denomination */}
+        {attendanceDenominations.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Banknote className="w-4 h-4" />
-                Giving by Payment Method
+                <Users className="w-4 h-4" />
+                Attendance Breakdown
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie
-                    data={givingByPaymentMethod}
+                    data={attendanceDenominations}
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
                     innerRadius={50}
-                    dataKey="amount"
-                    nameKey="method"
+                    dataKey="count"
+                    nameKey="name"
                     labelLine={false}
                     label={renderCustomLabel}
                   >
-                    {givingByPaymentMethod.map((_, i) => (
-                      <Cell key={i} fill={PAYMENT_METHOD_COLORS[i % PAYMENT_METHOD_COLORS.length]} />
+                    {attendanceDenominations.map((entry, i) => (
+                      <Cell key={i} fill={ATTENDANCE_COLORS[entry.name] || '#9ca3af'} />
                     ))}
                   </Pie>
-                  <Tooltip content={<PieTooltip isCurrency />} />
+                  <Tooltip content={<PieTooltip />} />
                   <Legend formatter={(value: string) => <span className="text-xs">{value}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Row 3: Demographics and Ministry Participation */}
+      <h3 className="text-lg font-semibold mt-8 mb-4 flex items-center gap-2">
+        <Activity className="w-5 h-5 text-primary" />
+        Congregational Insights
+      </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Gender and Marital Status Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {membersByGender.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Gender Distribution
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={membersByGender}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      innerRadius={40}
+                      dataKey="count"
+                      nameKey="gender"
+                    >
+                      {membersByGender.map((entry, i) => (
+                        <Cell key={i} fill={GENDER_COLORS[entry.gender] || '#9ca3af'} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<PieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {membersByMaritalStatus.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Heart className="w-4 h-4" />
+                  Marital Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={membersByMaritalStatus}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      innerRadius={40}
+                      dataKey="count"
+                      nameKey="status"
+                    >
+                      {membersByMaritalStatus.map((entry, i) => (
+                        <Cell key={i} fill={MARITAL_COLORS[entry.status] || '#9ca3af'} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={<PieTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Ministry Participation */}
+        {membersByMinistry.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Award className="w-4 h-4" />
+                Ministry Participation
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={membersByMinistry} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number" hide />
+                  <YAxis 
+                    dataKey="ministry" 
+                    type="category" 
+                    width={100} 
+                    tick={{ fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Age Breakdown */}
+        {membersByAge.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <BarChart3 className="w-4 h-4" />
+                Age Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={membersByAge}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="group" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="var(--secondary)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Visitor Follow-up Status */}
+        {visitorsByStatus.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Smile className="w-4 h-4" />
+                Visitor Follow-up Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={visitorsByStatus}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    innerRadius={50}
+                    dataKey="count"
+                    nameKey="status"
+                    labelLine={false}
+                    label={renderCustomLabel}
+                  >
+                    {visitorsByStatus.map((_, i) => (
+                      <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                  <Legend formatter={(value: string) => <span className="text-xs uppercase">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>

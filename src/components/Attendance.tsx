@@ -26,6 +26,10 @@ interface AttendanceRecord {
   isCustomService?: boolean;
   customServiceId?: string;
   attendanceType?: 'individual' | 'general';
+  menCount?: number;
+  womenCount?: number;
+  childrenCount?: number;
+  visitorsCount?: number;
   // Audit fields
   createdAt?: string;
   createdBy?: string;
@@ -316,8 +320,8 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 icon-bg-blue rounded-full flex items-center justify-center">
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{totalServices}</p>
@@ -330,8 +334,8 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 icon-bg-green rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{averageAttendance}</p>
@@ -344,8 +348,8 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 icon-bg-purple rounded-full flex items-center justify-center">
+                <TrendingUp className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{thisWeekAttendance}</p>
@@ -431,22 +435,22 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 icon-bg-pink rounded-full flex items-center justify-center flex-shrink-0">
+                      <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceType}</h3>
                       <div className="flex flex-wrap items-center gap-1 mt-1">
                         {record.attendanceType === 'general' ? (
-                          <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs badge-info">Head Count</Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] sm:text-xs bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs badge-warning">Individual</Badge>
                         )}
                         {record.isCustomService && (
                           <Badge variant="outline" className="text-[10px] sm:text-xs">Custom</Badge>
                         )}
                         {!record.isCustomService && (
-                          <Badge variant="default" className="text-[10px] sm:text-xs bg-green-100 text-green-800">Permanent</Badge>
+                          <Badge variant="default" className="text-[10px] sm:text-xs badge-success border-none">Permanent</Badge>
                         )}
                       </div>
                       <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -481,12 +485,12 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
                         return (
                           <>
                             {(editInfo.canEdit || isDev) ? (
-                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-green-50 text-green-700 border-green-200">
+                              <Badge variant="outline" className="text-[10px] sm:text-xs badge-success">
                                 <Unlock className="w-3 h-3 mr-1" />
                                 {isDev && !editInfo.canEdit ? 'Dev' : editInfo.label}
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-[10px] sm:text-xs bg-gray-50 text-gray-500 border-gray-200">
+                              <Badge variant="outline" className="text-[10px] sm:text-xs badge-muted">
                                 <Lock className="w-3 h-3 mr-1" />
                                 {editInfo.label}
                               </Badge>
@@ -630,7 +634,7 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
         </CardHeader>
         <CardContent>
           {showAddForm && (
-            <form onSubmit={handleAddService} className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
+            <form onSubmit={handleAddService} className="space-y-4 mb-6 p-4 border rounded-lg box-muted">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="serviceName">Service Name *</Label>
@@ -797,6 +801,10 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [totalCount, setTotalCount] = useState('');
+  const [menCount, setMenCount] = useState('');
+  const [womenCount, setWomenCount] = useState('');
+  const [childrenCount, setChildrenCount] = useState('');
+  const [visitorsCount, setVisitorsCount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { data: cachedSvc } = useCachedData<CustomService[]>(
     'custom-services',
@@ -852,6 +860,10 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         endTime: endTime || undefined,
         attendees: [],
         totalCount: parseInt(totalCount),
+        menCount: parseInt(menCount) || 0,
+        womenCount: parseInt(womenCount) || 0,
+        childrenCount: parseInt(childrenCount) || 0,
+        visitorsCount: parseInt(visitorsCount) || 0,
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name,
         attendanceType: 'general'
       });
@@ -866,6 +878,10 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
         endTime: endTime || undefined,
         attendees: [],
         totalCount: parseInt(totalCount),
+        menCount: parseInt(menCount) || 0,
+        womenCount: parseInt(womenCount) || 0,
+        childrenCount: parseInt(childrenCount) || 0,
+        visitorsCount: parseInt(visitorsCount) || 0,
         isCustomService: serviceType !== SUNDAY_MAIN_SERVICE.name
       });
     } catch (error: any) {
@@ -954,6 +970,73 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
               </div>
             </div>
 
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="menCount">Men</Label>
+                <Input
+                  id="menCount"
+                  type="number"
+                  value={menCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setMenCount(val);
+                    const total = (parseInt(val) || 0) + (parseInt(womenCount) || 0) + (parseInt(childrenCount) || 0) + (parseInt(visitorsCount) || 0);
+                    setTotalCount(String(total));
+                  }}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="womenCount">Women</Label>
+                <Input
+                  id="womenCount"
+                  type="number"
+                  value={womenCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setWomenCount(val);
+                    const total = (parseInt(menCount) || 0) + (parseInt(val) || 0) + (parseInt(childrenCount) || 0) + (parseInt(visitorsCount) || 0);
+                    setTotalCount(String(total));
+                  }}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="childrenCount">Children</Label>
+                <Input
+                  id="childrenCount"
+                  type="number"
+                  value={childrenCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setChildrenCount(val);
+                    const total = (parseInt(menCount) || 0) + (parseInt(womenCount) || 0) + (parseInt(val) || 0) + (parseInt(visitorsCount) || 0);
+                    setTotalCount(String(total));
+                  }}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="visitorsCount">Visitors</Label>
+                <Input
+                  id="visitorsCount"
+                  type="number"
+                  value={visitorsCount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setVisitorsCount(val);
+                    const total = (parseInt(menCount) || 0) + (parseInt(womenCount) || 0) + (parseInt(childrenCount) || 0) + (parseInt(val) || 0);
+                    setTotalCount(String(total));
+                  }}
+                  placeholder="0"
+                  min="0"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="totalCount">Total Attendance Count *</Label>
               <Input
@@ -964,6 +1047,7 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
                 placeholder="Enter total number of attendees"
                 min="1"
                 required
+                className="bg-muted font-bold"
               />
             </div>
 
@@ -1005,6 +1089,10 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
   const [members, setMembers] = useState<Member[]>([]);
   const [editAttendees, setEditAttendees] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editMenCount, setEditMenCount] = useState('');
+  const [editWomenCount, setEditWomenCount] = useState('');
+  const [editChildrenCount, setEditChildrenCount] = useState('');
+  const [editVisitorsCount, setEditVisitorsCount] = useState('');
   const [canEdit, setCanEdit] = useState(false);
   const { user, canAccess } = useAuth();
 
@@ -1018,8 +1106,12 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
           api.attendance.getById(recordId),
           api.attendance.getEditStatus(recordId)
         ]);
-        setRecord(recordData);
+         setRecord(recordData);
         setEditTotalCount(String(recordData.totalCount || 0));
+        setEditMenCount(String(recordData.menCount || 0));
+        setEditWomenCount(String(recordData.womenCount || 0));
+        setEditChildrenCount(String(recordData.childrenCount || 0));
+        setEditVisitorsCount(String(recordData.visitorsCount || 0));
         setEditAttendees(recordData.attendees || []);
         setCanEdit((editStatus.canEdit || editStatus.isDev) && canRecordAttendance);
 
@@ -1071,6 +1163,10 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
           startTime: record.startTime,
           endTime: record.endTime,
           totalCount: parseInt(editTotalCount),
+          menCount: parseInt(editMenCount) || 0,
+          womenCount: parseInt(editWomenCount) || 0,
+          childrenCount: parseInt(editChildrenCount) || 0,
+          visitorsCount: parseInt(editVisitorsCount) || 0,
           isCustomService: record.isCustomService
         });
       } else {
@@ -1178,6 +1274,68 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
           <CardContent>
             {isEditing ? (
               <div className="space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editMenCount">Men</Label>
+                    <Input
+                      id="editMenCount"
+                      type="number"
+                      value={editMenCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditMenCount(val);
+                        const total = (parseInt(val) || 0) + (parseInt(editWomenCount) || 0) + (parseInt(editChildrenCount) || 0) + (parseInt(editVisitorsCount) || 0);
+                        setEditTotalCount(String(total));
+                      }}
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editWomenCount">Women</Label>
+                    <Input
+                      id="editWomenCount"
+                      type="number"
+                      value={editWomenCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditWomenCount(val);
+                        const total = (parseInt(editMenCount) || 0) + (parseInt(val) || 0) + (parseInt(editChildrenCount) || 0) + (parseInt(editVisitorsCount) || 0);
+                        setEditTotalCount(String(total));
+                      }}
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editChildrenCount">Children</Label>
+                    <Input
+                      id="editChildrenCount"
+                      type="number"
+                      value={editChildrenCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditChildrenCount(val);
+                        const total = (parseInt(editMenCount) || 0) + (parseInt(editWomenCount) || 0) + (parseInt(val) || 0) + (parseInt(editVisitorsCount) || 0);
+                        setEditTotalCount(String(total));
+                      }}
+                      min="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editVisitorsCount">Visitors</Label>
+                    <Input
+                      id="editVisitorsCount"
+                      type="number"
+                      value={editVisitorsCount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditVisitorsCount(val);
+                        const total = (parseInt(editMenCount) || 0) + (parseInt(editWomenCount) || 0) + (parseInt(editChildrenCount) || 0) + (parseInt(val) || 0);
+                        setEditTotalCount(String(total));
+                      }}
+                      min="0"
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="editTotalCount">Total Attendance Count</Label>
                   <Input
@@ -1185,7 +1343,8 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     type="number"
                     value={editTotalCount}
                     onChange={(e) => setEditTotalCount(e.target.value)}
-                    min="0"
+                    min="1"
+                    className="bg-muted font-bold"
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -1194,16 +1353,41 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                   </Button>
                   <Button variant="outline" onClick={() => {
                     setIsEditing(false);
-                    setEditTotalCount(String(record.totalCount));
+                    setEditTotalCount(String(record.totalCount || 0));
+                    setEditMenCount(String(record.menCount || 0));
+                    setEditWomenCount(String(record.womenCount || 0));
+                    setEditChildrenCount(String(record.childrenCount || 0));
+                    setEditVisitorsCount(String(record.visitorsCount || 0));
                   }}>
                     Cancel
                   </Button>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4">
-                <div className="text-4xl font-bold text-primary">{record.totalCount}</div>
-                <p className="text-muted-foreground mt-1">people attended</p>
+              <div className="space-y-6">
+                <div className="text-center py-2">
+                  <div className="text-4xl font-bold text-primary">{record.totalCount}</div>
+                  <p className="text-muted-foreground mt-1">total people attended</p>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-6">
+                  <div className="text-center p-3 rounded-lg bg-blue-50/50">
+                    <div className="text-xl font-semibold text-blue-700">{record.menCount || 0}</div>
+                    <p className="text-xs text-blue-600/70 font-medium uppercase tracking-wider">Men</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-pink-50/50">
+                    <div className="text-xl font-semibold text-pink-700">{record.womenCount || 0}</div>
+                    <p className="text-xs text-pink-600/70 font-medium uppercase tracking-wider">Women</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-purple-50/50">
+                    <div className="text-xl font-semibold text-purple-700">{record.childrenCount || 0}</div>
+                    <p className="text-xs text-purple-600/70 font-medium uppercase tracking-wider">Children</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-orange-50/50">
+                    <div className="text-xl font-semibold text-orange-700">{record.visitorsCount || 0}</div>
+                    <p className="text-xs text-orange-600/70 font-medium uppercase tracking-wider">Visitors</p>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

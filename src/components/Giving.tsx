@@ -187,21 +187,21 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     const now = Date.now();
     const elapsed = now - created;
     const remaining = EDIT_WINDOW_MS - elapsed;
-    if (remaining <= 0) return { canEdit: false, timeRemaining: '' };
+    if (remaining <= 0) return { canEdit: false, timeRemaining: '', label: 'Locked' };
     const hours = Math.floor(remaining / (60 * 60 * 1000));
     const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-    return { canEdit: true, timeRemaining: `${hours}h ${minutes}m left` };
+    return { canEdit: true, timeRemaining: `${hours}h ${minutes}m left`, label: `${hours}h ${minutes}m left` };
   };
 
   const isDev = user?.role === 'dev';
 
   const getServiceTypeColor = (type: string) => {
     switch (type) {
-      case 'sunday_morning': return 'bg-blue-100 text-blue-800';
-      case 'sunday_evening': return 'bg-purple-100 text-purple-800';
-      case 'midweek': return 'bg-green-100 text-green-800';
-      case 'special': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'sunday_morning': return 'badge-info';
+      case 'sunday_evening': return 'badge-purple';
+      case 'midweek': return 'badge-success';
+      case 'special': return 'badge-orange';
+      default: return 'badge-muted';
     }
   };
 
@@ -382,8 +382,8 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <Banknote className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 icon-bg-green rounded-full flex items-center justify-center">
+                <Banknote className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{formatAmount(totalGiving)}</p>
@@ -396,8 +396,8 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 icon-bg-blue rounded-full flex items-center justify-center">
+                <Calendar className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{formatAmount(thisMonthGiving)}</p>
@@ -410,8 +410,8 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 icon-bg-purple rounded-full flex items-center justify-center">
+                <TrendingUp className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{formatAmount(thisWeekGiving)}</p>
@@ -484,8 +484,8 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   {/* Header */}
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Church className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 icon-bg-pink rounded-full flex items-center justify-center flex-shrink-0">
+                        <Church className="w-5 h-5 sm:w-6 sm:h-6" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceName}</h3>
@@ -509,7 +509,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   </div>
 
                   {/* Breakdown */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 sm:p-3 bg-muted/50 rounded-lg">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 sm:p-3 box-muted rounded-lg">
                     <div>
                       <p className="text-xs text-muted-foreground">Offering</p>
                       <p className="font-medium">{formatAmount(record.offerings.offering)}</p>
@@ -536,7 +536,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                   {Object.entries(record.offerings.customTypes).length > 0 && (
                     <div className="flex flex-wrap gap-1 sm:gap-2">
                       {Object.entries(record.offerings.customTypes).map(([type, amount]) => (
-                        <Badge key={type} variant="outline" className="bg-purple-50 text-[10px] sm:text-xs">
+                        <Badge key={type} variant="outline" className="badge-purple text-[10px] sm:text-xs">
                           {type}: {formatAmount(amount)}
                         </Badge>
                       ))}
@@ -553,7 +553,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                         </Badge>
                       ))}
                     {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
-                      <Badge variant="outline" className="bg-yellow-50 text-[10px] sm:text-xs">
+                      <Badge variant="outline" className="box-warning text-[10px] sm:text-xs border-none">
                         Foreign: GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)}
                       </Badge>
                     )}
@@ -582,9 +582,9 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                         const editable = editInfo.canEdit || isDev;
                         return (
                           <>
-                            <Badge variant="outline" className={editable ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}>
+                            <Badge variant="outline" className={editable ? 'badge-success' : 'badge-muted'}>
                               {editable ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
-                              {editable ? (isDev && !editInfo.canEdit ? 'Dev' : editInfo.timeRemaining) : 'Locked'}
+                              {editable ? (isDev && !editInfo.canEdit ? 'Dev' : editInfo.label) : 'Locked'}
                             </Badge>
                             {onViewRecord && (
                               <Button
@@ -684,7 +684,7 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
         </CardHeader>
         <CardContent>
           {showAddForm && (
-            <form onSubmit={handleAddType} className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
+            <form onSubmit={handleAddType} className="space-y-4 mb-6 p-4 box-muted rounded-lg">
               <div className="space-y-2">
                 <Label htmlFor="typeName">Type Name *</Label>
                 <Input
@@ -1060,9 +1060,9 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
                 )}
               </div>
 
-              <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="p-3 box-primary rounded-lg">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">Total Giving:</span>
+                  <span className="font-medium text-primary-foreground/80 dark:text-primary-foreground/90">Total Giving:</span>
                   <span className="text-xl font-bold">{formatGhanaCedis(total)}</span>
                 </div>
               </div>
@@ -1131,7 +1131,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="foreignCurrency">Currency</Label>
-                    <Select value={foreignCurrency || 'none'} onValueChange={(val) => setForeignCurrency(val === 'none' ? '' : val)}>
+                    <Select value={foreignCurrency || 'none'} onValueChange={(val: string) => setForeignCurrency(val === 'none' ? '' : val)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
@@ -1179,13 +1179,13 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
                 </div>
               </div>
 
-              <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-50' : 'bg-red-50'}`}>
+              <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-100/50 dark:bg-green-900/20' : 'bg-red-100/50 dark:bg-red-900/20'}`}>
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">Payment Total:</span>
-                  <span className="text-xl font-bold">{formatGhanaCedis(paymentTotal)}</span>
+                  <span className={`font-medium ${isBalanced ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>Payment Total:</span>
+                  <span className={`text-xl font-bold ${isBalanced ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{formatGhanaCedis(paymentTotal)}</span>
                 </div>
                 {!isBalanced && total > 0 && (
-                  <p className="text-sm text-destructive mt-1">
+                  <p className="text-sm text-destructive dark:text-red-400 mt-1">
                     Payment total must match giving total ({formatGhanaCedis(total)})
                   </p>
                 )}
@@ -1420,7 +1420,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className={canEdit || isDev ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-500'}>
+            <Badge variant="outline" className={canEdit || isDev ? 'badge-success' : 'badge-muted'}>
               {canEdit || isDev ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
               {canEdit ? timeRemaining : isDev ? 'Dev Access' : 'Locked'}
             </Badge>
@@ -1444,7 +1444,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
             {/* Giving Breakdown */}
             <div>
               <h3 className="font-medium mb-3">Giving Breakdown</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 p-3 box-muted rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">Offering</p>
                   <p className="font-medium">{formatGhanaCedis(record.offerings.offering)}</p>
@@ -1466,7 +1466,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
                 <h3 className="font-medium mb-3">Custom Types</h3>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(record.offerings.customTypes).map(([type, amount]) => (
-                    <Badge key={type} variant="outline" className="bg-purple-50 text-sm py-1 px-3">
+                    <Badge key={type} variant="outline" className="badge-purple text-sm py-1 px-3">
                       {type}: {formatGhanaCedis(amount)}
                     </Badge>
                   ))}
@@ -1477,7 +1477,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
             {/* Payment Breakdown */}
             <div>
               <h3 className="font-medium mb-3">Payment Breakdown</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-3 box-muted rounded-lg">
                 {Object.entries(record.paymentBreakdown)
                   .filter(([key]) => key !== 'foreign_currency')
                   .map(([method, amount]) => (
@@ -1488,7 +1488,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
                   ))}
               </div>
               {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
-                <div className="mt-2 p-3 bg-yellow-50 rounded-lg">
+                <div className="mt-2 p-3 box-warning rounded-lg">
                   <p className="text-xs text-muted-foreground">Foreign Currency ({record.paymentBreakdown.foreign_currency.currency})</p>
                   <p className="font-medium">
                     {CURRENCIES.find(c => c.code === record.paymentBreakdown.foreign_currency?.currency)?.symbol || ''}
@@ -1568,9 +1568,9 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
               </div>
             )}
 
-            <div className="p-3 bg-primary/10 rounded-lg">
+            <div className="p-3 box-primary rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="font-medium">Total Giving:</span>
+                <span className="font-medium text-primary-foreground/80 dark:text-primary-foreground/90">Total Giving:</span>
                 <span className="text-xl font-bold">{formatGhanaCedis(total)}</span>
               </div>
             </div>
@@ -1604,7 +1604,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Currency</Label>
-                  <Select value={foreignCurrency || 'none'} onValueChange={(val) => setForeignCurrency(val === 'none' ? '' : val)}>
+                  <Select value={foreignCurrency || 'none'} onValueChange={(val: string) => setForeignCurrency(val === 'none' ? '' : val)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select currency" />
                     </SelectTrigger>
@@ -1627,13 +1627,13 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
               </div>
             </div>
 
-            <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-100/50 dark:bg-green-900/20' : 'bg-red-100/50 dark:bg-red-900/20'}`}>
               <div className="flex justify-between items-center">
-                <span className="font-medium">Payment Total:</span>
-                <span className="text-xl font-bold">{formatGhanaCedis(paymentTotal)}</span>
+                <span className={`font-medium ${isBalanced ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>Payment Total:</span>
+                <span className={`text-xl font-bold ${isBalanced ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{formatGhanaCedis(paymentTotal)}</span>
               </div>
               {!isBalanced && total > 0 && (
-                <p className="text-sm text-destructive mt-1">
+                <p className="text-sm text-destructive dark:text-red-400 mt-1">
                   Payment total must match giving total ({formatGhanaCedis(total)})
                 </p>
               )}

@@ -206,7 +206,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
             <CardContent>
               <div className="space-y-2">
                 {sr.absentees.map((a: any) => (
-                  <div key={a.id || a.memberId} className="text-sm flex justify-between items-center px-2 py-1 bg-orange-50 dark:bg-orange-900/20 rounded">
+                  <div key={a.id || a.memberId} className="text-sm flex justify-between items-center px-2 py-1 box-warning rounded border-none">
                     {onViewMember && (a.memberId || a.id) ? (
                       <button
                         onClick={() => onViewMember(a.memberId || a.id)}
@@ -232,7 +232,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
             <CardContent>
               <div className="space-y-1">
                 {sr.visitors.map((v) => (
-                  <div key={v.id} className="text-sm px-2 py-1 bg-purple-50 dark:bg-purple-900/20 rounded">
+                  <div key={v.id} className="text-sm px-2 py-1 badge-purple rounded">
                     {v.firstName} {v.lastName} {v.phone ? `— ${v.phone}` : ''}
                   </div>
                 ))}
@@ -248,7 +248,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
             <CardContent>
               <div className="space-y-1">
                 {sr.newMembers.map((m) => (
-                  <div key={m.id} className="text-sm px-2 py-1 bg-green-50 dark:bg-green-900/20 rounded">
+                  <div key={m.id} className="text-sm px-2 py-1 badge-success rounded">
                     {m.firstName} {m.lastName} — Zone {m.zone}
                   </div>
                 ))}

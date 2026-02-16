@@ -54,41 +54,42 @@
 
 .dark {
   /* Dark mode - Rich, deep colors with vibrant accents */
-  --background: #0f172a;
-  --foreground: #f1f5f9;
-  --card: #1e293b;
-  --card-foreground: #f1f5f9;
-  --popover: #1e293b;
-  --popover-foreground: #f1f5f9;
-  --primary: #f43f5e;
+  --background: #020617;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-foreground: #f8fafc;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --primary: #fb7185;
   --primary-foreground: #ffffff;
-  --secondary: #818cf8;
-  --secondary-foreground: #ffffff;
-  --muted: #334155;
+  --secondary: #a5b4fc;
+  --secondary-foreground: #000000;
+  --muted: #1e293b;
   --muted-foreground: #94a3b8;
-  --accent: #451a03;
+  --accent: #1e293b;
   --accent-foreground: #fbbf24;
-  --destructive: #ef4444;
+  --destructive: #f43f5e;
   --destructive-foreground: #ffffff;
-  --border: #334155;
-  --input: #334155;
+  --border: #1e293b;
+  --input: #1e293b;
+  --input-background: #020617;
   --ring: #818cf8;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   /* Vibrant chart colors for dark mode */
-  --chart-1: #f43f5e;
-  --chart-2: #818cf8;
+  --chart-1: #fb7185;
+  --chart-2: #a5b4fc;
   --chart-3: #34d399;
   --chart-4: #fbbf24;
-  --chart-5: #a78bfa;
+  --chart-5: #c084fc;
   /* Dark sidebar with depth */
-  --sidebar: #1e293b;
+  --sidebar: #0f172a;
   --sidebar-foreground: #f1f5f9;
   --sidebar-primary: #f43f5e;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #312e81;
+  --sidebar-accent: #1e293b;
   --sidebar-accent-foreground: #c7d2fe;
-  --sidebar-border: #334155;
+  --sidebar-border: #1e293b;
   --sidebar-ring: #818cf8;
   /* Additional accent colors */
   --success: #34d399;
@@ -281,6 +282,26 @@ html {
   }
   .badge-error {
     @apply bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300;
+  }
+  .badge-purple {
+    @apply bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300;
+  }
+  .badge-orange {
+    @apply bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300;
+  }
+  .badge-muted {
+    @apply bg-slate-100 text-slate-800 dark:bg-slate-800/50 dark:text-slate-400;
+  }
+
+  /* Informational boxes */
+  .box-muted {
+    @apply bg-muted/50 dark:bg-muted/20 border border-border/50;
+  }
+  .box-warning {
+    @apply bg-amber-50 text-amber-900 dark:bg-amber-900/20 dark:text-amber-200 border border-amber-200/50 dark:border-amber-900/30;
+  }
+  .box-primary {
+    @apply bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground/90 border border-primary/20;
   }
 
   /* Colorful icon backgrounds */

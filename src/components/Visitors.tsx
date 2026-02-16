@@ -245,8 +245,8 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-primary">
+                      <div className="w-10 h-10 icon-bg-pink rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium">
                           {visitor.firstName[0]}{visitor.lastName[0]}
                         </span>
                       </div>
@@ -256,7 +256,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-1">
                           {visitor.interestedInMembership && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <Badge variant="outline" className="badge-success">
                               <UserPlus className="w-3 h-3 mr-1" />
                               Interested in Membership
                             </Badge>
@@ -299,7 +299,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                     </div>
 
                     {visitor.notes && (
-                      <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                      <div className="text-sm text-muted-foreground box-muted p-2 rounded">
                         <strong>Notes:</strong> {visitor.notes}
                       </div>
                     )}
@@ -398,9 +398,10 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     try {
       await api.visitors.create({
         ...formData,
+        gender: formData.gender || 'male', // Ensure valid gender
         potentialZone: formData.potentialZone || undefined,
         followUpStatus: 'pending' // Default value for database constraint
-      } as any);
+      } as Visitor);
       onSave({
         ...formData,
         potentialZone: formData.potentialZone || undefined
@@ -1033,8 +1034,8 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <span className="text-lg font-medium text-primary">
+            <div className="w-12 h-12 icon-bg-pink rounded-full flex items-center justify-center">
+              <span className="text-lg font-medium">
                 {visitor.firstName[0]}{visitor.lastName[0]}
               </span>
             </div>
@@ -1044,7 +1045,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
               </div>
               {visitor.interestedInMembership && (
                 <div className="flex gap-2 mt-1">
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  <Badge variant="outline" className="badge-success">
                     <UserPlus className="w-3 h-3 mr-1" />
                     Interested in Membership
                   </Badge>
