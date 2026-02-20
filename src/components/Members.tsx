@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, ArrowUpDown, Download, RefreshCw, ChevronDown } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -503,64 +503,78 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{members.length}</div>
-                  <p className="text-xs text-muted-foreground">Total</p>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-md hover:shadow-blue-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Users className="w-12 h-12 text-blue-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/40 flex items-center justify-center mb-2 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
-                    {members.filter(m => m.status === 'new').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">New</p>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Total</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-cyan-500/50 via-cyan-500/40 to-transparent border border-cyan-500/50 transition-all duration-300 hover:shadow-md hover:shadow-cyan-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <UserPlus className="w-12 h-12 text-cyan-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/40 flex items-center justify-center mb-2 text-cyan-600 group-hover:scale-110 transition-transform duration-300">
+                  <UserPlus className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {members.filter(m => m.status === 'active').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Active</p>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'new').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">New</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-md hover:shadow-emerald-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <UserCheck className="w-12 h-12 text-emerald-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/40 flex items-center justify-center mb-2 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                  <UserCheck className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {members.filter(m => m.status === 'semi-active').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Semi-Active</p>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'active').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Active</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-sky-500/50 via-sky-500/40 to-transparent border border-sky-500/50 transition-all duration-300 hover:shadow-md hover:shadow-sky-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Users className="w-12 h-12 text-sky-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/40 flex items-center justify-center mb-2 text-sky-600 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                    {members.filter(m => m.status === 'inactive').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Inactive</p>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'semi-active').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Semi-Active</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-md hover:shadow-amber-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <UserMinus className="w-12 h-12 text-amber-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/40 flex items-center justify-center mb-2 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                  <UserMinus className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                    {members.filter(m => m.status === 'sabbatical').length}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Sabbatical</p>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'inactive').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Inactive</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-md hover:shadow-purple-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Users className="w-12 h-12 text-purple-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/40 flex items-center justify-center mb-2 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-4 h-4" />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'sabbatical').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Sabbatical</div>
+              </div>
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>

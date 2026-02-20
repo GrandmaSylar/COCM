@@ -60,8 +60,8 @@ export type LoginResult =
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<LoginResult>;
-  completeLogin: (session: any, userData: any) => Promise<void>;
+  login: (email: string, password: string, keepSignedIn?: boolean) => Promise<LoginResult>;
+  completeLogin: (session: any, userData: any, keepSignedIn?: boolean) => Promise<void>;
   logout: () => void;
   switchRole: (role: UserRole) => void;
   isAuthenticated: boolean;
@@ -113,6 +113,12 @@ const mockUsers: User[] = [];
 
 // Export empty demo credentials for compatibility (using real backend auth now)
 export const demoCredentials = {};
+
+// Storage keys
+const SUPABASE_STORAGE_KEY = 'sb-szligatlxwpcknwkhdyp-auth-token';
+const KEEP_SIGNED_IN_KEY = 'cocm_keep_signed_in';
+// Sentinel written to sessionStorage on login — auto-cleared by browser when tab/window closes
+const SESSION_ACTIVE_KEY = 'cocm_session_active';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null); // Start with no user logged in
@@ -176,6 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize session from Supabase on mount
   useEffect(() => {
     const initSession = async () => {
+      const keepSignedIn = localStorage.getItem(KEEP_SIGNED_IN_KEY) === 'true';
+      const sessionActive = !!sessionStorage.getItem(SESSION_ACTIVE_KEY);
+
+      // If not keeping signed in and no active session sentinel (browser was closed/reopened),
+      // clear the stale localStorage token and force sign out
+      if (!keepSignedIn && !sessionActive) {
+        localStorage.removeItem(SUPABASE_STORAGE_KEY);
+        await supabase.auth.signOut();
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const userData = await fetchUserWithPermissions(session.user.id);
@@ -194,8 +211,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Safety net: clear localStorage token on tab/browser close if not keeping signed in
+    // (sessionStorage sentinel is cleared automatically by the browser)
+    const handleUnload = () => {
+      if (localStorage.getItem(KEEP_SIGNED_IN_KEY) !== 'true') {
+        localStorage.removeItem(SUPABASE_STORAGE_KEY);
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+
     return () => {
       subscription.unsubscribe();
+      window.removeEventListener('beforeunload', handleUnload);
     };
   }, []);
 
@@ -280,7 +307,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const login = async (identifier: string, password: string): Promise<LoginResult> => {
+  const login = async (identifier: string, password: string, keepSignedIn = false): Promise<LoginResult> => {
     try {
       // Use real API authentication
       const { api } = await import('../services/api');
@@ -288,6 +315,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check if 2FA is required
       if (response && response.requires2FA) {
+        // Store keepSignedIn preference for use after 2FA completes
+        if (keepSignedIn) {
+          localStorage.setItem(KEEP_SIGNED_IN_KEY, 'true');
+        } else {
+          localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+        }
+        // Write sentinel so current tab stays valid during 2FA
+        sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
         return {
           success: true,
           requires2FA: true,
@@ -307,6 +342,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           access_token: response.session.access_token,
           refresh_token: response.session.refresh_token
         });
+
+        if (keepSignedIn) {
+          // Persist across browser restarts
+          localStorage.setItem(KEEP_SIGNED_IN_KEY, 'true');
+        } else {
+          // Session only — sentinel in sessionStorage auto-clears on tab/browser close
+          localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+        }
+        // Always write the sentinel so this tab is considered active
+        sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
 
         // Fetch user with their temporary permissions from database
         const userData = await fetchUserWithPermissions(response.user.id);
@@ -333,12 +378,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const completeLogin = async (session: any, userData: any) => {
+  const completeLogin = async (session: any, userData: any, keepSignedIn = false) => {
     // Set the Supabase session after OTP verification
     await supabase.auth.setSession({
       access_token: session.access_token,
       refresh_token: session.refresh_token,
     });
+
+    if (keepSignedIn) {
+      localStorage.setItem(KEEP_SIGNED_IN_KEY, 'true');
+    } else {
+      localStorage.removeItem(KEEP_SIGNED_IN_KEY);
+    }
+    // Write sentinel for this tab
+    sessionStorage.setItem(SESSION_ACTIVE_KEY, 'true');
 
     // Fetch user with their temporary permissions
     const fullUser = await fetchUserWithPermissions(userData.id);
@@ -373,11 +426,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Clear localStorage items
     localStorage.removeItem('customThemeColors');
+    localStorage.removeItem(KEEP_SIGNED_IN_KEY);
 
-    // Clear Supabase session from storage directly to ensure clean logout
-    const storageKey = `sb-szligatlxwpcknwkhdyp-auth-token`;
-    localStorage.removeItem(storageKey);
-    sessionStorage.removeItem(storageKey);
+    // Clear Supabase session token from all storage
+    localStorage.removeItem(SUPABASE_STORAGE_KEY);
+    sessionStorage.removeItem(SUPABASE_STORAGE_KEY);
+    sessionStorage.removeItem(SESSION_ACTIVE_KEY);
 
     // Clear app state from sessionStorage so login page renders
     sessionStorage.removeItem('currentPage');

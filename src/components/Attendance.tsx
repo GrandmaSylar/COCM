@@ -317,47 +317,44 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 icon-bg-blue rounded-full flex items-center justify-center">
-                <Calendar className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalServices}</p>
-                <p className="text-sm text-muted-foreground">Total Services</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Calendar className="w-20 h-20 text-blue-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+              <Calendar className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{totalServices}</div>
+            <div className="text-sm font-medium text-muted-foreground">Total Services</div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 icon-bg-green rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{averageAttendance}</p>
-                <p className="text-sm text-muted-foreground">Average Attendance</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Users className="w-20 h-20 text-emerald-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+              <Users className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{averageAttendance}</div>
+            <div className="text-sm font-medium text-muted-foreground">Average Attendance</div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 icon-bg-purple rounded-full flex items-center justify-center">
-                <TrendingUp className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{thisWeekAttendance}</p>
-                <p className="text-sm text-muted-foreground">This Week</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+            <TrendingUp className="w-20 h-20 text-purple-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-11 h-11 rounded-xl bg-purple-500/40 flex items-center justify-center mb-4 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+              <TrendingUp className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{thisWeekAttendance}</div>
+            <div className="text-sm font-medium text-muted-foreground">This Week</div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}

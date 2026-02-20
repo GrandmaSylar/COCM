@@ -289,87 +289,76 @@ export function Reports() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 stagger-children">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center shrink-0">
-                <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold">{summary.totalMembers}</p>
-                <p className="text-xs text-muted-foreground">Total Members</p>
-                {summary.activeMembers > 0 && (
-                  <p className="text-xs text-green-600">{summary.activeMembers} active</p>
-                )}
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 stagger-children">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Users className="w-16 h-16 text-blue-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+              <Users className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalMembers}</div>
+            <div className="text-xs font-medium text-muted-foreground">Total Members</div>
+            {summary.activeMembers > 0 && <div className="text-xs text-emerald-600 mt-0.5">{summary.activeMembers} active</div>}
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center shrink-0">
-                <Calendar className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold">{summary.avgAttendance}</p>
-                <p className="text-xs text-muted-foreground">Avg Attendance</p>
-                <p className="text-xs text-muted-foreground">{summary.servicesHeld} services</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Calendar className="w-16 h-16 text-emerald-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+              <Calendar className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.avgAttendance}</div>
+            <div className="text-xs font-medium text-muted-foreground">Avg Attendance</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{summary.servicesHeld} services</div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center shrink-0">
-                <Banknote className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold truncate">{formatGhanaCedis(summary.totalGiving)}</p>
-                <p className="text-xs text-muted-foreground">Total Giving</p>
-                {summary.avgGivingPerService > 0 && (
-                  <p className="text-xs text-muted-foreground">{formatGhanaCedis(summary.avgGivingPerService)}/service</p>
-                )}
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Banknote className="w-16 h-16 text-purple-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-purple-500/40 flex items-center justify-center mb-3 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+              <Banknote className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving)}</div>
+            <div className="text-xs font-medium text-muted-foreground">Total Giving</div>
+            {summary.avgGivingPerService > 0 && <div className="text-xs text-muted-foreground mt-0.5">{formatGhanaCedis(summary.avgGivingPerService)}/service</div>}
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-full flex items-center justify-center shrink-0">
-                <TrendingUp className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold">
-                  {summary.growthRate > 0 ? '+' : ''}{summary.growthRate.toFixed(1)}%
-                </p>
-                <p className="text-xs text-muted-foreground">Growth Rate</p>
-                <p className="text-xs text-muted-foreground">{summary.newMembersThisMonth} new this month</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <TrendingUp className="w-16 h-16 text-amber-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/40 flex items-center justify-center mb-3 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+              <TrendingUp className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.growthRate > 0 ? '+' : ''}{summary.growthRate.toFixed(1)}%</div>
+            <div className="text-xs font-medium text-muted-foreground">Growth Rate</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{summary.newMembersThisMonth} new this month</div>
+          </div>
+        </div>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/30 rounded-full flex items-center justify-center shrink-0">
-                <Smile className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-2xl font-bold">{visitorConversionRate}%</p>
-                <p className="text-xs text-muted-foreground">Visitor Conversion</p>
-                <p className="text-xs text-muted-foreground">Growth efficiency</p>
-              </div>
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-cyan-500/50 via-cyan-500/40 to-transparent border border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Smile className="w-16 h-16 text-cyan-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/40 flex items-center justify-center mb-3 text-cyan-600 group-hover:scale-110 transition-transform duration-300">
+              <Smile className="w-5 h-5" />
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{visitorConversionRate}%</div>
+            <div className="text-xs font-medium text-muted-foreground">Visitor Conversion</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Growth efficiency</div>
+          </div>
+        </div>
       </div>
 
       {/* Row 1: Attendance + Giving Trends */}

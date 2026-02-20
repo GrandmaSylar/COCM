@@ -159,30 +159,42 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalVisitors}</div>
-                  <p className="text-xs text-muted-foreground">Total Visitors</p>
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Users className="w-16 h-16 text-blue-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-5 h-5" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600 dark:text-green-400">{interestedInMembership}</div>
-                  <p className="text-xs text-muted-foreground">Interested in Membership</p>
+                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{totalVisitors}</div>
+                <div className="text-sm font-medium text-muted-foreground">Total Visitors</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+                <UserPlus className="w-16 h-16 text-emerald-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                  <UserPlus className="w-5 h-5" />
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="shadow-sm hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{thisMonthVisitors}</div>
-                  <p className="text-xs text-muted-foreground">This Month</p>
+                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{interestedInMembership}</div>
+                <div className="text-sm font-medium text-muted-foreground">Interested in Membership</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Calendar className="w-16 h-16 text-amber-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/40 flex items-center justify-center mb-3 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                  <Calendar className="w-5 h-5" />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{thisMonthVisitors}</div>
+                <div className="text-sm font-medium text-muted-foreground">This Month</div>
+              </div>
+            </div>
           </div>
         </CollapsibleContent>
       </Collapsible>

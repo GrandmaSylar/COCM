@@ -196,6 +196,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const secondaryHSL = hexToHSL(customColors.secondary);
         root.style.setProperty('--primary-hsl', primaryHSL);
         root.style.setProperty('--secondary-hsl', secondaryHSL);
+
+        // Set gradient end color: use accent if it differs from primary, else lighten primary
+        const gradientEnd = customColors.accent !== customColors.primary
+          ? customColors.accent
+          : lightenHex(customColors.primary, 30);
+        root.style.setProperty('--primary-gradient-end', gradientEnd);
       } else {
         // Reset all custom properties
         const props = [
@@ -203,7 +209,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           '--success', '--warning', '--error', '--info',
           '--muted-custom', '--border-custom',
           '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5',
-          '--primary-hsl', '--secondary-hsl'
+          '--primary-hsl', '--secondary-hsl', '--primary-gradient-end'
         ];
         props.forEach(prop => root.style.removeProperty(prop));
       }
@@ -267,6 +273,18 @@ function hexToHSL(hex: string): string {
   }
   
   return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+}
+
+// Helper: lighten a hex color by a given amount (0-100)
+function lightenHex(hex: string, amount: number): string {
+  hex = hex.replace('#', '');
+  let r = parseInt(hex.substring(0, 2), 16);
+  let g = parseInt(hex.substring(2, 4), 16);
+  let b = parseInt(hex.substring(4, 6), 16);
+  r = Math.min(255, Math.round(r + (255 - r) * (amount / 100)));
+  g = Math.min(255, Math.round(g + (255 - g) * (amount / 100)));
+  b = Math.min(255, Math.round(b + (255 - b) * (amount / 100)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 export function useTheme() {
