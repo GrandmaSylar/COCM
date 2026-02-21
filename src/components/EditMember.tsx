@@ -15,7 +15,7 @@ import { api } from '../services/api';
 interface EditMemberProps {
   member: Member;
   onBack: () => void;
-  onSave: (member: Member) => void;
+  onSave: (member: Member) => Promise<void>;
 }
 
 export function EditMember({ member, onBack, onSave }: EditMemberProps) {
@@ -86,7 +86,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.gender) return;
+    if (!formData.gender || !formData.zone) return;
 
     setIsLoading(true);
 
@@ -99,7 +99,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         }
         await api.members.setSabbatical(member.id, {
           startDate: sabbaticalStartDate,
-          endDate: sabbaticalUntilFurtherNotice ? undefined : sabbaticalEndDate || undefined,
+          endDate: sabbaticalUntilFurtherNotice ? undefined : sabbaticalStartDate || undefined,
           reason: sabbaticalReason || undefined,
         });
       }
@@ -108,6 +108,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         ...member,
         ...formData,
         gender: formData.gender as 'male' | 'female',
+        zone: formData.zone as Zone,
         maritalStatus: formData.maritalStatus || undefined,
         status: formData.status as MemberStatus,
         sabbaticalStartDate: formData.status === 'sabbatical' ? sabbaticalStartDate : undefined,
@@ -369,7 +370,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender *</Label>
-                <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
+                <Select value={formData.gender} onValueChange={(value: string) => handleInputChange('gender', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
@@ -381,7 +382,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="maritalStatus">Marital Status</Label>
-                <Select value={formData.maritalStatus} onValueChange={(value) => handleInputChange('maritalStatus', value)}>
+                <Select value={formData.maritalStatus} onValueChange={(value: string) => handleInputChange('maritalStatus', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select marital status" />
                   </SelectTrigger>
@@ -431,7 +432,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
               <h3>Member Status</h3>
               <div className="space-y-2">
                 <Label htmlFor="status">Status *</Label>
-                <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
+                <Select value={formData.status} onValueChange={(value: string) => handleInputChange('status', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -478,7 +479,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     <Checkbox
                       id="sabbaticalUfn"
                       checked={sabbaticalUntilFurtherNotice}
-                      onCheckedChange={(checked) => {
+                      onCheckedChange={(checked: boolean | 'indeterminate') => {
                         setSabbaticalUntilFurtherNotice(!!checked);
                         if (checked) setSabbaticalEndDate('');
                       }}
@@ -568,7 +569,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="zone">Zone *</Label>
-                  <Select value={formData.zone} onValueChange={(value) => handleInputChange('zone', value)}>
+                  <Select value={formData.zone} onValueChange={(value: string) => handleInputChange('zone', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select zone" />
                     </SelectTrigger>
@@ -642,7 +643,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       <Label htmlFor="baptismMonth">Month</Label>
                       <Select 
                         value={baptismInfo.month} 
-                        onValueChange={(value) => setBaptismInfo({ ...baptismInfo, month: value })}
+                        onValueChange={(value: string) => setBaptismInfo({ ...baptismInfo, month: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select month" />
@@ -811,7 +812,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             <Label>Relationship *</Label>
                             <Select 
                               value={member.relationship} 
-                              onValueChange={(value) => updateFamilyMember(member.id, 'relationship', value)}
+                              onValueChange={(value: string) => updateFamilyMember(member.id, 'relationship', value)}
                               disabled={member.isLinked}
                             >
                               <SelectTrigger>
@@ -962,7 +963,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       <Label htmlFor="altIdType">ID Type</Label>
                       <Select 
                         value={legalInfo.alternativeIdType} 
-                        onValueChange={(value) => setLegalInfo({ ...legalInfo, alternativeIdType: value })}
+                        onValueChange={(value: string) => setLegalInfo({ ...legalInfo, alternativeIdType: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select ID type" />

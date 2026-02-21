@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth, TwoFAData } from './components/AuthContext';
 import { ThemeProvider } from './components/ThemeContext';
 import { Login } from './components/Login';
@@ -6,25 +6,40 @@ import { SignUp } from './components/SignUp';
 import { ForgotPassword } from './components/ForgotPassword';
 import { OtpVerification } from './components/OtpVerification';
 import { Layout } from './components/Layout';
-import { Dashboard } from './components/Dashboard';
-import { Members, Member } from './components/Members';
-import { AddMember } from './components/AddMember';
-import { EditMember } from './components/EditMember';
-import { MemberProfile } from './components/MemberProfile';
-import { MemberAttendanceHistory } from './components/MemberAttendanceHistory';
-import { Attendance, RecordAttendance, AttendanceDetail } from './components/Attendance';
-import { MarkAttendance } from './components/MarkAttendance';
-import { Visitors, AddVisitor, VisitorProfile, EditVisitor, Visitor } from './components/Visitors';
-import { Giving, RecordGiving, GivingDetail } from './components/Giving';
-import { Reports } from './components/Reports';
-import { Settings, AddUser } from './components/Settings';
-import { Help } from './components/Help';
-import { Services } from './components/Services';
-import { ActivityLog } from './components/ActivityLog';
-import { Notifications } from './components/Notifications';
 import { Toaster } from './components/ui/sonner';
-import { toast } from 'sonner@2.0.3';
+
+// Lazy load main pages
+const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
+const Members = lazy(() => import('./components/Members').then(module => ({ default: module.Members })));
+const AddMember = lazy(() => import('./components/AddMember').then(module => ({ default: module.AddMember })));
+const EditMember = lazy(() => import('./components/EditMember').then(module => ({ default: module.EditMember })));
+const MemberProfile = lazy(() => import('./components/MemberProfile').then(module => ({ default: module.MemberProfile })));
+const MemberAttendanceHistory = lazy(() => import('./components/MemberAttendanceHistory').then(module => ({ default: module.MemberAttendanceHistory })));
+const Attendance = lazy(() => import('./components/Attendance').then(module => ({ default: module.Attendance })));
+const RecordAttendance = lazy(() => import('./components/Attendance').then(module => ({ default: module.RecordAttendance })));
+const AttendanceDetail = lazy(() => import('./components/Attendance').then(module => ({ default: module.AttendanceDetail })));
+const MarkAttendance = lazy(() => import('./components/MarkAttendance').then(module => ({ default: module.MarkAttendance })));
+const Visitors = lazy(() => import('./components/Visitors').then(module => ({ default: module.Visitors })));
+const AddVisitor = lazy(() => import('./components/Visitors').then(module => ({ default: module.AddVisitor })));
+const VisitorProfile = lazy(() => import('./components/Visitors').then(module => ({ default: module.VisitorProfile })));
+const EditVisitor = lazy(() => import('./components/Visitors').then(module => ({ default: module.EditVisitor })));
+const Giving = lazy(() => import('./components/Giving').then(module => ({ default: module.Giving })));
+const RecordGiving = lazy(() => import('./components/Giving').then(module => ({ default: module.RecordGiving })));
+const GivingDetail = lazy(() => import('./components/Giving').then(module => ({ default: module.GivingDetail })));
+const Reports = lazy(() => import('./components/Reports').then(module => ({ default: module.Reports })));
+const Settings = lazy(() => import('./components/Settings').then(module => ({ default: module.Settings })));
+const AddUser = lazy(() => import('./components/Settings').then(module => ({ default: module.AddUser })));
+const Help = lazy(() => import('./components/Help').then(module => ({ default: module.Help })));
+const Services = lazy(() => import('./components/Services').then(module => ({ default: module.Services })));
+const ActivityLog = lazy(() => import('./components/ActivityLog').then(module => ({ default: module.ActivityLog })));
+const Notifications = lazy(() => import('./components/Notifications').then(module => ({ default: module.Notifications })));
+
+// Types needed by App which can't easily be lazy-loaded alongside their components
+import type { Member } from './components/Members';
+import type { Visitor } from './components/Visitors';
+import { toast } from 'sonner';
 import { api } from './services/api';
+import * as Sentry from '@sentry/react';
 
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
@@ -51,7 +66,7 @@ const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
 };
 
 function AppContent() {
-  const { isAuthenticated, completeLogin } = useAuth();
+  const { isAuthenticated, completeLogin, isInitializing } = useAuth();
   const isNavigatingRef = useRef(false);
 
   // Restore page from sessionStorage
@@ -163,6 +178,16 @@ function AppContent() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Show full screen loader while auth is initializing to prevent login page flash
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading CoC.M...</p>
+      </div>
+    );
+  }
 
   // Show authentication pages when not authenticated
   if (!isAuthenticated) {
@@ -673,7 +698,13 @@ function AppContent() {
 
   return (
     <Layout currentPage={currentPage} onNavigate={handleNavigate}>
-      {renderCurrentPage()}
+      <Suspense fallback={
+        <div className="flex items-center justify-center h-[50vh]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }>
+        {renderCurrentPage()}
+      </Suspense>
     </Layout>
   );
 }
@@ -683,16 +714,26 @@ import { TutorialOverlay } from './components/TutorialOverlay';
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <TutorialProvider>
-          <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
-            <AppContent />
-            <TutorialOverlay />
-            <Toaster position="top-right" />
-          </div>
-        </TutorialProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <Sentry.ErrorBoundary fallback={
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
+        <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
+        <p className="text-muted-foreground mb-4">We've been notified and are looking into the issue.</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">
+          Refresh Page
+        </button>
+      </div>
+    }>
+      <ThemeProvider>
+        <AuthProvider>
+          <TutorialProvider>
+            <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
+              <AppContent />
+              <TutorialOverlay />
+              <Toaster position="top-right" />
+            </div>
+          </TutorialProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </Sentry.ErrorBoundary>
   );
 }

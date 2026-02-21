@@ -15,7 +15,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collap
 
 interface AddMemberProps {
   onBack: () => void;
-  onSave: (member: Omit<Member, 'id' | 'joinDate'>) => void;
+  onSave: (member: Omit<Member, 'id' | 'joinDate'>) => Promise<void>;
   visitorData?: Visitor; // Optional - for converting visitors to members
 }
 
@@ -175,7 +175,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.gender) return;
+    if (!formData.gender || !formData.zone) return;
 
     setIsLoading(true);
 
@@ -183,6 +183,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
       await onSave({
         ...formData,
         gender: formData.gender as 'male' | 'female',
+        zone: formData.zone as Zone,
         maritalStatus: formData.maritalStatus || undefined,
         status: 'new' as MemberStatus, // Default status for new members - auto-evaluated after 4 Sundays
         baptismInfo,
@@ -442,7 +443,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Photo Upload Section */}
         <Card>
-          <Collapsible open={sectionsOpen.photo} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, photo: open }))}>
+          <Collapsible open={sectionsOpen.photo} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, photo: open }))}>
             <SectionHeader title="Profile Photo" icon={Upload} isOpen={sectionsOpen.photo} status={getSectionStatus('photo')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6">
@@ -502,7 +503,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Basic Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.basic} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, basic: open }))}>
+          <Collapsible open={sectionsOpen.basic} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, basic: open }))}>
             <SectionHeader title="Basic Information" icon={User} isOpen={sectionsOpen.basic} hasRequired status={getSectionStatus('basic')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -543,7 +544,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="gender">Gender *</Label>
-                    <Select value={formData.gender} onValueChange={(value) => handleInputChange('gender', value)}>
+                    <Select value={formData.gender} onValueChange={(value: string) => handleInputChange('gender', value)}>
                       <SelectTrigger className={formData.gender ? 'border-green-500' : ''}>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
@@ -555,7 +556,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="maritalStatus">Marital Status</Label>
-                    <Select value={formData.maritalStatus} onValueChange={(value) => handleInputChange('maritalStatus', value)}>
+                    <Select value={formData.maritalStatus} onValueChange={(value: string) => handleInputChange('maritalStatus', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select marital status" />
                       </SelectTrigger>
@@ -607,7 +608,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Contact Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.contact} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, contact: open }))}>
+          <Collapsible open={sectionsOpen.contact} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, contact: open }))}>
             <SectionHeader title="Contact Information" icon={Phone} isOpen={sectionsOpen.contact} hasRequired status={getSectionStatus('contact')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -653,7 +654,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Location Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.location} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, location: open }))}>
+          <Collapsible open={sectionsOpen.location} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, location: open }))}>
             <SectionHeader title="Location Information" icon={MapPin} isOpen={sectionsOpen.location} hasRequired status={getSectionStatus('location')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -685,7 +686,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="zone">Zone *</Label>
-                    <Select value={formData.zone} onValueChange={(value) => handleInputChange('zone', value)}>
+                    <Select value={formData.zone} onValueChange={(value: string) => handleInputChange('zone', value)}>
                       <SelectTrigger className={formData.zone ? 'border-green-500' : ''}>
                         <SelectValue placeholder="Select zone" />
                       </SelectTrigger>
@@ -716,7 +717,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Baptism Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.baptism} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, baptism: open }))}>
+          <Collapsible open={sectionsOpen.baptism} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, baptism: open }))}>
             <SectionHeader title="Baptism & Ministry" icon={Droplets} isOpen={sectionsOpen.baptism} hasRequired status={getSectionStatus('baptism')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -761,7 +762,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                       <Label htmlFor="baptismMonth">Month</Label>
                       <Select
                         value={baptismInfo.month}
-                        onValueChange={(value) => setBaptismInfo({ ...baptismInfo, month: value })}
+                        onValueChange={(value: string) => setBaptismInfo({ ...baptismInfo, month: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select month" />
@@ -883,7 +884,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Family Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.family} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, family: open }))}>
+          <Collapsible open={sectionsOpen.family} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, family: open }))}>
             <SectionHeader title="Family Information" icon={Users} isOpen={sectionsOpen.family} status={getSectionStatus('family')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -933,7 +934,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                               <Label>Relationship *</Label>
                               <Select
                                 value={member.relationship}
-                                onValueChange={(value) => updateFamilyMember(member.id, 'relationship', value)}
+                                onValueChange={(value: string) => updateFamilyMember(member.id, 'relationship', value)}
                                 disabled={member.isLinked}
                               >
                                 <SelectTrigger>
@@ -1053,7 +1054,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Legal Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.legal} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, legal: open }))}>
+          <Collapsible open={sectionsOpen.legal} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, legal: open }))}>
             <SectionHeader title="Legal Information" icon={FileText} isOpen={sectionsOpen.legal} status={getSectionStatus('legal')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
@@ -1087,7 +1088,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
                       <Label htmlFor="altIdType">ID Type</Label>
                       <Select
                         value={legalInfo.alternativeIdType}
-                        onValueChange={(value) => setLegalInfo({ ...legalInfo, alternativeIdType: value })}
+                        onValueChange={(value: string) => setLegalInfo({ ...legalInfo, alternativeIdType: value })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select ID type" />
@@ -1119,7 +1120,7 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
 
         {/* Additional Information Section */}
         <Card>
-          <Collapsible open={sectionsOpen.additional} onOpenChange={(open) => setSectionsOpen(prev => ({ ...prev, additional: open }))}>
+          <Collapsible open={sectionsOpen.additional} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, additional: open }))}>
             <SectionHeader title="Additional Notes" icon={StickyNote} isOpen={sectionsOpen.additional} status={getSectionStatus('additional')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6">

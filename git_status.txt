@@ -1,5 +1,0 @@
-D	src/components/Dashboard.tsx
-D	src/components/Layout.tsx
-D	src/components/Login.tsx
-D	src/styles/animations.css
-D	src/styles/globals.css

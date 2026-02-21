@@ -65,6 +65,7 @@ interface AuthContextType {
   logout: () => void;
   switchRole: (role: UserRole) => void;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   rolePermissions: RolePermissions;
   updateRolePermissions: (role: UserRole, permissions: string[]) => void;
   toggleUserStatus: (userId: string) => void;
@@ -122,6 +123,7 @@ const SESSION_ACTIVE_KEY = 'cocm_session_active';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null); // Start with no user logged in
+  const [isInitializing, setIsInitializing] = useState(true);
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(defaultPermissions);
   const [users, setUsers] = useState<User[]>(mockUsers);
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
@@ -182,23 +184,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize session from Supabase on mount
   useEffect(() => {
     const initSession = async () => {
-      const keepSignedIn = localStorage.getItem(KEEP_SIGNED_IN_KEY) === 'true';
-      const sessionActive = !!sessionStorage.getItem(SESSION_ACTIVE_KEY);
+      try {
+        const keepSignedIn = localStorage.getItem(KEEP_SIGNED_IN_KEY) === 'true';
+        const sessionActive = !!sessionStorage.getItem(SESSION_ACTIVE_KEY);
 
-      // If not keeping signed in and no active session sentinel (browser was closed/reopened),
-      // clear the stale localStorage token and force sign out
-      if (!keepSignedIn && !sessionActive) {
-        localStorage.removeItem(SUPABASE_STORAGE_KEY);
-        await supabase.auth.signOut();
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const userData = await fetchUserWithPermissions(session.user.id);
-        if (userData) {
-          setUser(userData);
+        // If not keeping signed in and no active session sentinel (browser was closed/reopened),
+        // clear the stale localStorage token and force sign out
+        if (!keepSignedIn && !sessionActive) {
+          localStorage.removeItem(SUPABASE_STORAGE_KEY);
+          await supabase.auth.signOut();
+          return;
         }
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const userData = await fetchUserWithPermissions(session.user.id);
+          if (userData) {
+            setUser(userData);
+          }
+        }
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -623,6 +629,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     logout,
     switchRole,
     isAuthenticated: !!user,
+    isInitializing,
     rolePermissions,
     updateRolePermissions,
     toggleUserStatus,

@@ -259,7 +259,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           toast.error(getFriendlyMessage(error));
         }
       }}
-      onRefresh={refreshServices}
+      onRefresh={async () => { await refreshServices(); }}
     />;
   }
 

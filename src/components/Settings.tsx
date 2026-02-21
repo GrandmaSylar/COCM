@@ -831,8 +831,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{systemUser.name}</h3>
-                              <Badge className={roleColors[systemUser.role]}>
-                                {roleLabels[systemUser.role]}
+                              <Badge className={roleColors[systemUser.role as UserRole]}>
+                                {roleLabels[systemUser.role as UserRole]}
                               </Badge>
                               {systemUser.approvalStatus === 'pending' && (
                                 <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
@@ -959,7 +959,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   {tempPerms.map((tp) => (
                                     <div key={tp.permission} className="flex flex-col sm:flex-row items-start gap-2 text-sm min-w-0">
                                       <span className="text-blue-700 dark:text-blue-300 truncate flex-shrink-0 sm:flex-shrink">
-                                        {tp.permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                        {tp.permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                       </span>
                                       <div className="flex items-center gap-2 flex-shrink-0">
                                         <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -1084,7 +1084,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         <SelectContent>
                                           {allPermissions.filter(p => !rolePermissions[systemUser.role]?.includes(p)).map(permission => (
                                             <SelectItem key={permission} value={permission}>
-                                              {permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                              {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
@@ -1220,7 +1220,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                             <span className={`text-xs truncate ${
                               hasPermission ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'
                             }`}>
-                              {permission.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                             </span>
                             {isDevRole && (
                               <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />
@@ -2316,7 +2316,7 @@ function BackupRestore() {
 
 // Security / 2FA Settings Component
 function SecuritySettings() {
-  const { user } = useAuth();
+  const { user, isDev } = useAuth();
   const [twoFAMethod, setTwoFAMethod] = useState<'none' | 'email' | 'phone'>('none');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -2446,10 +2446,26 @@ function SecuritySettings() {
           </Alert>
         )}
 
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-          <Save className="h-4 w-4" />
-          {isSaving ? 'Saving...' : 'Save 2FA Preference'}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+            <Save className="h-4 w-4" />
+            {isSaving ? 'Saving...' : 'Save 2FA Preference'}
+          </Button>
+
+          {/* Test Sentry Error Button */}
+          {isDev && (
+            <Button 
+              variant="destructive"
+              onClick={() => {
+                throw new Error("Sentry Test Error from User Request");
+              }}
+              className="gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Test Sentry Error
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
