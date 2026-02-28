@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, User, Phone, MapPin, Droplets, Users, FileText, StickyNote, ChevronDown, Check } from 'lucide-react';
 import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, MINISTRIES } from './Members';
 import { Visitor } from './Visitors';
+import type { ChildMember } from './Children';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
@@ -17,26 +18,27 @@ interface AddMemberProps {
   onBack: () => void;
   onSave: (member: Omit<Member, 'id' | 'joinDate'>) => Promise<void>;
   visitorData?: Visitor; // Optional - for converting visitors to members
+  childData?: ChildMember; // Optional - for promoting children to members
 }
 
-export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
+export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberProps) {
   const [formData, setFormData] = useState({
-    firstName: visitorData?.firstName || '',
-    lastName: visitorData?.lastName || '',
-    otherNames: visitorData?.otherNames || '',
+    firstName: visitorData?.firstName || childData?.firstName || '',
+    lastName: visitorData?.lastName || childData?.lastName || '',
+    otherNames: visitorData?.otherNames || childData?.otherNames || '',
     email: visitorData?.email || '',
-    phone: visitorData?.phone || '',
+    phone: visitorData?.phone || childData?.phone || '',
     secondPhone: visitorData?.secondPhone || '',
-    gender: visitorData?.gender || ('' as 'male' | 'female' | ''),
+    gender: visitorData?.gender || childData?.gender || ('' as 'male' | 'female' | ''),
     maritalStatus: '' as 'single' | 'married' | 'divorced' | 'widowed' | '',
-    dateOfBirth: visitorData?.dateOfBirth || '',
+    dateOfBirth: visitorData?.dateOfBirth || childData?.dateOfBirth || '',
     occupation: '',
     hometown: '',
-    residenceLocation: visitorData?.residenceLocation || '',
+    residenceLocation: visitorData?.residenceLocation || childData?.residenceLocation || '',
     digitalAddress: '',
-    zone: visitorData?.potentialZone || ('' as Zone | ''),
+    zone: visitorData?.potentialZone || childData?.zone || ('' as Zone | ''),
     zoneNumber: '',
-    notes: visitorData ? `Converted from visitor. Original notes: ${visitorData.notes}` : '',
+    notes: visitorData ? `Converted from visitor. Original notes: ${visitorData.notes}` : (childData?.notes || ''),
     photo: '' as string
   });
 
@@ -66,7 +68,28 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
   });
 
   // Family Info State
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(() => {
+    if (childData && childData.parents) {
+      return childData.parents.map(parent => {
+        const firstName = parent.firstName || '';
+        const lastName = parent.lastName || '';
+        
+        return {
+          id: parent.id,
+          relationship: parent.relationship === 'mother' ? 'mother' : parent.relationship === 'father' ? 'father' : 'sibling',
+          firstName,
+          lastName,
+          otherNames: '',
+          phone: parent.phone,
+          occupation: '',
+          hometown: '',
+          isLinked: parent.isLinked ?? false,
+          linkedMemberId: parent.linkedMemberId
+        };
+      });
+    }
+    return [];
+  });
   // Track search state per family member
   const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
 
@@ -284,10 +307,15 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     }
 
     try {
-      const members = await api.members.getAll();
-      const filtered = members.filter((m: Member) =>
+      const [members, children] = await Promise.all([
+        api.members.getAll(),
+        api.children.members.getAll()
+      ]);
+      const allMembers = [...members, ...children];
+
+      const filtered = allMembers.filter((m: any) =>
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-        m.phone.includes(query)
+        (m.phone && m.phone.includes(query))
       );
       setFamilySearchStates(prev => ({
         ...prev,
@@ -302,14 +330,16 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
     }
   };
 
-  const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {
+  const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: any) => {
+    // Try to determine if it is a child member or adult member.
+    // existingMember could be type Member or ChildMember.
     setFamilyMembers(familyMembers.map(m =>
       m.id === familyMemberId ? {
         ...m,
         firstName: existingMember.firstName,
         lastName: existingMember.lastName,
         otherNames: existingMember.otherNames || '',
-        phone: existingMember.phone,
+        phone: existingMember.phone || '',
         occupation: existingMember.occupation || '',
         hometown: existingMember.hometown || '',
         isLinked: true,
@@ -432,9 +462,9 @@ export function AddMember({ onBack, onSave, visitorData }: AddMemberProps) {
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
-          <h1>Add New Member</h1>
+          <h1>{childData ? 'Promote Child to Member' : isConvertingVisitor ? 'Convert Visitor to Member' : 'Add New Member'}</h1>
           <p className="text-muted-foreground">
-            Register a new church member
+            {childData ? `Pre-filled from ${childData.firstName} ${childData.lastName}'s child profile` : isConvertingVisitor ? `Register ${visitorData?.firstName} ${visitorData?.lastName} as a new member` : 'Register a new church member'}
           </p>
         </div>
       </div>

@@ -30,7 +30,9 @@ import {
   Church,
   Key,
   Smartphone,
-  Home
+  Home,
+  Baby,
+  User
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 
@@ -363,6 +365,69 @@ const featureGuides: FeatureGuide[] = [
         description: 'Dev users can customize the system appearance: primary, secondary, and accent colors using color pickers with hex values. Click "Apply Colors" to save or "Reset to Default" to restore original colors.',
         icon: SettingsIcon,
         note: 'Only Dev role can change theme colors. Changes apply to both light and dark modes.'
+      }
+    ]
+  },
+  {
+    id: 'children',
+    title: "Children's Ministry",
+    icon: Baby,
+    description: "Access the Children's Ministry features using the 2×2 tile navigation. Manage child members, track visitors, mark attendance, and record giving across the four main tabs.",
+    permissions: ['view_members'],
+    availableFor: ['dev', 'admin', 'pastor', 'elder'],
+    steps: [
+      {
+        title: "Navigate the Children's Ministry Page",
+        description: "The Children's Ministry module uses a 2x2 tile grid for main navigation (Members, Visitors, Attendance, Giving) instead of side tabs. Click any tile to access its specific view.",
+        icon: Baby
+      },
+      {
+        title: 'View & Search Child Members',
+        description: 'View all child members in a list. Use the search bar to find children by name or parents by name/phone. Filter by age group, gender, or zone.',
+        icon: Eye
+      },
+      {
+        title: 'View a Child Profile',
+        description: 'Click a child card to view their full profile, including personal details, linked parents with contact info, recent attendance, and giving history.',
+        icon: User
+      },
+      {
+        title: 'View Profile Photo',
+        description: 'Click on a child\'s profile photo thumbnail to view it in a larger dialog overlay.',
+        icon: Eye,
+        note: 'ESC or click outside to close'
+      },
+      {
+        title: 'Add a Child Member',
+        description: 'Register a new child. Fill in personal info (name, gender, DOB), link existing parents or add new parent details, and upload a profile photo.',
+        icon: Plus,
+        note: 'Requires manage_members'
+      },
+      {
+        title: 'Edit or Delete a Child',
+        description: 'Update a child\'s details or remove their record from the system. Changes reflect immediately.',
+        icon: Edit,
+        note: 'Requires edit_members / delete_members'
+      },
+      {
+        title: 'Promote to Main Member',
+        description: 'When a child reaches the appropriate age, use the promote action to transfer their record to the main adult Members list.',
+        icon: UserCheck
+      },
+      {
+        title: 'Track Visitors',
+        description: 'Record children visiting for the first time. Capture parent contact info for follow-up and later conversion to full members.',
+        icon: UserPlus
+      },
+      {
+        title: 'Record & View Attendance',
+        description: 'Track attendance for children\'s services. Mark individual children present/absent or record general head count.',
+        icon: Calendar
+      },
+      {
+        title: 'View Giving Records',
+        description: 'Record and track offerings, donations, and other giving specifically within the Children\'s Ministry services.',
+        icon: Banknote
       }
     ]
   }

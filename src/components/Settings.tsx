@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
@@ -1001,7 +1001,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       </div>
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-muted-foreground">
-                                          {(systemUser.tabAccess || []).length} of 7 tabs
+                                          {(systemUser.tabAccess || []).length} of 8 tabs
                                         </span>
                                         <ChevronDown
                                           className="h-4 w-4 text-muted-foreground transition-transform duration-300 ease-in-out"
@@ -1020,7 +1020,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         { id: 'reports', label: 'Reports', icon: BarChart3 },
                                         { id: 'services', label: 'Services', icon: Church },
                                         { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
-                                      ].map(tab => {
+                                          { id: 'children', label: 'Children', icon: Baby },
+                                        ].map(tab => {
                                         const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
                                         return (
                                           <button
