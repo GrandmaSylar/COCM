@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
-import { Users, Calendar, Banknote, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw, Heart, Smile, Award } from 'lucide-react';
+import { Users, Calendar, Banknote, TrendingUp, Download, ChevronDown, BarChart3, PieChart as PieChartIcon, Activity, RefreshCw, Heart, Smile, Award, Receipt } from 'lucide-react';
 import { Button } from './ui/button';
-import { formatGhanaCedis } from './ui/utils';
+import { formatGhanaCedis, getExpenseKey } from './ui/utils';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   Tooltip, Legend, ComposedChart
 } from 'recharts';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { api } from '../services/api';
+import { api, invalidateApiCache } from '../services/api';
 import { exportToCSV, exportToPDF, exportToXLSX } from '../utils/export';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -96,6 +96,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 
 export function Reports() {
   const [selectedPeriod, setSelectedPeriod] = useState('year');
+  const [selectedScope, setSelectedScope] = useState('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -111,6 +112,8 @@ export function Reports() {
   const [attendanceDenominations, setAttendanceDenominations] = useState<any[]>([]);
   const [visitorsByStatus, setVisitorsByStatus] = useState<any[]>([]);
   const [visitorConversionRate, setVisitorConversionRate] = useState(0);
+  const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
+  const [totalExpenses, setTotalExpenses] = useState(0);
   const [summary, setSummary] = useState({
     totalMembers: 0,
     avgAttendance: 0,
@@ -126,12 +129,24 @@ export function Reports() {
     avgGivingPerService: 0,
     mostActiveZone: 'N/A',
     activeMembers: 0,
+    mainTotalMembers: 0,
+    childrenTotalMembers: 0,
+    mainAvgAttendance: 0,
+    childrenAvgAttendance: 0,
+    mainTotalGiving: 0,
+    childrenTotalGiving: 0,
+    totalVisitors: 0,
+    mainTotalVisitors: 0,
+    childrenTotalVisitors: 0,
   });
 
   const fetchReports = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
-      const data = await api.reports.getReports(selectedPeriod);
+      const [data, expenses] = await Promise.all([
+        api.reports.getReports(selectedPeriod, selectedScope),
+        api.expenses.getAll()
+      ]);
       setAttendanceData(data.attendanceData || []);
       setGivingData(data.givingData || []);
       setMembershipData(data.membershipData || []);
@@ -146,6 +161,33 @@ export function Reports() {
       setVisitorsByStatus(data.visitorsByStatus || []);
       setVisitorConversionRate(data.visitorConversionRate || 0);
       setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
+
+      // Store expense records and compute totalExpenses for the selected period
+      setExpenseRecords(expenses || []);
+      const now = new Date();
+      let periodStart: Date;
+      switch (selectedPeriod) {
+        case 'month':
+          periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'quarter':
+          periodStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+          break;
+        case '6months':
+          periodStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          break;
+        case '2years':
+          periodStart = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+          break;
+        default: // year
+          periodStart = new Date(now.getFullYear(), 0, 1);
+          break;
+      }
+      const filteredExpenses = (expenses || []).filter((exp: any) => {
+        const d = new Date(exp.serviceDate);
+        return d >= periodStart && d <= now;
+      });
+      setTotalExpenses(filteredExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0));
     } catch (error) {
       console.error('Failed to fetch reports:', error);
     } finally {
@@ -155,7 +197,7 @@ export function Reports() {
 
   useEffect(() => {
     fetchReports();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, selectedScope]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -244,15 +286,78 @@ export function Reports() {
   // Filter attendance data to only months with data for cleaner charts
   const hasData = (arr: any[], key: string) => arr.some(d => d[key] > 0);
 
+  // Compute net giving & expense-related derived data
+  const scopeTotalExpenses = selectedScope === 'children' ? 0 : totalExpenses;
+  const netGiving = (summary.totalGiving || 0) - scopeTotalExpenses;
+
+  // Build expenses by month (matching givingData month labels)
+  const now = new Date();
+  let periodStart: Date;
+  switch (selectedPeriod) {
+    case 'month':
+      periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'quarter':
+      periodStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      break;
+    case '6months':
+      periodStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      break;
+    case '2years':
+      periodStart = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+      break;
+    default:
+      periodStart = new Date(now.getFullYear(), 0, 1);
+      break;
+  }
+  const filteredExpenseRecords = expenseRecords.filter((exp: any) => {
+    const d = new Date(exp.serviceDate);
+    return d >= periodStart && d <= now;
+  });
+
+  const expensesByMonthMap: Record<string, number> = {};
+  filteredExpenseRecords.forEach((exp: any) => {
+    const d = new Date(exp.serviceDate);
+    const label = d.toLocaleString('default', { month: 'short' });
+    expensesByMonthMap[label] = (expensesByMonthMap[label] || 0) + (exp.amount || 0);
+  });
+
+  // Merge expenses into givingData
+  const mergedGivingData = givingData.map((item: any) => {
+    const expenses = selectedScope === 'children' ? 0 : (expensesByMonthMap[item.month] || 0);
+    return {
+      ...item,
+      expenses,
+      netAmount: (item.amount || 0) - expenses,
+    };
+  });
+
+  // Group expenses by service type for breakdown chart
+  const expensesByServiceTypeMap: Record<string, number> = {};
+  if (selectedScope !== 'children') {
+    filteredExpenseRecords.forEach((exp: any) => {
+      const stype = exp.serviceType || 'Other';
+      expensesByServiceTypeMap[stype] = (expensesByServiceTypeMap[stype] || 0) + (exp.amount || 0);
+    });
+  }
+  const expensesByServiceType = Object.entries(expensesByServiceTypeMap)
+    .map(([type, amount]) => ({ type, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
   return (
     <div className="space-y-6 relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-2">
             Church statistics and trends — {periodLabel}
           </p>
+          {selectedScope !== 'main' && (
+            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-purple-100 text-purple-700">
+              Viewing: {selectedScope === 'all' ? 'Merged (All)' : "Children's Data"}
+            </span>
+          )}
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
@@ -269,6 +374,16 @@ export function Reports() {
               <SelectItem value="6months">Last 6 Months</SelectItem>
               <SelectItem value="year">This Year</SelectItem>
               <SelectItem value="2years">Last 2 Years</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedScope} onValueChange={(val) => { invalidateApiCache('/reports'); setSelectedScope(val); }}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="main">Main Data</SelectItem>
+              <SelectItem value="children">Children's Data</SelectItem>
+              <SelectItem value="all">Merged (All)</SelectItem>
             </SelectContent>
           </Select>
           <DropdownMenu>
@@ -289,7 +404,7 @@ export function Reports() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 stagger-children">
         <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
             <Users className="w-16 h-16 text-blue-600" />
@@ -301,6 +416,11 @@ export function Reports() {
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalMembers}</div>
             <div className="text-xs font-medium text-muted-foreground">Total Members</div>
             {summary.activeMembers > 0 && <div className="text-xs text-emerald-600 mt-0.5">{summary.activeMembers} active</div>}
+            {selectedScope === 'all' && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Main: {summary.mainTotalMembers} &middot; Children: {summary.childrenTotalMembers}
+              </div>
+            )}
           </div>
         </div>
 
@@ -315,6 +435,11 @@ export function Reports() {
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.avgAttendance}</div>
             <div className="text-xs font-medium text-muted-foreground">Avg Attendance</div>
             <div className="text-xs text-muted-foreground mt-0.5">{summary.servicesHeld} services</div>
+            {selectedScope === 'all' && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Main: {summary.mainAvgAttendance} &middot; Children: {summary.childrenAvgAttendance}
+              </div>
+            )}
           </div>
         </div>
 
@@ -329,6 +454,11 @@ export function Reports() {
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving)}</div>
             <div className="text-xs font-medium text-muted-foreground">Total Giving</div>
             {summary.avgGivingPerService > 0 && <div className="text-xs text-muted-foreground mt-0.5">{formatGhanaCedis(summary.avgGivingPerService)}/service</div>}
+            {selectedScope === 'all' && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Main: {formatGhanaCedis(summary.mainTotalGiving)} &middot; Children: {formatGhanaCedis(summary.childrenTotalGiving)}
+              </div>
+            )}
           </div>
         </div>
 
@@ -354,9 +484,28 @@ export function Reports() {
             <div className="w-10 h-10 rounded-xl bg-cyan-500/40 flex items-center justify-center mb-3 text-cyan-600 group-hover:scale-110 transition-transform duration-300">
               <Smile className="w-5 h-5" />
             </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{visitorConversionRate}%</div>
-            <div className="text-xs font-medium text-muted-foreground">Visitor Conversion</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Growth efficiency</div>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalVisitors || 0}</div>
+            <div className="text-xs font-medium text-muted-foreground">Total Visitors</div>
+            <div className="text-xs text-cyan-600 mt-0.5">{visitorConversionRate}% converted</div>
+            {selectedScope === 'all' && (
+              <div className="text-xs text-muted-foreground mt-0.5">
+                Main: {summary.mainTotalVisitors || 0} &middot; Children: {summary.childrenTotalVisitors || 0}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-teal-500/50 via-teal-500/40 to-transparent border border-teal-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
+            <Receipt className="w-16 h-16 text-teal-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/40 flex items-center justify-center mb-3 text-teal-600 group-hover:scale-110 transition-transform duration-300">
+              <Receipt className="w-5 h-5" />
+            </div>
+            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(netGiving)}</div>
+            <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
+            {scopeTotalExpenses > 0 && <div className="text-xs text-red-500 mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
           </div>
         </div>
       </div>
@@ -393,14 +542,23 @@ export function Reports() {
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                {hasData(attendanceData, 'individual') && (
-                  <Area type="monotone" dataKey="individual" name="Individual" stroke="#3b82f6" fill="url(#colorIndividual)" strokeWidth={2} />
-                )}
-                {hasData(attendanceData, 'general') && (
-                  <Area type="monotone" dataKey="general" name="General" stroke="#f97316" fill="url(#colorGeneral)" strokeWidth={2} />
-                )}
-                {!hasData(attendanceData, 'individual') && !hasData(attendanceData, 'general') && (
-                  <Area type="monotone" dataKey="attendance" name="Avg Attendance" stroke="#1B4D3E" fill="url(#colorAttendance)" strokeWidth={2} />
+                {selectedScope === 'all' ? (
+                  <>
+                    <Area type="monotone" dataKey="mainAttendance" name="Main" stroke="#1B4D3E" fillOpacity={0} strokeWidth={2} />
+                    <Area type="monotone" dataKey="childrenAttendance" name="Children" stroke="#6d28d9" fillOpacity={0} strokeWidth={2} />
+                  </>
+                ) : (
+                  <>
+                    {hasData(attendanceData, 'individual') && (
+                      <Area type="monotone" dataKey="individual" name="Individual" stroke="#3b82f6" fill="url(#colorIndividual)" strokeWidth={2} />
+                    )}
+                    {hasData(attendanceData, 'general') && (
+                      <Area type="monotone" dataKey="general" name="General" stroke="#f97316" fill="url(#colorGeneral)" strokeWidth={2} />
+                    )}
+                    {!hasData(attendanceData, 'individual') && !hasData(attendanceData, 'general') && (
+                      <Area type="monotone" dataKey="attendance" name="Avg Attendance" stroke="#1B4D3E" fill="url(#colorAttendance)" strokeWidth={2} />
+                    )}
+                  </>
                 )}
               </AreaChart>
             </ResponsiveContainer>
@@ -417,23 +575,38 @@ export function Reports() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={givingData}>
+              <ComposedChart data={mergedGivingData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip content={<CustomTooltip isCurrency />} />
                 <Legend />
-                {hasData(givingData, 'offering') ? (
+                {selectedScope === 'all' ? (
                   <>
-                    <Bar dataKey="offering" name="Offering" stackId="a" fill="#1B4D3E" radius={[0, 0, 0, 0]} />
-                    <Bar dataKey="donation" name="Donation" stackId="a" fill="#FFD700" />
-                    <Bar dataKey="thanksgiving" name="Thanksgiving" stackId="a" fill="#f97316" />
-                    {hasData(givingData, 'custom') && (
-                      <Bar dataKey="custom" name="Custom" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                    )}
+                    <Bar dataKey="mainAmount" stackId="giving" fill="#1B4D3E" name="Main" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="childrenAmount" stackId="giving" fill="#6d28d9" name="Children" radius={[4, 4, 0, 0]} />
+                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
                   </>
                 ) : (
-                  <Bar dataKey="amount" name="Total Giving" fill="#FFD700" radius={[4, 4, 0, 0]} />
+                  hasData(givingData, 'offering') ? (
+                    <>
+                      <Bar dataKey="offering" name="Offering" stackId="a" fill="#1B4D3E" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="donation" name="Donation" stackId="a" fill="#FFD700" />
+                      <Bar dataKey="thanksgiving" name="Thanksgiving" stackId="a" fill="#f97316" />
+                      {hasData(mergedGivingData, 'custom') && (
+                        <Bar dataKey="custom" name="Custom" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]} />
+                      )}
+                      <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                    </>
+                  ) : (
+                    <>
+                      <Bar dataKey="amount" name="Total Giving" fill="#FFD700" radius={[4, 4, 0, 0]} />
+                      <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                    </>
+                  )
                 )}
               </ComposedChart>
             </ResponsiveContainer>
@@ -557,7 +730,7 @@ export function Reports() {
             </Card>
           )}
 
-          {membersByMaritalStatus.length > 0 && (
+          {membersByMaritalStatus.length > 0 ? (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -585,6 +758,10 @@ export function Reports() {
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
+            </Card>
+          ) : selectedScope === 'children' && (
+            <Card className="flex items-center justify-center min-h-[200px]">
+              <p className="text-muted-foreground text-sm">No data for this scope</p>
             </Card>
           )}
         </div>
@@ -683,7 +860,7 @@ export function Reports() {
       {/* Row 3: Bar Charts — Zones + Giving by Type */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Members by Zone */}
-        {membersByZone.length > 0 && (
+        {membersByZone.length > 0 ? (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -706,6 +883,10 @@ export function Reports() {
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
+          </Card>
+        ) : selectedScope === 'children' && (
+          <Card className="flex items-center justify-center min-h-[300px]">
+            <p className="text-muted-foreground text-sm">No data for this scope</p>
           </Card>
         )}
 
@@ -737,6 +918,29 @@ export function Reports() {
         )}
       </div>
 
+      {/* Expenses Breakdown by Service Type */}
+      {expensesByServiceType.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Receipt className="w-4 h-4" />
+              Expenses by Service Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={expensesByServiceType} layout="vertical" margin={{ left: 0, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={100} />
+                <Tooltip content={<CustomTooltip isCurrency />} />
+                <Bar dataKey="amount" name="Expenses" fill="#ef4444" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Membership Growth — Full Width */}
       <Card>
         <CardHeader className="pb-2">
@@ -759,25 +963,47 @@ export function Reports() {
               <YAxis tick={{ fontSize: 12 }} />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <Area
-                type="monotone"
-                dataKey="members"
-                name="Total Members"
-                stroke="#1B4D3E"
-                fill="url(#colorMembers)"
-                strokeWidth={2}
-                dot={{ fill: '#1B4D3E', r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="newMembers"
-                name="New Members"
-                stroke="#FFD700"
-                strokeWidth={2}
-                dot={{ fill: '#FFD700', r: 3 }}
-                activeDot={{ r: 5 }}
-              />
+              {selectedScope === 'all' ? (
+                <>
+                  <Area
+                    type="monotone"
+                    dataKey="mainMembers"
+                    name="Main Members"
+                    stroke="#1B4D3E"
+                    fill="url(#colorMembers)"
+                    strokeWidth={2}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="childrenMembers"
+                    name="Children"
+                    stroke="#6d28d9"
+                    strokeWidth={2}
+                  />
+                </>
+              ) : (
+                <>
+                  <Area
+                    type="monotone"
+                    dataKey="members"
+                    name="Total Members"
+                    stroke="#1B4D3E"
+                    fill="url(#colorMembers)"
+                    strokeWidth={2}
+                    dot={{ fill: '#1B4D3E', r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="newMembers"
+                    name="New Members"
+                    stroke="#FFD700"
+                    strokeWidth={2}
+                    dot={{ fill: '#FFD700', r: 3 }}
+                    activeDot={{ r: 5 }}
+                  />
+                </>
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>

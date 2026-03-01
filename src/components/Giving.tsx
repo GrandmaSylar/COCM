@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Banknote, Plus, TrendingUp, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw } from 'lucide-react';
+import { Banknote, Plus, TrendingUp, TrendingDown, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { formatGhanaCedis } from './ui/utils';
+import { formatGhanaCedis, getExpenseKey } from './ui/utils';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
@@ -104,6 +104,7 @@ const CURRENCIES = [
 export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = false }: GivingProps) {
   const [records, setRecords] = useState<GivingRecord[]>([]);
   const [customTypes, setCustomTypes] = useState<CustomGivingType[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [showCustomTypeManager, setShowCustomTypeManager] = useState(initialShowTypeManager);
@@ -120,8 +121,13 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     () => api.giving.types.getAll(),
     { duration: 5 * 60 * 1000 }
   );
+  const { data: cachedExpenses, loading: loadingExpenses, refresh: refreshExpenses } = useCachedData<any[]>(
+    'expense-records',
+    () => api.expenses.getAll(),
+    { duration: 2 * 60 * 1000 }
+  );
 
-  const loading = loadingGiving || loadingTypes;
+  const loading = loadingGiving || loadingTypes || loadingExpenses;
 
   useEffect(() => {
     if (cachedGiving) setRecords(cachedGiving);
@@ -131,13 +137,17 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     if (cachedTypes) setCustomTypes(cachedTypes);
   }, [cachedTypes]);
 
+  useEffect(() => {
+    if (cachedExpenses) setExpenseRecords(cachedExpenses);
+  }, [cachedExpenses]);
+
   const canRecordGiving = canAccess('record_giving');
   const canManageCustomTypes = canAccess('manage_giving_types');
 
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refreshGiving(), refreshTypes()]);
+      await Promise.all([refreshGiving(), refreshTypes(), refreshExpenses()]);
     } finally {
       setRefreshing(false);
     }
@@ -168,6 +178,15 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
       return recordDate >= weekAgo && recordDate <= now;
     })
     .reduce((sum, record) => sum + record.totalAmount, 0);
+
+  // Build expense lookup by serviceDate + serviceType (using camelCase as returned by the API)
+  const expensesByKey = new Map<string, number>();
+  expenseRecords.forEach((exp: any) => {
+    const key = getExpenseKey(exp.serviceDate, exp.serviceType);
+    expensesByKey.set(key, (expensesByKey.get(key) || 0) + (exp.amount || 0));
+  });
+  const totalExpenses = Array.from(expensesByKey.values()).reduce((sum, v) => sum + v, 0);
+  const netGiving = totalGiving - totalExpenses;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -378,7 +397,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4 stagger-children">
         <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
             <Banknote className="w-20 h-20 text-emerald-600" />
@@ -415,6 +434,19 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisWeekGiving)}</div>
             <div className="text-sm font-medium text-muted-foreground">This Week</div>
+          </div>
+        </div>
+
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+            <TrendingDown className="w-20 h-20 text-amber-600" />
+          </div>
+          <div className="relative z-10">
+            <div className="w-11 h-11 rounded-xl bg-amber-500/40 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+              <TrendingDown className="w-5 h-5" />
+            </div>
+            <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(netGiving)}</div>
+            <div className="text-sm font-medium text-muted-foreground">Net Giving</div>
           </div>
         </div>
       </div>
@@ -528,6 +560,29 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                       </div>
                     )}
                   </div>
+
+                  {/* Net Giving Breakdown (when expenses exist for this record) */}
+                  {(() => {
+                    const key = getExpenseKey(record.serviceDate, record.serviceType);
+                    const recordExpenses = expensesByKey.get(key) ?? 0;
+                    if (recordExpenses <= 0) return null;
+                    return (
+                      <div className="p-2 sm:p-3 box-muted rounded-lg space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Gross Giving</span>
+                          <span className="text-sm font-medium">{formatAmount(record.totalAmount)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-muted-foreground">Total Expenses</span>
+                          <span className="text-sm font-medium text-red-500">−{formatAmount(recordExpenses)}</span>
+                        </div>
+                        <div className="flex justify-between items-center border-t pt-1">
+                          <span className="text-xs font-semibold">Net Giving</span>
+                          <span className="text-sm font-bold text-emerald-600">{formatAmount(record.totalAmount - recordExpenses)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Custom Types */}
                   {Object.entries(record.offerings.customTypes).length > 0 && (

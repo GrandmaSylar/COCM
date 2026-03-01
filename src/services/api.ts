@@ -6,6 +6,10 @@ const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const BASE_URL = `${supabaseUrl}/functions/v1/server`;
 
 export class ApiError extends Error {
+  failedTable?: string;
+  results?: any;
+  errorObj?: any;
+
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
@@ -100,13 +104,21 @@ async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}, is
       }
 
       let errorMessage = `Request failed: ${response.statusText}`;
+      let errorData: any = null;
       try {
-        const errorData = await response.json();
+        errorData = await response.json();
         errorMessage = errorData.error || errorMessage;
       } catch {
         // If response is not JSON, use status text
       }
-      throw new ApiError(response.status, errorMessage);
+      
+      const apiError = new ApiError(response.status, errorMessage);
+      if (errorData) {
+        apiError.errorObj = errorData;
+        if (errorData.failedTable) apiError.failedTable = errorData.failedTable;
+        if (errorData.results) apiError.results = errorData.results;
+      }
+      throw apiError;
     }
 
     // Handle empty responses
@@ -158,6 +170,45 @@ export function invalidateApiCache(pattern?: string) {
       getCache.delete(key);
     }
   }
+}
+
+// ============================================================================
+// EXPENSE PAYLOAD TYPES (camelCase API contract)
+// ============================================================================
+
+export interface ExpenseCreatePayload {
+  formId: string;
+  details: string;
+  serviceDate: string;
+  serviceType: string;
+  amount: number;
+  paymentMethodId?: string;
+  paymentMethodName: string;
+  referenceNumber?: string;
+  requestedById?: string;
+  requestedByName?: string;
+  recommendedById?: string;
+  recommendedByName?: string;
+  approvedById?: string;
+  approvedByName?: string;
+}
+
+export interface ExpenseUpdatePayload {
+  formId?: string;
+  details?: string;
+  serviceDate?: string;
+  serviceType?: string;
+  amount?: number;
+  expenseDate?: string;
+  paymentMethodId?: string;
+  paymentMethodName?: string;
+  referenceNumber?: string;
+  requestedById?: string;
+  requestedByName?: string;
+  recommendedById?: string;
+  recommendedByName?: string;
+  approvedById?: string;
+  approvedByName?: string;
 }
 
 export const api = {
@@ -606,10 +657,10 @@ export const api = {
         body: JSON.stringify({ backupData, restoreMode, selectedTables })
       }),
 
-    restore: (backupData: any, restoreMode: 'replace' | 'merge' | 'update', selectedTables: string[] = []) =>
+    restore: (backupData: any, restoreMode: 'replace' | 'merge' | 'update', selectedTables: string[] = [], restoreFailureMode?: 'partial' | 'atomic') =>
       fetchApi('/backups/restore', {
         method: 'POST',
-        body: JSON.stringify({ backupData, restoreMode, selectedTables })
+        body: JSON.stringify({ backupData, restoreMode, selectedTables, restoreFailureMode })
       }),
 
     delete: (id: string) => fetchApi(`/backups/${id}`, { method: 'DELETE' }),
@@ -669,6 +720,47 @@ export const api = {
       getAll: () => fetchApi('/children/giving'),
       create: (data: any) => fetchApi('/children/giving', { method: 'POST', body: JSON.stringify(data) }),
       update: (id: string, data: any) => fetchApi(`/children/giving/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    analytics: {
+      get: (period?: string) => fetchApi(`/children/analytics${period ? '?period=' + period : ''}`)
+    },
+  },
+
+  // ============================================================================
+  // EXPENSES
+  // ============================================================================
+
+  expenses: {
+    getAll: () => fetchApi('/expenses'),
+
+    getNextFormId: () => fetchApi('/expenses/next-form-id'),
+
+    create: (data: ExpenseCreatePayload) => fetchApi('/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    }),
+
+    update: (id: string, data: ExpenseUpdatePayload) => fetchApi(`/expenses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    }),
+
+    delete: (id: string) => fetchApi(`/expenses/${id}`, { method: 'DELETE' }),
+
+    paymentMethods: {
+      getAll: () => fetchApi('/expenses/payment-methods'),
+
+      create: (data: any) => fetchApi('/expenses/payment-methods', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }),
+
+      update: (id: string, data: any) => fetchApi(`/expenses/payment-methods/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data)
+      }),
+
+      delete: (id: string) => fetchApi(`/expenses/payment-methods/${id}`, { method: 'DELETE' }),
     },
   },
 
