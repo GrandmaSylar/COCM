@@ -39,6 +39,8 @@ interface ServiceDateDetail {
   absentees: any[];
   visitors: { id: string; firstName: string; lastName: string; phone: string }[];
   newMembers: { id: string; firstName: string; lastName: string; zone: string }[];
+  childrenAttendance?: any[];
+  childrenGiving?: any[];
 }
 
 interface ServicesProps {
@@ -86,10 +88,10 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
     }
   };
 
-  const openDetail = async (date: string) => {
+  const openDetail = async (date: string, serviceType?: string) => {
     setLoadingDetail(true);
     try {
-      const detail = await api.serviceRecords.getByDate(date);
+      const detail = await api.serviceRecords.getByDate(date, serviceType);
       setSelectedRecord(detail);
     } catch (err) {
       console.error('Failed to fetch detail:', err);
@@ -253,6 +255,39 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           </Card>
         )}
 
+        {/* Children Attendance (for this service date) */}
+        {sr.childrenAttendance && sr.childrenAttendance.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Children Attendance ({sr.childrenAttendance.reduce((sum: number, r: any) => sum + (r.entries?.length || 0), 0)})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {sr.childrenAttendance.flatMap((r: any) => r.entries || []).map((e: any) => (
+                  <div key={e.id} className="text-sm px-2 py-1 badge-info rounded">
+                    {e.childName}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Children Giving (for this service date) */}
+        {sr.childrenGiving && sr.childrenGiving.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Children Giving ({formatGhanaCedis(sr.childrenGiving.reduce((sum: number, g: any) => sum + (g.amount || 0), 0))})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {sr.childrenGiving.map((g: any) => (
+                  <div key={g.id} className="text-sm px-2 py-1 rounded flex justify-between">
+                    <span>{g.givingType || 'Offering'}</span>
+                    <span className="font-medium">{formatGhanaCedis(g.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* New Members */}
         {sr.newMembers && sr.newMembers.length > 0 && (
           <Card>
@@ -279,7 +314,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
       <div className="flex items-center justify-between">
         <h1>Services</h1>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-orange-500' : ''}`} />
           Refresh
         </Button>
       </div>
@@ -292,7 +327,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 stagger-children">
             {todayRecords.map((sr) => (
-              <Card key={sr.serviceDate} className="cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all border-l-4 border-l-secondary" onClick={() => openDetail(sr.serviceDate)}>
+              <Card key={`${sr.serviceDate}_${sr.serviceType}`} className="cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all border-l-4 border-l-secondary" onClick={() => openDetail(sr.serviceDate, sr.serviceType)}>
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
                     <div>
@@ -337,8 +372,8 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
               <div className="divide-y">
                 {pastRecords.map((sr) => (
                   <button
-                    key={sr.serviceDate}
-                    onClick={() => openDetail(sr.serviceDate)}
+                    key={`${sr.serviceDate}_${sr.serviceType}`}
+                    onClick={() => openDetail(sr.serviceDate, sr.serviceType)}
                     className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors text-left"
                   >
                     <div className="flex-1 min-w-0">

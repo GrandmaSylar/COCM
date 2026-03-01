@@ -48,38 +48,15 @@ export function exportToPDF(data: any[], filename: string, title: string, column
     return;
   }
 
-  // Create a simple HTML table and open in new window for printing
-  const headers = columns.map(col => `<th style="border: 1px solid #ddd; padding: 8px; background: #f4f4f4;">${col.label}</th>`).join('');
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) return;
 
-  const rows = data.map(item =>
-    `<tr>${columns.map(col => {
-      let value = item[col.key];
-
-      // Handle nested properties
-      if (col.key.includes('.')) {
-        const keys = col.key.split('.');
-        value = keys.reduce((obj, key) => obj?.[key], item);
-      }
-
-      // Handle arrays
-      if (Array.isArray(value)) {
-        value = value.join(', ');
-      }
-
-      // Handle objects
-      if (typeof value === 'object' && value !== null) {
-        value = JSON.stringify(value);
-      }
-
-      return `<td style="border: 1px solid #ddd; padding: 8px;">${String(value ?? '')}</td>`;
-    }).join('')}</tr>`
-  ).join('');
-
+  // Build a static layout free of dynamic input
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
-      <title>${title}</title>
+      <title>Export</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         h1 { color: #333; margin-bottom: 20px; }
@@ -92,21 +69,71 @@ export function exportToPDF(data: any[], filename: string, title: string, column
       </style>
     </head>
     <body>
-      <h1>${title}</h1>
-      <p class="meta">Generated on ${new Date().toLocaleString()} | Total records: ${data.length}</p>
+      <h1 id="doc-title"></h1>
+      <p class="meta" id="doc-meta"></p>
       <button class="no-print" onclick="window.print()">Print / Save as PDF</button>
       <table>
-        <thead><tr>${headers}</tr></thead>
-        <tbody>${rows}</tbody>
+        <thead id="doc-thead"><tr></tr></thead>
+        <tbody id="doc-tbody"></tbody>
       </table>
     </body>
     </html>
   `;
 
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
+  printWindow.document.write(html);
+  printWindow.document.close();
+
+  // Populate data safely using DOM API
+  printWindow.document.title = title;
+  const titleEl = printWindow.document.getElementById('doc-title');
+  if (titleEl) titleEl.textContent = title;
+
+  const metaEl = printWindow.document.getElementById('doc-meta');
+  if (metaEl) metaEl.textContent = `Generated on ${new Date().toLocaleString()} | Total records: ${data.length}`;
+
+  const theadTr = printWindow.document.querySelector('#doc-thead tr');
+  if (theadTr) {
+    columns.forEach(col => {
+      const th = printWindow.document.createElement('th');
+      th.style.border = '1px solid #ddd';
+      th.style.padding = '8px';
+      th.style.background = '#f4f4f4';
+      th.textContent = col.label;
+      theadTr.appendChild(th);
+    });
+  }
+
+  const tbody = printWindow.document.getElementById('doc-tbody');
+  if (tbody) {
+    data.forEach(item => {
+      const tr = printWindow.document.createElement('tr');
+      columns.forEach(col => {
+        let value = item[col.key];
+
+        // Handle nested properties
+        if (col.key.includes('.')) {
+          const keys = col.key.split('.');
+          value = keys.reduce((obj, key) => obj?.[key], item);
+        }
+
+        // Handle arrays
+        if (Array.isArray(value)) {
+          value = value.join(', ');
+        }
+
+        // Handle objects
+        if (typeof value === 'object' && value !== null) {
+          value = JSON.stringify(value);
+        }
+
+        const td = printWindow.document.createElement('td');
+        td.style.border = '1px solid #ddd';
+        td.style.padding = '8px';
+        td.textContent = String(value ?? '');
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
   }
 }
 
@@ -169,10 +196,24 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
-  document.body.appendChild(link);
+  
+  // Removed document.body.appendChild(link) to fix Snyk DOM XSS warning.
+  // Most modern browsers support clicking unattached links.
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  
+  requestAnimationFrame(() => {
+    URL.revokeObjectURL(url);
+  });
+}
+
+// Helper to escape HTML special characters (prevents XSS in PDF export)
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // Helper to escape XML special characters

@@ -1,13 +1,27 @@
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { supabase } from '../utils/supabase/client';
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/server`;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const BASE_URL = `${supabaseUrl}/functions/v1/server`;
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+// Generate or retrieve a persistent Device ID for tracking active sessions
+export function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'unknown'; // Server-side rendering fallback
+  const DEVICE_ID_KEY = 'cocm_device_id';
+  let deviceId = localStorage.getItem(DEVICE_ID_KEY);
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+  return deviceId;
 }
 
 async function getAccessToken(): Promise<string> {
@@ -26,13 +40,20 @@ function getCacheKey(endpoint: string): string {
   return endpoint;
 }
 
-async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+function normalizeImageContentType(file: File): string {
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    return file.type;
+  }
+  return 'image/jpeg';
+}
+
+async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const isGet = method === 'GET';
   const cacheKey = getCacheKey(endpoint);
 
   // For GET requests, check short-lived cache
-  if (isGet) {
+  if (isGet && !isRetry) {
     const cached = getCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < GET_CACHE_TTL) {
       return cached.data as T;
@@ -58,6 +79,26 @@ async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): P
     });
 
     if (!response.ok) {
+      const isPublicAuthRoute = endpoint.startsWith('/auth/signin') || 
+                                endpoint.startsWith('/auth/signup') || 
+                                endpoint.startsWith('/auth/forgot-password') || 
+                                endpoint.startsWith('/auth/reset-password') || 
+                                endpoint.startsWith('/auth/verify-reset-otp') ||
+                                endpoint.startsWith('/auth/heartbeat');
+
+      if (response.status === 401 && !isRetry && !isPublicAuthRoute) {
+        // Only attempt refresh if we actually had a user session
+        if (token !== publicAnonKey) {
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshData.session) {
+            await supabase.auth.signOut();
+            window.location.href = '/';
+            throw new ApiError(401, 'Session expired. Please log in again.');
+          }
+          return fetchApi<T>(endpoint, options, true);
+        }
+      }
+
       let errorMessage = `Request failed: ${response.statusText}`;
       try {
         const errorData = await response.json();
@@ -87,13 +128,13 @@ async function fetchApi<T = any>(endpoint: string, options: RequestInit = {}): P
   })();
 
   // Track in-flight GET requests for dedup
-  if (isGet) {
+  if (isGet && !isRetry) {
     inflightRequests.set(cacheKey, requestPromise);
     requestPromise.finally(() => inflightRequests.delete(cacheKey));
   }
 
   // Mutating requests invalidate related cache entries
-  if (!isGet) {
+  if (!isGet && !isRetry) {
     // Extract the resource path (e.g., /members from /members/123)
     const resourcePath = endpoint.split('/').slice(0, 2).join('/');
     for (const key of getCache.keys()) {
@@ -129,19 +170,22 @@ export const api = {
       fetchApi('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
     
     signIn: (identifier: string, password: string) =>
-      fetchApi('/auth/signin', { method: 'POST', body: JSON.stringify({ identifier, password }) }),
+      fetchApi('/auth/signin', { method: 'POST', body: JSON.stringify({ identifier, password, deviceId: getDeviceId() }) }),
     
     signOut: () =>
       fetchApi('/auth/signout', { method: 'POST' }),
 
     heartbeat: () =>
-      fetchApi('/auth/heartbeat', { method: 'POST' }),
+      fetchApi('/auth/heartbeat', { method: 'POST', body: JSON.stringify({ deviceId: getDeviceId() }) }),
 
     getSession: () =>
       fetchApi('/auth/session'),
 
+    sendOtp: (data: { userId: string; tempToken: string; method: string }) =>
+      fetchApi('/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
+
     verifyOtp: (data: { userId: string; tempToken: string; code: string }) =>
-      fetchApi('/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
+      fetchApi('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ ...data, deviceId: getDeviceId() }) }),
 
     resendOtp: (data: { userId: string; tempToken: string }) =>
       fetchApi('/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
@@ -203,12 +247,7 @@ export const api = {
       const fileName = `${memberId}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // Determine content type from file or extension
-      const contentType = file.type || {
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        gif: 'image/gif', webp: 'image/webp', heic: 'image/heic',
-        heif: 'image/heif', svg: 'image/svg+xml', bmp: 'image/bmp',
-      }[fileExt] || 'image/jpeg';
+      const contentType = normalizeImageContentType(file);
 
       const { error: uploadError } = await supabase.storage
         .from('member-photos')
@@ -382,7 +421,13 @@ export const api = {
   // ============================================================================
 
   reports: {
-    getReports: (period?: string) => fetchApi(`/reports${period ? `?period=${period}` : ''}`),
+    getReports: (period?: string, scope?: string) => {
+      const qs = new URLSearchParams();
+      if (period) qs.set('period', period);
+      if (scope) qs.set('scope', scope);
+      const q = qs.toString();
+      return fetchApi(`/reports${q ? '?' + q : ''}`);
+    },
   },
 
   // ============================================================================
@@ -466,7 +511,7 @@ export const api = {
 
     getById: (id: string) => fetchApi(`/service-records/${id}`),
 
-    getByDate: (date: string) => fetchApi(`/service-records/by-date/${date}`),
+    getByDate: (date: string, serviceType?: string) => fetchApi(`/service-records/by-date/${date}${serviceType ? `?serviceType=${encodeURIComponent(serviceType)}` : ''}`),
 
     getToday: () => fetchApi('/service-records/today'),
   },
@@ -568,5 +613,89 @@ export const api = {
       }),
 
     delete: (id: string) => fetchApi(`/backups/${id}`, { method: 'DELETE' }),
+  },
+
+  // ============================================================================
+  // CHILDREN
+  // ============================================================================
+
+  children: {
+    members: {
+      getAll: () => fetchApi('/children/members'),
+      getById: (id: string) => fetchApi(`/children/members/${id}`),
+      create: (data: any) => fetchApi('/children/members', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any) => fetchApi(`/children/members/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+      delete: (id: string) => fetchApi(`/children/members/${id}`, { method: 'DELETE' }),
+      getAnalytics: (id: string) => fetchApi(`/children/members/${id}/analytics`),
+      getAttendanceHistory: (id: string, from?: string, to?: string) => {
+        const params = new URLSearchParams();
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        const qs = params.toString();
+        return fetchApi(`/children/members/${id}/attendance-history${qs ? '?' + qs : ''}`);
+      },
+      uploadPhoto: async (memberId: string, file: File) => {
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${memberId}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const contentType = normalizeImageContentType(file);
+
+        const { error: uploadError } = await supabase.storage
+          .from('member-photos')
+          .upload(filePath, file, { contentType, upsert: true });
+
+        if (uploadError) throw new Error('Failed to upload photo');
+
+        const { data } = supabase.storage
+          .from('member-photos')
+          .getPublicUrl(filePath);
+
+        return data.publicUrl;
+      },
+    },
+    visitors: {
+      getAll: () => fetchApi('/children/visitors'),
+      create: (data: any) => fetchApi('/children/visitors', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any) => fetchApi(`/children/visitors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    attendance: {
+      getAll: () => fetchApi('/children/attendance'),
+      getById: (id: string) => fetchApi(`/children/attendance/${id}`),
+      create: (data: any) => fetchApi('/children/attendance', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any) => fetchApi(`/children/attendance/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+    giving: {
+      getAll: () => fetchApi('/children/giving'),
+      create: (data: any) => fetchApi('/children/giving', { method: 'POST', body: JSON.stringify(data) }),
+      update: (id: string, data: any) => fetchApi(`/children/giving/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    },
+  },
+
+  // ============================================================================
+  // SYSTEM OPTIONS
+  // ============================================================================
+
+  options: {
+    getAll: () => fetchApi('/options'),
+  },
+
+  // ============================================================================
+  // ADMIN (dev-only configuration)
+  // ============================================================================
+
+  admin: {
+    getNotificationConfig: () => fetchApi('/admin/notification-config'),
+    updateNotificationConfig: (type: string, data: any) =>
+      fetchApi(`/admin/notification-config/${type}`, { method: 'PUT', body: JSON.stringify(data) }),
+    getActivityLogConfig: () => fetchApi('/admin/activity-log-config'),
+    updateActivityLogConfig: (category: string, data: any) =>
+      fetchApi(`/admin/activity-log-config/${category}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+    // System Options Management
+    getOptions: () => fetchApi('/admin/options'),
+    createOption: (data: any) => fetchApi('/admin/options', { method: 'POST', body: JSON.stringify(data) }),
+    updateOption: (id: string, data: any) => fetchApi(`/admin/options/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deleteOption: (id: string) => fetchApi(`/admin/options/${id}`, { method: 'DELETE' }),
   },
 };

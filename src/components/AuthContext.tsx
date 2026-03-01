@@ -445,6 +445,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionStorage.removeItem('selectedVisitorId');
     sessionStorage.removeItem('selectedAttendanceId');
     sessionStorage.removeItem('selectedGivingId');
+    sessionStorage.removeItem('selectedChildId');
 
     // Sign out from Supabase and wait for completion
     try {

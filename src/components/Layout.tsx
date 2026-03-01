@@ -33,6 +33,7 @@ import {
   ArrowLeft,
   ArrowRight,
   User,
+  Baby,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { api } from "../services/api";
@@ -69,6 +70,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     { id: "services", label: "Services", icon: Church },
     { id: "members", label: "Members", icon: Users },
     { id: "visitors", label: "Visitors", icon: UserPlus },
+    { id: "children", label: "Children", icon: Baby },
     { id: "attendance", label: "Attendance", icon: Calendar },
     { id: "giving", label: "Giving", icon: Banknote },
     { id: "reports", label: "Reports", icon: BarChart3 },

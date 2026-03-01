@@ -1,0 +1,8 @@
+{
+    "deno.enable": true,
+    "deno.enablePaths": [
+        "supabase/functions"
+    ],
+    "snyk.advanced.organization": "4f541ab7-d2bb-473f-91a5-2e01ed903685",
+    "snyk.advanced.autoSelectOrganization": false
+}
