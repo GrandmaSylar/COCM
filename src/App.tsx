@@ -33,10 +33,18 @@ const Help = lazy(() => import('./components/Help').then(module => ({ default: m
 const Services = lazy(() => import('./components/Services').then(module => ({ default: module.Services })));
 const ActivityLog = lazy(() => import('./components/ActivityLog').then(module => ({ default: module.ActivityLog })));
 const Notifications = lazy(() => import('./components/Notifications').then(module => ({ default: module.Notifications })));
+const Children = lazy(() => import('./components/Children').then(module => ({ default: module.Children })));
+const AddChildMember = lazy(() => import('./components/AddChildMember').then(m => ({ default: m.AddChildMember })));
+const EditChildMember = lazy(() => import('./components/EditChildMember').then(m => ({ default: m.EditChildMember })));
+const ChildProfile = lazy(() => import('./components/ChildProfile').then(m => ({ default: m.ChildProfile })));
+const ChildrenMarkAttendance = lazy(() =>
+  import('./components/ChildrenMarkAttendance').then(m => ({ default: m.ChildrenMarkAttendance }))
+);
 
 // Types needed by App which can't easily be lazy-loaded alongside their components
 import type { Member } from './components/Members';
 import type { Visitor } from './components/Visitors';
+import type { ChildMember } from './components/Children';
 import { toast } from 'sonner';
 import { api } from './services/api';
 import * as Sentry from '@sentry/react';
@@ -44,7 +52,7 @@ import * as Sentry from '@sentry/react';
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
-               'member-attendance-history' | 'services' | 'activity-log' | 'notifications';
+               'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor';
 
 // Map sub-pages to their parent for back navigation
 const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
@@ -63,6 +71,11 @@ const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
   'giving-detail': 'giving',
   'manage-giving-types': 'giving',
   'add-user': 'settings',
+  'children-add': 'children',
+  'children-profile': 'children',
+  'children-edit': 'children-profile',
+  'children-mark-attendance': 'children',
+  'children-add-visitor': 'children',
 };
 
 function AppContent() {
@@ -89,6 +102,9 @@ function AppContent() {
   const [membersRefreshKey, setMembersRefreshKey] = useState(0);
   const [twoFAData, setTwoFAData] = useState<TwoFAData | null>(null);
   const [restoringState, setRestoringState] = useState(true);
+  const [selectedChild, setSelectedChild] = useState<ChildMember | null>(null);
+  const [childrenRefreshKey, setChildrenRefreshKey] = useState(0);
+  const [childrenAttendanceRefreshKey, setChildrenAttendanceRefreshKey] = useState(0);
 
   // Persist page to sessionStorage
   useEffect(() => {
@@ -112,6 +128,11 @@ function AppContent() {
   }, [selectedAttendanceId]);
 
   useEffect(() => {
+    if (selectedChild) sessionStorage.setItem('selectedChildId', selectedChild.id);
+    else sessionStorage.removeItem('selectedChildId');
+  }, [selectedChild]);
+
+  useEffect(() => {
     if (selectedGivingId) sessionStorage.setItem('selectedGivingId', selectedGivingId);
     else sessionStorage.removeItem('selectedGivingId');
   }, [selectedGivingId]);
@@ -124,12 +145,19 @@ function AppContent() {
         const visitorId = sessionStorage.getItem('selectedVisitorId');
         const attId = sessionStorage.getItem('selectedAttendanceId');
         const givId = sessionStorage.getItem('selectedGivingId');
+        const childId = sessionStorage.getItem('selectedChildId');
 
         if (memberId && !selectedMember) {
           try {
             const member = await api.members.getById(memberId);
             if (member) setSelectedMember(member);
           } catch { /* member may no longer exist */ }
+        }
+        if (childId && !selectedChild) {
+          try {
+            const child = await api.children.members.getById(childId);
+            if (child) setSelectedChild(child);
+          } catch { /* child may no longer exist */ }
         }
         if (visitorId && !selectedVisitor) {
           try {
@@ -144,11 +172,12 @@ function AppContent() {
       }
     };
     if (isAuthenticated) {
+      setRestoringState(true);
       restoreState();
-    } else {
+    } else if (!isInitializing) {
       setRestoringState(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isInitializing]);
 
   // Browser back/forward button support
   const navigateTo = useCallback((page: AppPage, pushState = true) => {
@@ -284,6 +313,7 @@ function AppContent() {
   };
 
   const handleAddMember = () => {
+    setSelectedChild(null);
     navigateTo('add-member');
   };
 
@@ -311,9 +341,24 @@ function AppContent() {
     }
   };
 
-  const handleSaveMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
+  const handleSaveMember = async (memberData: any) => {
     try {
-      await api.members.create(memberData);
+      const { photo, ...dataToSave } = memberData;
+      const createdMember = await api.members.create(dataToSave);
+
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          const photoUrl = await api.members.uploadPhoto(createdMember.id, file);
+          await api.members.update(createdMember.id, { ...createdMember, photoUrl });
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+          toast.error('Member added, but photo upload failed.');
+        }
+      }
+
       toast.success('Member added successfully!');
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('members');
@@ -328,11 +373,27 @@ function AppContent() {
     navigateTo('edit-member');
   };
 
-  const handleUpdateMember = async (memberData: Member) => {
+  const handleUpdateMember = async (memberData: any) => {
     try {
-      await api.members.update(memberData.id, memberData);
+      const { photo, ...dataToSave } = memberData;
+      let finalPhotoUrl = dataToSave.photoUrl ?? (photo && typeof photo === 'string' && !photo.startsWith('data:image') ? photo : undefined);
+
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          finalPhotoUrl = await api.members.uploadPhoto(memberData.id, file);
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+          toast.error('Member updated, but photo upload failed.');
+        }
+      }
+
+      const updated = { ...dataToSave, photoUrl: finalPhotoUrl };
+      await api.members.update(memberData.id, updated);
       toast.success('Member updated successfully!');
-      setSelectedMember(memberData);
+      setSelectedMember(updated);
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('member-profile');
     } catch (error: any) {
@@ -433,9 +494,22 @@ function AppContent() {
     navigateTo('convert-visitor');
   };
 
-  const handleSaveConvertedMember = async (memberData: Omit<Member, 'id' | 'joinDate'>) => {
+  const handleSaveConvertedMember = async (memberData: any) => {
     try {
-      await api.members.create(memberData);
+      const { photo, ...dataToSave } = memberData;
+      const createdMember = await api.members.create(dataToSave);
+      
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          const photoUrl = await api.members.uploadPhoto(createdMember.id, file);
+          await api.members.update(createdMember.id, { ...createdMember, photoUrl });
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+        }
+      }
 
       if (selectedVisitor) {
         await api.visitors.update(selectedVisitor.id, {
@@ -455,6 +529,111 @@ function AppContent() {
   };
 
   // Notification click handler - navigate to relevant page
+  const handleAddChild = () => {
+    navigateTo('children-add');
+  };
+
+  const handleViewChild = (child: ChildMember) => {
+    setSelectedChild(child);
+    navigateTo('children-profile');
+  };
+
+  const handleEditChild = (child: ChildMember) => {
+    setSelectedChild(child);
+    navigateTo('children-edit');
+  };
+
+  const handleSaveChild = async (data: any) => {
+    try {
+      const { photo, ...memberData } = data;
+      const createdChild = await api.children.members.create(memberData);
+      
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          const photoUrl = await api.children.members.uploadPhoto(createdChild.id, file);
+          await api.children.members.update(createdChild.id, { ...createdChild, photoUrl });
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+          toast.error('Member created, but photo upload failed.');
+        }
+      }
+
+      toast.success('Child member added successfully!');
+      setChildrenRefreshKey(prev => prev + 1);
+      navigateTo('children');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to add child member. Please try again.');
+    }
+  };
+
+  const handleUpdateChild = async (data: any) => {
+    try {
+      const { photo, ...memberData } = data;
+      let finalPhotoUrl = memberData.photoUrl ?? (photo && typeof photo === 'string' && !photo.startsWith('data:image') ? photo : undefined);
+
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          finalPhotoUrl = await api.children.members.uploadPhoto(data.id, file);
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+          toast.error('Member updated, but photo upload failed.');
+        }
+      }
+
+      const updatedChild = await api.children.members.update(data.id, { ...memberData, photoUrl: finalPhotoUrl });
+      toast.success('Child member updated successfully!');
+      setSelectedChild(updatedChild);
+      setChildrenRefreshKey(prev => prev + 1);
+      navigateTo('children-profile');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update child member. Please try again.');
+    }
+  };
+
+  const handleDeleteChild = async (child: ChildMember) => {
+    try {
+      await api.children.members.delete(child.id);
+      toast.success('Child deleted successfully!');
+      setSelectedChild(null);
+      setChildrenRefreshKey(prev => prev + 1);
+      navigateTo('children');
+    } catch (error: any) {
+      console.error('Failed to delete child member:', error);
+      toast.error(error?.message || 'Failed to delete child member. Please try again.');
+    }
+  };
+
+  const handlePromoteChildToMember = (child: ChildMember) => {
+    setSelectedChild(child);
+    navigateTo('add-member');
+  };
+
+  const handleMarkChildrenAttendance = () => {
+    navigateTo('children-mark-attendance');
+  };
+
+  const handleSaveChildrenAttendance = (data: any) => {
+    toast.success('Attendance recorded successfully!');
+    setChildrenAttendanceRefreshKey(prev => prev + 1);
+    navigateTo('children');
+  };
+
+  const handleAddChildVisitor = () => {
+    navigateTo('children-add-visitor');
+  };
+
+  const handleSaveChildVisitor = (data: any) => {
+    toast.success('Child visitor added successfully!');
+    setChildrenRefreshKey(prev => prev + 1);
+    navigateTo('children');
+  };
+
   const handleNotificationClick = (notification: any) => {
     const { type, entityType, entityId } = notification;
 
@@ -501,13 +680,15 @@ function AppContent() {
       case 'add-member':
         return (
           <AddMember
-            onBack={() => navigateTo('members')}
+            onBack={() => selectedChild ? navigateTo('children-profile') : navigateTo('members')}
             onSave={handleSaveMember}
+            childData={selectedChild ?? undefined}
           />
         );
 
       case 'member-profile':
-        return selectedMember ? (
+        if (!selectedMember) { navigateTo('members', false); return null; }
+        return (
           <MemberProfile
             member={selectedMember}
             onBack={() => navigateTo('members')}
@@ -516,25 +697,27 @@ function AppContent() {
             onViewMember={handleViewMemberById}
             onViewAttendanceHistory={() => navigateTo('member-attendance-history')}
           />
-        ) : null;
+        );
 
       case 'member-attendance-history':
-        return selectedMember ? (
+        if (!selectedMember) { navigateTo('members', false); return null; }
+        return (
           <MemberAttendanceHistory
             memberId={selectedMember.id}
             memberName={`${selectedMember.firstName} ${selectedMember.lastName}`}
             onBack={() => navigateTo('member-profile')}
           />
-        ) : null;
+        );
 
       case 'edit-member':
-        return selectedMember ? (
+        if (!selectedMember) { navigateTo('members', false); return null; }
+        return (
           <EditMember
             member={selectedMember}
             onBack={() => navigateTo('member-profile')}
             onSave={handleUpdateMember}
           />
-        ) : null;
+        );
 
       case 'attendance':
         return <Attendance
@@ -548,7 +731,8 @@ function AppContent() {
         />;
 
       case 'attendance-detail':
-        return selectedAttendanceId ? (
+        if (!selectedAttendanceId) { navigateTo('attendance', false); return null; }
+        return (
           <AttendanceDetail
             recordId={selectedAttendanceId}
             onBack={() => navigateTo('attendance')}
@@ -557,7 +741,7 @@ function AppContent() {
               navigateTo('attendance');
             }}
           />
-        ) : null;
+        );
 
       case 'record-attendance':
         return (
@@ -594,32 +778,35 @@ function AppContent() {
         );
 
       case 'visitor-profile':
-        return selectedVisitor ? (
+        if (!selectedVisitor) { navigateTo('visitors', false); return null; }
+        return (
           <VisitorProfile
             visitor={selectedVisitor}
             onBack={() => navigateTo('visitors')}
             onEdit={handleEditVisitor}
             onConvertToMember={handleConvertVisitorToMember}
           />
-        ) : null;
+        );
 
       case 'edit-visitor':
-        return selectedVisitor ? (
+        if (!selectedVisitor) { navigateTo('visitors', false); return null; }
+        return (
           <EditVisitor
             visitor={selectedVisitor}
             onBack={() => navigateTo('visitor-profile')}
             onSave={handleUpdateVisitor}
           />
-        ) : null;
+        );
 
       case 'convert-visitor':
-        return selectedVisitor ? (
+        if (!selectedVisitor) { navigateTo('visitors', false); return null; }
+        return (
           <AddMember
             onBack={() => navigateTo('visitor-profile')}
             onSave={handleSaveConvertedMember}
             visitorData={selectedVisitor}
           />
-        ) : null;
+        );
 
       case 'giving':
         return <Giving
@@ -632,7 +819,8 @@ function AppContent() {
         />;
 
       case 'giving-detail':
-        return selectedGivingId ? (
+        if (!selectedGivingId) { navigateTo('giving', false); return null; }
+        return (
           <GivingDetail
             recordId={selectedGivingId}
             onBack={() => navigateTo('giving')}
@@ -641,7 +829,7 @@ function AppContent() {
               navigateTo('giving');
             }}
           />
-        ) : null;
+        );
 
       case 'manage-giving-types':
         return (
@@ -690,6 +878,61 @@ function AppContent() {
             onSave={handleSaveUser}
           />
         );
+
+      case 'children':
+        return (
+          <Children
+            key={childrenRefreshKey}
+            onAddChild={handleAddChild}
+            onViewChild={handleViewChild}
+            onMarkAttendance={handleMarkChildrenAttendance}
+            onAddChildVisitor={handleAddChildVisitor}
+            refreshKey={childrenRefreshKey}
+            attendanceRefreshKey={childrenAttendanceRefreshKey}
+          />
+        );
+
+      case 'children-add':
+        return (
+          <AddChildMember
+            onBack={() => navigateTo('children')}
+            onSave={handleSaveChild}
+          />
+        );
+
+      case 'children-edit':
+        if (!selectedChild) { navigateTo('children', false); return null; }
+        return (
+          <EditChildMember
+            child={selectedChild}
+            onBack={() => navigateTo('children-profile')}
+            onSave={handleUpdateChild}
+          />
+        );
+
+      case 'children-profile':
+        if (!selectedChild) { navigateTo('children', false); return null; }
+        return (
+          <ChildProfile
+            child={selectedChild}
+            onBack={() => navigateTo('children')}
+            onEdit={handleEditChild}
+            onDelete={handleDeleteChild}
+            onPromoteToMember={handlePromoteChildToMember}
+            onViewMember={handleViewMemberById}
+          />
+        );
+
+      case 'children-mark-attendance':
+        return (
+          <ChildrenMarkAttendance
+            onBack={() => navigateTo('children')}
+            onSave={handleSaveChildrenAttendance}
+          />
+        );
+
+      case 'children-add-visitor':
+        return null;
 
       default:
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;

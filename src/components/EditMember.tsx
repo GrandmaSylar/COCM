@@ -229,10 +229,15 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     }
 
     try {
-      const members = await api.members.getAll();
-      const filtered = members.filter((m: Member) =>
+      const [members, children] = await Promise.all([
+        api.members.getAll(),
+        api.children.members.getAll()
+      ]);
+      const allMembers = [...members, ...children];
+
+      const filtered = allMembers.filter((m: any) =>
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-        m.phone.includes(query)
+        (m.phone && m.phone.includes(query))
       );
       setFamilySearchStates(prev => ({
         ...prev,
@@ -247,14 +252,14 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     }
   };
 
-  const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: Member) => {
+  const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: any) => {
     setFamilyMembers(familyMembers.map(m =>
       m.id === familyMemberId ? {
         ...m,
         firstName: existingMember.firstName,
         lastName: existingMember.lastName,
         otherNames: existingMember.otherNames || '',
-        phone: existingMember.phone,
+        phone: existingMember.phone || '',
         occupation: existingMember.occupation || '',
         hometown: existingMember.hometown || '',
         isLinked: true,
@@ -476,7 +481,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       <Label className="text-sm">Start Date *</Label>
                       <Input
                         type="date"
-                        value={sabbaticalStartDate}
+                        value={sabbaticalStartDate || ''}
                         onChange={(e) => setSabbaticalStartDate(e.target.value)}
                         required
                       />
@@ -486,7 +491,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                         <Label className="text-sm">End Date</Label>
                         <Input
                           type="date"
-                          value={sabbaticalEndDate}
+                          value={sabbaticalEndDate || ''}
                           onChange={(e) => setSabbaticalEndDate(e.target.value)}
                         />
                       </div>
@@ -506,7 +511,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <div className="space-y-1">
                     <Label className="text-sm">Reason</Label>
                     <Input
-                      value={sabbaticalReason}
+                      value={sabbaticalReason || ''}
                       onChange={(e) => setSabbaticalReason(e.target.value)}
                       placeholder="Reason for sabbatical..."
                     />
@@ -648,7 +653,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     <Input
                       id="baptismFullDate"
                       type="date"
-                      value={baptismInfo.fullDate}
+                      value={baptismInfo.fullDate || ''}
                       onChange={(e) => setBaptismInfo({ ...baptismInfo, fullDate: e.target.value })}
                     />
                   </div>
@@ -682,7 +687,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                         type="number"
                         min="1900"
                         max={new Date().getFullYear()}
-                        value={baptismInfo.year}
+                        value={baptismInfo.year || ''}
                         onChange={(e) => setBaptismInfo({ ...baptismInfo, year: e.target.value })}
                         placeholder="YYYY"
                       />
@@ -698,7 +703,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       type="number"
                       min="1900"
                       max={new Date().getFullYear()}
-                      value={baptismInfo.year}
+                      value={baptismInfo.year || ''}
                       onChange={(e) => setBaptismInfo({ ...baptismInfo, year: e.target.value })}
                       placeholder="YYYY"
                     />
@@ -709,7 +714,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <Label htmlFor="previousCongregation">Previous Congregation</Label>
                   <Input
                     id="previousCongregation"
-                    value={baptismInfo.previousCongregation}
+                    value={baptismInfo.previousCongregation || ''}
                     onChange={(e) => setBaptismInfo({ ...baptismInfo, previousCongregation: e.target.value })}
                     placeholder="If member transferred from another congregation"
                   />
@@ -722,7 +727,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <Label htmlFor="roleInPreviousCongregation">Role/Ministry in Previous Congregation</Label>
                   <Input
                     id="roleInPreviousCongregation"
-                    value={baptismInfo.roleInPreviousCongregation}
+                    value={baptismInfo.roleInPreviousCongregation || ''}
                     onChange={(e) => setBaptismInfo({ ...baptismInfo, roleInPreviousCongregation: e.target.value })}
                     placeholder="e.g., Deacon, Song Leader, Teacher"
                   />
@@ -879,7 +884,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             <div className="space-y-2">
                               <Label>First Name *</Label>
                               <Input
-                                value={member.firstName}
+                                value={member.firstName || ''}
                                 onChange={(e) => updateFamilyMember(member.id, 'firstName', e.target.value)}
                                 placeholder="First name"
                                 disabled={member.isLinked}
@@ -889,7 +894,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             <div className="space-y-2">
                               <Label>Other Names</Label>
                               <Input
-                                value={member.otherNames}
+                                value={member.otherNames || ''}
                                 onChange={(e) => updateFamilyMember(member.id, 'otherNames', e.target.value)}
                                 placeholder="Other names"
                                 disabled={member.isLinked}
@@ -898,7 +903,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             <div className="space-y-2">
                               <Label>Last Name *</Label>
                               <Input
-                                value={member.lastName}
+                                value={member.lastName || ''}
                                 onChange={(e) => updateFamilyMember(member.id, 'lastName', e.target.value)}
                                 placeholder="Last name"
                                 disabled={member.isLinked}
@@ -911,7 +916,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                             <div className="space-y-2">
                               <Label>Phone Number</Label>
                               <Input
-                                value={member.phone}
+                                value={member.phone || ''}
                                 onChange={(e) => updateFamilyMember(member.id, 'phone', e.target.value)}
                                 placeholder="+233 24 123 4567"
                                 disabled={member.isLinked}
@@ -955,7 +960,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     <Label htmlFor="ghanaCardNumber">Ghana Card Number</Label>
                     <Input
                       id="ghanaCardNumber"
-                      value={legalInfo.ghanaCardNumber}
+                      value={legalInfo.ghanaCardNumber || ''}
                       onChange={(e) => setLegalInfo({ ...legalInfo, ghanaCardNumber: e.target.value })}
                       placeholder="GHA-XXXXXXXXX-X"
                     />
@@ -965,7 +970,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     <Input
                       id="ghanaCardExpiry"
                       type="date"
-                      value={legalInfo.ghanaCardExpiryDate}
+                      value={legalInfo.ghanaCardExpiryDate || ''}
                       onChange={(e) => setLegalInfo({ ...legalInfo, ghanaCardExpiryDate: e.target.value })}
                     />
                   </div>
@@ -998,7 +1003,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       <Label htmlFor="altIdNumber">ID Number</Label>
                       <Input
                         id="altIdNumber"
-                        value={legalInfo.alternativeIdNumber}
+                        value={legalInfo.alternativeIdNumber || ''}
                         onChange={(e) => setLegalInfo({ ...legalInfo, alternativeIdNumber: e.target.value })}
                         placeholder="Enter ID number"
                       />
