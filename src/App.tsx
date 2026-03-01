@@ -40,6 +40,13 @@ const ChildProfile = lazy(() => import('./components/ChildProfile').then(m => ({
 const ChildrenMarkAttendance = lazy(() =>
   import('./components/ChildrenMarkAttendance').then(m => ({ default: m.ChildrenMarkAttendance }))
 );
+const AddChildVisitor = lazy(() =>
+  import('./components/AddChildVisitor').then(m => ({ default: m.AddChildVisitor }))
+);
+const Expenses = lazy(() => import('./components/Expenses').then(m => ({ default: m.Expenses })));
+const AddExpense = lazy(() => import('./components/AddExpense').then(m => ({ default: m.AddExpense })));
+const EditExpense = lazy(() => import('./components/EditExpense').then(m => ({ default: m.EditExpense })));
+const ExpenseReceipt = lazy(() => import('./components/ExpenseReceipt').then(m => ({ default: m.ExpenseReceipt })));
 
 // Types needed by App which can't easily be lazy-loaded alongside their components
 import type { Member } from './components/Members';
@@ -52,7 +59,8 @@ import * as Sentry from '@sentry/react';
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
-               'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor';
+               'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor' |
+               'expenses' | 'add-expense' | 'edit-expense' | 'expense-receipt';
 
 // Map sub-pages to their parent for back navigation
 const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
@@ -76,10 +84,13 @@ const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
   'children-edit': 'children-profile',
   'children-mark-attendance': 'children',
   'children-add-visitor': 'children',
+  'add-expense': 'expenses',
+  'edit-expense': 'expenses',
+  'expense-receipt': 'expenses',
 };
 
 function AppContent() {
-  const { isAuthenticated, completeLogin, isInitializing } = useAuth();
+  const { isAuthenticated, completeLogin, isInitializing, user } = useAuth();
   const isNavigatingRef = useRef(false);
 
   // Restore page from sessionStorage
@@ -98,13 +109,27 @@ function AppContent() {
   const [selectedGivingId, setSelectedGivingId] = useState<string | null>(null);
   const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
   const [givingRefreshKey, setGivingRefreshKey] = useState(0);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(null);
+  const [expensesRefreshKey, setExpensesRefreshKey] = useState(0);
   const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
   const [membersRefreshKey, setMembersRefreshKey] = useState(0);
   const [twoFAData, setTwoFAData] = useState<TwoFAData | null>(null);
   const [restoringState, setRestoringState] = useState(true);
   const [selectedChild, setSelectedChild] = useState<ChildMember | null>(null);
   const [childrenRefreshKey, setChildrenRefreshKey] = useState(0);
-  const [childrenAttendanceRefreshKey, setChildrenAttendanceRefreshKey] = useState(0);
+
+  const getInitialChildrenTab = (): any => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('childrenActiveTab');
+      if (saved) return saved;
+    }
+    return 'members';
+  };
+  const [childrenActiveTab, setChildrenActiveTab] = useState<'members' | 'visitors' | 'attendance' | 'giving'>(getInitialChildrenTab);
+
+  useEffect(() => {
+    sessionStorage.setItem('childrenActiveTab', childrenActiveTab);
+  }, [childrenActiveTab]);
 
   // Persist page to sessionStorage
   useEffect(() => {
@@ -137,6 +162,11 @@ function AppContent() {
     else sessionStorage.removeItem('selectedGivingId');
   }, [selectedGivingId]);
 
+  useEffect(() => {
+    if (selectedExpenseId) sessionStorage.setItem('selectedExpenseId', selectedExpenseId);
+    else sessionStorage.removeItem('selectedExpenseId');
+  }, [selectedExpenseId]);
+
   // Restore entities from sessionStorage on mount
   useEffect(() => {
     const restoreState = async () => {
@@ -145,6 +175,7 @@ function AppContent() {
         const visitorId = sessionStorage.getItem('selectedVisitorId');
         const attId = sessionStorage.getItem('selectedAttendanceId');
         const givId = sessionStorage.getItem('selectedGivingId');
+        const expId = sessionStorage.getItem('selectedExpenseId');
         const childId = sessionStorage.getItem('selectedChildId');
 
         if (memberId && !selectedMember) {
@@ -167,6 +198,7 @@ function AppContent() {
         }
         if (attId) setSelectedAttendanceId(attId);
         if (givId) setSelectedGivingId(givId);
+        if (expId) setSelectedExpenseId(expId);
       } finally {
         setRestoringState(false);
       }
@@ -618,20 +650,27 @@ function AppContent() {
     navigateTo('children-mark-attendance');
   };
 
-  const handleSaveChildrenAttendance = (data: any) => {
+  const handleSaveChildrenAttendance = (data?: any) => {
     toast.success('Attendance recorded successfully!');
-    setChildrenAttendanceRefreshKey(prev => prev + 1);
+    setChildrenRefreshKey(prev => prev + 1);
     navigateTo('children');
   };
 
   const handleAddChildVisitor = () => {
+    setChildrenActiveTab('visitors');
     navigateTo('children-add-visitor');
   };
 
-  const handleSaveChildVisitor = (data: any) => {
-    toast.success('Child visitor added successfully!');
-    setChildrenRefreshKey(prev => prev + 1);
-    navigateTo('children');
+  const handleSaveChildVisitor = async (data: any) => {
+    try {
+      await api.children.visitors.create(data);
+      toast.success('Child visitor added successfully!');
+      setChildrenRefreshKey(prev => prev + 1);
+      setChildrenActiveTab('visitors');
+      navigateTo('children');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to add child visitor. Please try again.');
+    }
   };
 
   const handleNotificationClick = (notification: any) => {
@@ -853,6 +892,49 @@ function AppContent() {
           />
         );
 
+      case 'expenses':
+        return (
+          <Expenses
+            key={expensesRefreshKey}
+            onAddExpense={() => navigateTo('add-expense')}
+            onViewReceipt={(id) => { setSelectedExpenseId(id); navigateTo('expense-receipt'); }}
+            onEditExpense={(id) => { setSelectedExpenseId(id); navigateTo('edit-expense'); }}
+            onDeleted={() => setExpensesRefreshKey(prev => prev + 1)}
+          />
+        );
+
+      case 'add-expense':
+        return (
+          <AddExpense
+            onBack={() => navigateTo('expenses')}
+            onSaved={() => { setExpensesRefreshKey(prev => prev + 1); navigateTo('expenses'); }}
+          />
+        );
+
+      case 'edit-expense':
+        if (!selectedExpenseId) { navigateTo('expenses', false); return null; }
+        if (!(user?.role === 'admin' || user?.role === 'dev')) {
+          toast.error('Admin access required');
+          navigateTo('expenses');
+          return null;
+        }
+        return (
+          <EditExpense
+            expenseId={selectedExpenseId}
+            onBack={() => navigateTo('expenses')}
+            onSaved={() => { setExpensesRefreshKey(prev => prev + 1); navigateTo('expenses'); }}
+          />
+        );
+
+      case 'expense-receipt':
+        if (!selectedExpenseId) { navigateTo('expenses', false); return null; }
+        return (
+          <ExpenseReceipt
+            expenseId={selectedExpenseId}
+            onBack={() => navigateTo('expenses')}
+          />
+        );
+
       case 'reports':
         return <Reports />;
 
@@ -887,8 +969,8 @@ function AppContent() {
             onViewChild={handleViewChild}
             onMarkAttendance={handleMarkChildrenAttendance}
             onAddChildVisitor={handleAddChildVisitor}
-            refreshKey={childrenRefreshKey}
-            attendanceRefreshKey={childrenAttendanceRefreshKey}
+            activeTab={childrenActiveTab}
+            onTabChange={setChildrenActiveTab}
           />
         );
 
@@ -932,7 +1014,15 @@ function AppContent() {
         );
 
       case 'children-add-visitor':
-        return null;
+        return (
+          <AddChildVisitor
+            onBack={() => {
+              setChildrenActiveTab('visitors');
+              navigateTo('children');
+            }}
+            onSave={handleSaveChildVisitor}
+          />
+        );
 
       default:
         return <Dashboard onNavigate={handleNavigate} onQuickAction={handleQuickAction} />;

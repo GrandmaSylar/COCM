@@ -3630,7 +3630,7 @@ app.get("/reports", async (c)=>{
         supabase.from('children_attendance_records').select('date, total_count, visitors_count').gte('date', startDateStr).order('date', { ascending: true }),
         supabase.from('children_giving_records').select('service_date, total_amount, offering_amount, cash_amount, mobile_money_amount').gte('service_date', startDateStr).order('service_date', { ascending: true }),
         supabase.from('children_members').select('created_at, status, gender, date_of_birth').order('created_at', { ascending: true }),
-        supabase.from('children_visitors').select('visit_date, follow_up_status, converted_to_member')
+        supabase.from('children_visitors').select('visit_date, converted_to_member')
       );
     }
 
@@ -3690,6 +3690,12 @@ app.get("/reports", async (c)=>{
         giving: 0, offering: 0, donation: 0, thanksgiving: 0, customGiving: 0,
         cash: 0, mobileMoney: 0, card: 0, bankTransfer: 0,
         members: 0, newMembers: 0,
+        // split tracking if scope === 'all'
+        mainAttendance: 0, mainAttendanceCount: 0,
+        childrenAttendance: 0, childrenAttendanceCount: 0,
+        mainGiving: 0, childrenGiving: 0,
+        mainNewMembers: 0, childrenNewMembers: 0,
+        mainMembers: 0, childrenMembers: 0,
       };
     }
 
@@ -3711,10 +3717,56 @@ app.get("/reports", async (c)=>{
       }
     });
 
+    // Split breakdowns
+    if (scope === 'all') {
+      const mainGeneral = mainResults[0]?.data || [];
+      const mainAll = mainResults[1]?.data || [];
+      const mainGiving = mainResults[3]?.data || [];
+      const mainMembersArray = mainResults[4]?.data || [];
+
+      // attendance
+      const mainAttSource = mainGeneral.length > 0 ? mainGeneral : mainAll;
+      mainAttSource.forEach((r: any) => {
+        const m = new Date(r.date).getMonth();
+        monthlyData[m].mainAttendance += r.total_count;
+        monthlyData[m].mainAttendanceCount++;
+      });
+      childrenAttendance.forEach((r: any) => {
+        const m = new Date(r.date).getMonth();
+        monthlyData[m].childrenAttendance += r.total_count;
+        monthlyData[m].childrenAttendanceCount++;
+      });
+      
+      // giving
+      mainGiving.forEach((r: any) => {
+        const m = new Date(r.service_date).getMonth();
+        monthlyData[m].mainGiving += parseFloat(r.total_amount) || 0;
+      });
+      childrenGiving.forEach((r: any) => {
+        const m = new Date(r.service_date).getMonth();
+        monthlyData[m].childrenGiving += parseFloat(r.total_amount) || 0;
+      });
+
+      // members
+      mainMembersArray.forEach((r: any) => {
+        const m = new Date(r.created_at).getMonth();
+        monthlyData[m].mainNewMembers++;
+      });
+      childrenMembers.forEach((r: any) => {
+        const m = new Date(r.created_at).getMonth();
+        monthlyData[m].childrenNewMembers++;
+      });
+    }
+
     for (let i = 0; i < 12; i++) {
       if (monthlyData[i].attendanceCount > 0) monthlyData[i].attendance = Math.round(monthlyData[i].attendance / monthlyData[i].attendanceCount);
       if (monthlyData[i].individualCount > 0) monthlyData[i].individualAttendance = Math.round(monthlyData[i].individualAttendance / monthlyData[i].individualCount);
       if (monthlyData[i].generalCount > 0) monthlyData[i].generalAttendance = Math.round(monthlyData[i].generalAttendance / monthlyData[i].generalCount);
+
+      if (scope === 'all') {
+        if (monthlyData[i].mainAttendanceCount > 0) monthlyData[i].mainAttendance = Math.round(monthlyData[i].mainAttendance / monthlyData[i].mainAttendanceCount);
+        if (monthlyData[i].childrenAttendanceCount > 0) monthlyData[i].childrenAttendance = Math.round(monthlyData[i].childrenAttendance / monthlyData[i].childrenAttendanceCount);
+      }
     }
 
     // Giving by month + breakdown
@@ -3738,26 +3790,57 @@ app.get("/reports", async (c)=>{
       monthlyData[m].newMembers++;
     });
     let runningTotal = 0;
+    let mainRunningTotal = 0;
+    let childrenRunningTotal = 0;
     for (let i = 0; i < 12; i++) {
       runningTotal += monthlyData[i].newMembers;
       monthlyData[i].members = runningTotal;
+      if (scope === 'all') {
+        mainRunningTotal += monthlyData[i].mainNewMembers;
+        childrenRunningTotal += monthlyData[i].childrenNewMembers;
+        monthlyData[i].mainMembers = mainRunningTotal;
+        monthlyData[i].childrenMembers = childrenRunningTotal;
+      }
     }
 
     // ── Chart data arrays ──
-    const attendanceData = Object.values(monthlyData).map((m: any) => ({
-      month: m.month, attendance: m.attendance,
-      individual: m.individualAttendance, general: m.generalAttendance
-    }));
-    const givingData = Object.values(monthlyData).map((m: any) => ({
-      month: m.month, amount: Math.round(m.giving * 100) / 100,
-      offering: Math.round(m.offering * 100) / 100,
-      donation: Math.round(m.donation * 100) / 100,
-      thanksgiving: Math.round(m.thanksgiving * 100) / 100,
-      custom: Math.round(m.customGiving * 100) / 100
-    }));
-    const membershipData = Object.values(monthlyData).map((m: any) => ({
-      month: m.month, members: m.members, newMembers: m.newMembers
-    }));
+    const attendanceData = Object.values(monthlyData).map((m: any) => {
+      const entry: any = {
+        month: m.month, attendance: m.attendance,
+        individual: m.individualAttendance, general: m.generalAttendance
+      };
+      if (scope === 'all') {
+        entry.mainAttendance = m.mainAttendance;
+        entry.childrenAttendance = m.childrenAttendance;
+      }
+      return entry;
+    });
+
+    const givingData = Object.values(monthlyData).map((m: any) => {
+      const entry: any = {
+        month: m.month, amount: Math.round(m.giving * 100) / 100,
+        offering: Math.round(m.offering * 100) / 100,
+        donation: Math.round(m.donation * 100) / 100,
+        thanksgiving: Math.round(m.thanksgiving * 100) / 100,
+        custom: Math.round(m.customGiving * 100) / 100
+      };
+      if (scope === 'all') {
+        entry.mainAmount = Math.round(m.mainGiving * 100) / 100;
+        entry.childrenAmount = Math.round(m.childrenGiving * 100) / 100;
+      }
+      return entry;
+    });
+
+    const membershipData = Object.values(monthlyData).map((m: any) => {
+      const entry: any = {
+        month: m.month, members: m.members, newMembers: m.newMembers
+      };
+      if (scope === 'all') {
+        entry.mainMembers = m.mainMembers;
+        entry.childrenMembers = m.childrenMembers;
+      }
+      return entry;
+    });
 
     // ── Members by status ──
     const statusCounts: Record<string, number> = {};
@@ -3868,8 +3951,38 @@ app.get("/reports", async (c)=>{
     const membersByAge = Object.entries(ageGroups).map(([group, count]) => ({ group, count })).filter(g => g.count > 0);
 
     // ── Visitor Analytics ──
-    const visitorsByStatus: any[] = [];
-    const visitorConversionRate = 0;
+    const visitorStatusCounts: Record<string, number> = {};
+    let mainTotalVisitors = 0, childrenTotalVisitors = 0;
+    let mainConvertedVisitors = 0, childrenConvertedVisitors = 0;
+
+    if (scope === 'main' || scope === 'all') {
+      const mainVisits = mainResults[5]?.data || [];
+      mainVisits.forEach((v: any) => {
+        mainTotalVisitors++;
+        if (v.converted_to_member) mainConvertedVisitors++;
+        const s = v.follow_up_status || 'unknown';
+        visitorStatusCounts[s] = (visitorStatusCounts[s] || 0) + 1;
+      });
+    }
+
+    if (scope === 'children' || scope === 'all') {
+      const childVisits = childrenResults[3]?.data || [];
+      childVisits.forEach((v: any) => {
+        childrenTotalVisitors++;
+        if (v.converted_to_member) childrenConvertedVisitors++;
+        const s = v.follow_up_status || 'untracked'; // Children might lack follow_up_status
+        visitorStatusCounts[s] = (visitorStatusCounts[s] || 0) + 1;
+      });
+    }
+
+    const visitorsByStatus = Object.entries(visitorStatusCounts)
+      .map(([status, count]) => ({ status, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const totalVisitors = (scope === 'main' ? mainTotalVisitors : (scope === 'children' ? childrenTotalVisitors : mainTotalVisitors + childrenTotalVisitors));
+    const totalConvertedVisitors = (scope === 'main' ? mainConvertedVisitors : (scope === 'children' ? childrenConvertedVisitors : mainConvertedVisitors + childrenConvertedVisitors));
+
+    const visitorConversionRate = totalVisitors > 0 ? (totalConvertedVisitors / totalVisitors) * 100 : 0;
 
     // ── Member retention ──
     const activeStatuses = new Set(['active', 'semi-active']);
@@ -3890,6 +4003,28 @@ app.get("/reports", async (c)=>{
 
     // Most active zone
     const mostActiveZone = membersByZone.length > 0 ? membersByZone.reduce((a, b) => a.count > b.count ? a : b).zone : 'N/A';
+
+    let mainTotalMembers = null, childrenTotalMembers = null;
+    let mainAvgAttendance = null, childrenAvgAttendance = null;
+    let mainTotalGiving = null, childrenTotalGiving = null;
+
+    if (scope === 'all') {
+      const mainMembersArray = mainResults[4]?.data || [];
+      const mainGivingArray = mainResults[3]?.data || [];
+      const mainGeneral = mainResults[0]?.data || [];
+      const mainAll = mainResults[1]?.data || [];
+      const mainAttSource = mainGeneral.length > 0 ? mainGeneral : mainAll;
+
+      mainTotalMembers = mainMembersArray.length;
+      childrenTotalMembers = childrenMembers.length;
+
+      mainTotalGiving = Math.round(mainGivingArray.reduce((sum: number, r: any) => sum + (parseFloat(r.total_amount) || 0), 0) * 100) / 100;
+      childrenTotalGiving = Math.round(childrenGiving.reduce((sum: number, r: any) => sum + (parseFloat(r.total_amount) || 0), 0) * 100) / 100;
+
+      const mainAttRecs = mainAttSource;
+      mainAvgAttendance = mainAttRecs.length > 0 ? Math.round(mainAttRecs.reduce((sum: number, r: any) => sum + r.total_count, 0) / mainAttRecs.length) : 0;
+      childrenAvgAttendance = childrenAttendance.length > 0 ? Math.round(childrenAttendance.reduce((sum: number, r: any) => sum + r.total_count, 0) / childrenAttendance.length) : 0;
+    }
 
     return c.json({
       attendanceData,
@@ -3920,7 +4055,18 @@ app.get("/reports", async (c)=>{
         monthlyAvgAttendance: monthlyData[now.getMonth()]?.attendance || 0,
         avgGivingPerService,
         mostActiveZone,
-        activeMembers
+        activeMembers,
+        totalVisitors, // Add total visitors to summary top level
+        ...(scope === 'all' ? {
+          mainTotalMembers,
+          childrenTotalMembers,
+          mainAvgAttendance,
+          childrenAvgAttendance,
+          mainTotalGiving,
+          childrenTotalGiving,
+          mainTotalVisitors,
+          childrenTotalVisitors
+        } : {})
       }
     });
   } catch (error) {
@@ -5668,9 +5814,13 @@ app.post("/backups", async (c) => {
       'notifications',
       'activity_log',
       'children_members',
+      'children_member_parents',
       'children_visitors',
-      'children_attendance',
-      'children_giving'
+      'children_visitor_guardians',
+      'children_attendance_records',
+      'children_giving_records',
+      'expense_payment_methods',
+      'expense_records'
     ];
 
     // Determine which tables to backup
@@ -5766,9 +5916,13 @@ app.post("/backups", async (c) => {
         'notifications': '*',
         'activity_log': '*',
         'children_members': '*',
+        'children_member_parents': '*',
         'children_visitors': '*',
-        'children_attendance': '*',
-        'children_giving': '*'
+        'children_visitor_guardians': '*',
+        'children_attendance_records': '*',
+        'children_giving_records': '*',
+        'expense_payment_methods': '*',
+        'expense_records': '*'
       };
 
       // Helper function to fetch all records with pagination (Supabase default limit is 1000)
@@ -5904,7 +6058,7 @@ app.post("/backups/restore", async (c) => {
     }
 
     const body = await c.req.json();
-    const { backupData, restoreMode, selectedTables } = body;
+    const { backupData, restoreMode, selectedTables, restoreFailureMode = 'partial' } = body;
 
     if (!backupData || !backupData.data) {
       return c.json({ error: 'Invalid backup data' }, 400);
@@ -5927,6 +6081,7 @@ app.post("/backups/restore", async (c) => {
     const results: any = {
       success: true,
       mode,
+      restoreFailureMode,
       tables: {}
     };
 
@@ -5949,7 +6104,15 @@ app.post("/backups/restore", async (c) => {
       'user_tab_access',
       'user_settings',
       'notifications',
-      'activity_log'
+      'activity_log',
+      'children_members',
+      'children_member_parents',
+      'children_visitors',
+      'children_visitor_guardians',
+      'children_attendance_records',
+      'children_giving_records',
+      'expense_payment_methods',
+      'expense_records'
     ];
 
     // Filter to only selected tables if specified
@@ -5976,6 +6139,10 @@ app.post("/backups/restore", async (c) => {
             if (deleteError) {
               console.error(`Error clearing ${tableName}:`, deleteError);
               results.tables[tableName] = { error: deleteError.message };
+              results.success = false;
+              if (restoreFailureMode === 'atomic') {
+                return c.json({ error: deleteError.message, failedTable: tableName, results }, 400);
+              }
               continue;
             }
           }
@@ -5992,6 +6159,10 @@ app.post("/backups/restore", async (c) => {
           if (error) {
             console.error(`Error restoring ${tableName}:`, error);
             results.tables[tableName] = { error: error.message };
+            results.success = false;
+            if (restoreFailureMode === 'atomic') {
+              return c.json({ error: error.message, failedTable: tableName, results }, 400);
+            }
           } else {
             results.tables[tableName] = { restored: (data || []).length };
           }
@@ -5999,6 +6170,8 @@ app.post("/backups/restore", async (c) => {
           // Merge mode - only insert new records (skip existing)
           let inserted = 0;
           let skipped = 0;
+          let hasError = false;
+          let lastErrorMessage = '';
 
           for (const record of tableData) {
             const { data: existing } = await supabase
@@ -6015,6 +6188,13 @@ app.post("/backups/restore", async (c) => {
               if (error) {
                 console.error(`Error inserting into ${tableName}:`, error);
                 skipped++;
+                hasError = true;
+                lastErrorMessage = error.message;
+                results.success = false;
+                if (restoreFailureMode === 'atomic') {
+                  results.tables[tableName] = { error: error.message, inserted, skipped };
+                  return c.json({ error: error.message, failedTable: tableName, results }, 400);
+                }
               } else {
                 inserted++;
               }
@@ -6023,12 +6203,20 @@ app.post("/backups/restore", async (c) => {
             }
           }
 
-          results.tables[tableName] = { inserted, skipped };
+          if (hasError) {
+            results.tables[tableName] = { error: lastErrorMessage, inserted, skipped };
+          } else {
+            results.tables[tableName] = { inserted, skipped };
+          }
         }
 
       } catch (tableError) {
         console.error(`Error processing ${tableName}:`, tableError);
         results.tables[tableName] = { error: tableError.message };
+        
+        if (restoreFailureMode === 'atomic') {
+          return c.json({ error: tableError.message, failedTable: tableName, results }, 400);
+        }
       }
     }
 
@@ -6105,7 +6293,7 @@ app.post("/backups/preview", async (c) => {
     }
 
     const body = await c.req.json();
-    const { backupData, restoreMode } = body;
+    const { backupData, restoreMode, selectedTables = [] } = body;
 
     if (!backupData || !backupData.data) {
       return c.json({ error: 'Invalid backup data' }, 400);
@@ -6119,12 +6307,18 @@ app.post("/backups/preview", async (c) => {
     };
 
     // For each table, count current records and backup records
-    const tables = [
+    const allTables = [
       'members', 'family_members', 'visitors', 'attendance_records', 'attendance_entries',
       'absentee_records', 'member_status_log', 'giving_records', 'custom_services', 'custom_giving_types',
       'custom_roles', 'profiles', 'temporary_permissions', 'user_tab_access', 'user_settings',
-      'service_records', 'notifications', 'activity_log'
+      'service_records', 'notifications', 'activity_log', 'children_members', 'children_member_parents',
+      'children_visitors', 'children_visitor_guardians', 'children_attendance_records', 'children_giving_records',
+      'expense_payment_methods', 'expense_records'
     ];
+
+    const tables = selectedTables && selectedTables.length > 0
+      ? allTables.filter(t => selectedTables.includes(t))
+      : allTables;
 
     for (const tableName of tables) {
       const backupCount = (backupData.data[tableName] || []).length;
@@ -6360,6 +6554,11 @@ app.post('/children/members', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children members create attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const body = await c.req.json();
 
     // Age validation: must be < 18
@@ -6429,6 +6628,11 @@ app.put('/children/members/:id', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children members update attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const id = c.req.param('id');
     const body = await c.req.json();
 
@@ -6503,6 +6707,11 @@ app.delete('/children/members/:id', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children members delete attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const id = c.req.param('id');
 
     // Get child member name before deleting
@@ -6537,13 +6746,23 @@ app.get('/children/visitors', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const { data, error } = await supabase
-      .from('children_visitors').select('*')
+      .from('children_visitors').select('*, children_visitor_guardians(*)')
       .order('visit_date', { ascending: false });
     if (error) {
       console.error('Error fetching children visitors:', error);
       return c.json({ error: 'Failed to fetch children visitors' }, 500);
     }
-    return c.json((data || []).map((v: any) => toCamelCase(v)));
+    return c.json((data || []).map((v: any) => {
+      const camelV = toCamelCase(v);
+      if (camelV.childrenVisitorGuardians) {
+        camelV.guardians = camelV.childrenVisitorGuardians;
+        delete camelV.childrenVisitorGuardians;
+      }
+      delete camelV.followUpStatus;
+      delete camelV.parentGuardianName;
+      delete camelV.parentGuardianPhone;
+      return camelV;
+    }));
   } catch (e) { console.error('GET /children/visitors error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -6551,26 +6770,54 @@ app.post('/children/visitors', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children visitors create attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const body = await c.req.json();
+
+    if (body.dateOfBirth) {
+      const dob = new Date(body.dateOfBirth);
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 18);
+      if (dob <= cutoff) return c.json({ error: 'Visitor must be under 18 years old' }, 400);
+    }
+
+    if (!body.guardians || !Array.isArray(body.guardians) || body.guardians.length === 0) {
+      return c.json({ error: 'At least one guardian is required' }, 400);
+    }
+
     const { data, error } = await supabase.from('children_visitors').insert({
       first_name: body.firstName,
       last_name: body.lastName,
       other_names: body.otherNames,
-      phone: body.phone || null,
       gender: body.gender || null,
       date_of_birth: body.dateOfBirth || null,
-      residence_location: body.residenceLocation || null,
-      visit_date: body.visitDate,
-      service_type: body.serviceType,
+      occupation: body.occupation || null,
+      contact_phone: body.contactPhone || null,
       referred_by: body.referredBy || null,
-      parent_guardian_name: body.parentGuardianName || null,
+      visit_date: body.visitDate,
+      service_type: body.serviceType || null,
       notes: body.notes || null,
-      follow_up_status: body.followUpStatus || 'pending',
       created_by: user.id,
     }).select().single();
     if (error) {
       console.error('Error creating child visitor:', error);
       return c.json({ error: error.message }, 500);
+    }
+
+    const guardiansToInsert = body.guardians.map((g: any) => ({
+      visitor_id: data.id,
+      full_name: g.fullName,
+      residential_location: g.residentialLocation || null,
+      contact_info: g.contactInfo || null,
+    }));
+    const { data: guardiansData, error: guardiansError } = await supabase.from('children_visitor_guardians').insert(guardiansToInsert).select();
+    if (guardiansError) {
+      console.error('Error creating child visitor guardians:', guardiansError);
+      await supabase.from('children_visitors').delete().eq('id', data.id);
+      return c.json({ error: 'Failed to save guardians. Visitor creation rolled back.' }, 500);
     }
 
     const prof = await getProfileForLog(user.id);
@@ -6580,7 +6827,9 @@ app.post('/children/visitors', async (c) => {
       description: `Added child visitor: ${body.firstName} ${body.lastName}`
     });
 
-    return c.json(toCamelCase(data), 201);
+    const result = toCamelCase(data);
+    result.guardians = guardiansData ? guardiansData.map((g: any) => toCamelCase(g)) : [];
+    return c.json(result, 201);
   } catch (e) { console.error('POST /children/visitors error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -6588,22 +6837,40 @@ app.put('/children/visitors/:id', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children visitors update attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const id = c.req.param('id');
     const body = await c.req.json();
+
+    if (body.dateOfBirth) {
+      const dob = new Date(body.dateOfBirth);
+      const cutoff = new Date();
+      cutoff.setFullYear(cutoff.getFullYear() - 18);
+      if (dob <= cutoff) return c.json({ error: 'Visitor must be under 18 years old' }, 400);
+    }
+
+    if (!body.guardians || !Array.isArray(body.guardians) || body.guardians.length === 0) {
+      return c.json({ error: 'At least one guardian is required' }, 400);
+    }
+
+    const { data: oldVisitor } = await supabase.from('children_visitors').select('*').eq('id', id).single();
+    const { data: oldGuardians } = await supabase.from('children_visitor_guardians').select('*').eq('visitor_id', id);
+
     const { data, error } = await supabase.from('children_visitors').update({
       first_name: body.firstName,
       last_name: body.lastName,
       other_names: body.otherNames,
-      phone: body.phone || null,
       gender: body.gender || null,
       date_of_birth: body.dateOfBirth || null,
-      residence_location: body.residenceLocation || null,
-      visit_date: body.visitDate,
-      service_type: body.serviceType,
+      occupation: body.occupation || null,
+      contact_phone: body.contactPhone || null,
       referred_by: body.referredBy || null,
-      parent_guardian_name: body.parentGuardianName || null,
+      visit_date: body.visitDate,
+      service_type: body.serviceType || null,
       notes: body.notes || null,
-      follow_up_status: body.followUpStatus || 'pending',
       converted_to_member: body.convertedToMember || false,
       converted_member_id: body.convertedMemberId || null,
       updated_at: new Date().toISOString(),
@@ -6613,6 +6880,30 @@ app.put('/children/visitors/:id', async (c) => {
       return c.json({ error: error.message }, 500);
     }
 
+    // Replace guardians
+    const { error: delError } = await supabase.from('children_visitor_guardians').delete().eq('visitor_id', id);
+    if (delError) {
+      console.error('Error deleting old guardians:', delError);
+      if (oldVisitor) await supabase.from('children_visitors').update(oldVisitor).eq('id', id);
+      return c.json({ error: 'Failed to update guardians. Changes rolled back.' }, 500);
+    }
+
+    const guardiansToInsert = body.guardians.map((g: any) => ({
+      visitor_id: id,
+      full_name: g.fullName,
+      residential_location: g.residentialLocation || null,
+      contact_info: g.contactInfo || null,
+    }));
+    const { data: guardiansData, error: guardiansError } = await supabase.from('children_visitor_guardians').insert(guardiansToInsert).select();
+    if (guardiansError) {
+      console.error('Error updating child visitor guardians:', guardiansError);
+      if (oldVisitor) await supabase.from('children_visitors').update(oldVisitor).eq('id', id);
+      if (oldGuardians && oldGuardians.length > 0) {
+        await supabase.from('children_visitor_guardians').insert(oldGuardians);
+      }
+      return c.json({ error: 'Failed to save new guardians. Changes rolled back.' }, 500);
+    }
+
     const prof = await getProfileForLog(user.id);
     await logActivity({
       userId: user.id, userName: prof.name, userRole: prof.role,
@@ -6620,7 +6911,9 @@ app.put('/children/visitors/:id', async (c) => {
       description: `Updated child visitor: ${body.firstName} ${body.lastName}`
     });
 
-    return c.json(toCamelCase(data));
+    const result = toCamelCase(data);
+    result.guardians = guardiansData ? guardiansData.map((g: any) => toCamelCase(g)) : [];
+    return c.json(result);
   } catch (e) { console.error('PUT /children/visitors/:id error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -6666,6 +6959,11 @@ app.post('/children/attendance', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children attendance create attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const body = await c.req.json();
     const childIds: string[] = body.childMemberIds || [];
     const visitorsCount: number = body.visitorsCount || 0;
@@ -6712,6 +7010,11 @@ app.put('/children/attendance/:id', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children attendance update attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const id = c.req.param('id');
     const body = await c.req.json();
     const childIds: string[] = body.childMemberIds || [];
@@ -6768,6 +7071,12 @@ app.post('/children/giving', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children giving attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
     const body = await c.req.json();
     const total = (body.offeringAmount || 0) + (body.cashAmount || 0) + (body.mobileMoneyAmount || 0);
     const { data, error } = await supabase.from('children_giving_records').insert({
@@ -6800,6 +7109,12 @@ app.put('/children/giving/:id', async (c) => {
   try {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      console.warn('Unauthorized children giving attempt by', user.id);
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
     const id = c.req.param('id');
     const body = await c.req.json();
     const { data, error } = await supabase.from('children_giving_records').update({
@@ -6825,6 +7140,450 @@ app.put('/children/giving/:id', async (c) => {
 
     return c.json(toCamelCase(data));
   } catch (e) { console.error('PUT /children/giving/:id error:', e); return c.json({ error: 'Internal server error' }, 500); }
+});
+
+// ============================================================================
+// CHILDREN ANALYTICS
+// ============================================================================
+
+app.get('/children/analytics', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const period = c.req.query('period') || '1y';
+    let startDate: string | null = null;
+    if (period !== 'all') {
+      const d = new Date();
+      if (period === '3m') d.setMonth(d.getMonth() - 3);
+      else if (period === '6m') d.setMonth(d.getMonth() - 6);
+      else if (period === '1y') d.setFullYear(d.getFullYear() - 1);
+      startDate = d.toISOString();
+    }
+
+    let givingQuery = supabase.from('children_giving_records').select('service_date, total_amount');
+    let attendanceQuery = supabase.from('children_attendance_records').select('id, date, total_count');
+    
+    if (startDate) {
+      givingQuery = givingQuery.gte('service_date', startDate.split('T')[0]);
+      attendanceQuery = attendanceQuery.gte('date', startDate.split('T')[0]);
+    }
+
+    const [membersRes, visitorsRes, givingRes, attendanceRes] = await Promise.all([
+      supabase.from('children_members').select('id, first_name, last_name, date_of_birth, gender, status, is_baptised, join_date'),
+      supabase.from('children_visitors').select('id, visit_date, converted_member_id'),
+      givingQuery,
+      attendanceQuery
+    ]);
+
+    if (membersRes.error || visitorsRes.error || givingRes.error || attendanceRes.error) {
+      console.error('Failed to fetch analytics base datasets:', {
+        membersErr: membersRes.error,
+        visitorsErr: visitorsRes.error,
+        givingErr: givingRes.error,
+        attendanceErr: attendanceRes.error
+      });
+      return c.json({ error: 'Failed to fetch analytics data' }, 500);
+    }
+
+    const members = membersRes.data || [];
+    const visitors = visitorsRes.data || [];
+    const giving = givingRes.data || [];
+    const attendanceRecords = attendanceRes.data || [];
+
+    const recordIds = attendanceRecords.map(r => r.id);
+    let attendanceEntries: any[] = [];
+    if (recordIds.length > 0) {
+      const { data: entriesData, error: entriesError } = await supabase.from('children_attendance_entries')
+        .select('attendance_record_id, child_member_id')
+        .in('attendance_record_id', recordIds);
+        
+      if (entriesError) {
+        console.error('Failed to fetch children attendance entries:', entriesError);
+        return c.json({ error: 'Failed to fetch analytics data' }, 500);
+      }
+      attendanceEntries = entriesData || [];
+    }
+
+    // 1. summary
+    const totalMembers = members.length;
+    const activeMembers = members.filter(m => m.status === 'active').length;
+    const visitorCount = visitors.length;
+    const totalGiving = giving.reduce((sum, g) => sum + (Number(g.total_amount) || 0), 0);
+    const baptisedCount = members.filter(m => m.is_baptised === true).length;
+    
+    const summary = {
+      totalMembers,
+      activeMembers,
+      visitorCount,
+      totalGiving,
+      baptisedCount
+    };
+
+    // 2. memberGrowth
+    const joinsByMonth: Record<string, number> = {};
+    members.forEach(m => {
+      if (!m.join_date) return;
+      if (startDate && m.join_date < startDate.split('T')[0]) return;
+      const ym = m.join_date.substring(0, 7); // YYYY-MM
+      joinsByMonth[ym] = (joinsByMonth[ym] || 0) + 1;
+    });
+    const memberGrowth = Object.entries(joinsByMonth)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, count]) => ({ month, count }));
+
+    // 3. genderBreakdown
+    const maleCount = members.filter(m => m.gender?.toLowerCase() === 'male').length;
+    const femaleCount = members.filter(m => m.gender?.toLowerCase() === 'female').length;
+    const genderBreakdown = { male: maleCount, female: femaleCount };
+
+    // 4. ageDistribution
+    const ageBuckets = { '0-5': 0, '6-10': 0, '11-14': 0, '15-17': 0 };
+    const today = new Date();
+    members.forEach(m => {
+      if (!m.date_of_birth) return;
+      const dob = new Date(m.date_of_birth);
+      let age = today.getFullYear() - dob.getFullYear();
+      const mDiff = today.getMonth() - dob.getMonth();
+      if (mDiff < 0 || (mDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      if (age >= 0 && age <= 5) ageBuckets['0-5']++;
+      else if (age >= 6 && age <= 10) ageBuckets['6-10']++;
+      else if (age >= 11 && age <= 14) ageBuckets['11-14']++;
+      else if (age >= 15 && age <= 17) ageBuckets['15-17']++;
+    });
+    const ageDistribution = ageBuckets;
+
+    // 5. attendanceTrend
+    const entriesByRecord = attendanceEntries.reduce((acc, e) => {
+      acc[e.attendance_record_id] = (acc[e.attendance_record_id] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const recordsByMonth: Record<string, { totalRate: number, count: number }> = {};
+    attendanceRecords.forEach(r => {
+      if (!r.date) return;
+      const ym = r.date.substring(0, 7);
+      const entriesCount = entriesByRecord[r.id] || 0;
+      const rate = totalMembers > 0 ? (entriesCount / totalMembers) * 100 : 0;
+      
+      if (!recordsByMonth[ym]) recordsByMonth[ym] = { totalRate: 0, count: 0 };
+      recordsByMonth[ym].totalRate += rate;
+      recordsByMonth[ym].count += 1;
+    });
+    
+    const attendanceTrend = Object.entries(recordsByMonth)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, stats]) => ({
+        month,
+        rate: Math.round(stats.totalRate / stats.count)
+      }));
+
+    // 6. givingTrend
+    const givingByMonth: Record<string, number> = {};
+    giving.forEach(g => {
+      if (!g.service_date) return;
+      const ym = g.service_date.substring(0, 7);
+      givingByMonth[ym] = (givingByMonth[ym] || 0) + Number(g.total_amount || 0);
+    });
+    const givingTrend = Object.entries(givingByMonth)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([month, amount]) => ({ month, amount }));
+
+    // 7. visitorConversion
+    const childrenMemberIds = new Set(members.map(m => m.id));
+    const convertedCount = visitors.filter(v => v.converted_member_id && childrenMemberIds.has(v.converted_member_id)).length;
+    const visitorConversion = { total: visitors.length, converted: convertedCount };
+
+    // 8. baptismStats
+    const baptismStats = { baptised: totalBaptised, notBaptised: totalMembers - totalBaptised };
+
+    // 9. ageOutAlerts
+    const ageOutAlerts: any[] = [];
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    members.forEach(m => {
+      if (!m.date_of_birth) return;
+      const dobStr = m.date_of_birth.includes('T') ? m.date_of_birth.split('T')[0] : m.date_of_birth;
+      const dobDate = new Date(dobStr);
+      const eighteenthBday = new Date(dobDate.getFullYear() + 18, dobDate.getMonth(), dobDate.getDate());
+      
+      const bdayStr = eighteenthBday.toISOString().split('T')[0];
+      const ninetyDaysFromNowStr = ninetyDaysFromNow.toISOString().split('T')[0];
+      
+      if (bdayStr >= todayStr && bdayStr <= ninetyDaysFromNowStr) {
+        ageOutAlerts.push({
+          id: m.id,
+          firstName: m.first_name,
+          lastName: m.last_name,
+          dateOfBirth: m.date_of_birth,
+          turnsEighteenOn: bdayStr
+        });
+      }
+    });
+
+    return c.json({
+      summary,
+      memberGrowth,
+      genderBreakdown,
+      ageDistribution,
+      attendanceTrend,
+      givingTrend,
+      visitorConversion,
+      baptismStats,
+      ageOutAlerts
+    });
+  } catch (e) {
+    console.error('GET /children/analytics error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
+// EXPENSES
+// ============================================================================
+
+// --- Payment Methods ---
+
+app.get('/expenses/payment-methods', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data, error } = await supabase.from('expense_payment_methods').select('*').order('name', { ascending: true });
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.post('/expenses/payment-methods', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const body = await c.req.json();
+    const { data, error } = await supabase.from('expense_payment_methods').insert({
+      name: body.name,
+      is_active: true,
+      created_by: user.id
+    }).select().single();
+
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data), 201);
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.patch('/expenses/payment-methods/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updateData: any = { updated_at: new Date().toISOString() };
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.is_active !== undefined) updateData.is_active = body.is_active;
+
+    const { data, error } = await supabase.from('expense_payment_methods').update(updateData).eq('id', id).select().single();
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.delete('/expenses/payment-methods/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const id = c.req.param('id');
+    const { count, error: countErr } = await supabase.from('expense_records').select('*', { count: 'exact', head: true }).eq('payment_method_id', id);
+    if (countErr) return c.json({ error: countErr.message }, 500);
+    
+    if (count && count > 0) {
+      return c.json({ error: 'Payment method is in use and cannot be deleted' }, 409);
+    }
+
+    const { error } = await supabase.from('expense_payment_methods').delete().eq('id', id);
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json({ message: 'Deleted successfully' });
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+// --- Form ID ---
+
+app.get('/expenses/next-form-id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Fetch ALL form_ids and compute numeric max robustly
+    const { data, error } = await supabase.from('expense_records').select('form_id');
+    if (error) return c.json({ error: error.message }, 500);
+
+    let maxNum = 0;
+    if (data && data.length > 0) {
+      for (const row of data) {
+        const match = row.form_id.match(/^EXP-(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) maxNum = num;
+        }
+      }
+    }
+    const nextFormId = `EXP-${String(maxNum + 1).padStart(4, '0')}`;
+    return c.json({ nextFormId });
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+// --- Expense Records ---
+
+app.get('/expenses', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data, error } = await supabase.from('expense_records').select('*').order('expense_date', { ascending: false });
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.post('/expenses', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const rawBody = await c.req.json();
+    // Accept camelCase payloads and normalize to snake_case
+    const body = toSnakeCase(rawBody);
+    const { form_id, details, service_date, service_type, amount, payment_method_name } = body;
+    
+    if (!form_id || !details || !service_date || !service_type || amount === undefined || !payment_method_name) {
+      return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const { data, error } = await supabase.from('expense_records').insert({
+      form_id, details, service_date, service_type, amount, payment_method_name,
+      payment_method_id: body.payment_method_id || null,
+      expense_date: today,
+      reference_number: body.reference_number || null,
+      requested_by_id: body.requested_by_id || null,
+      requested_by_name: body.requested_by_name || null,
+      recommended_by_id: body.recommended_by_id || null,
+      recommended_by_name: body.recommended_by_name || null,
+      approved_by_id: body.approved_by_id || null,
+      approved_by_name: body.approved_by_name || null,
+      status: 'approved',
+      created_by: user.id
+    }).select().single();
+
+    if (error) {
+      if (error.code === '23505' && error.message.includes('form_id')) {
+        return c.json({ error: 'This Form ID already exists — please change it' }, 409);
+      }
+      return c.json({ error: error.message }, 500);
+    }
+
+    const prof = await getProfileForLog(user.id);
+    await logActivity({
+      userId: user.id, userName: prof.name, userRole: prof.role,
+      action: 'create', entityType: 'expense', entityId: data.id,
+      description: `Created expense record ${form_id}`
+    });
+
+    return c.json(toCamelCase(data), 201);
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.put('/expenses/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const id = c.req.param('id');
+    const rawBody = await c.req.json();
+    // Accept camelCase payloads and normalize to snake_case
+    const body = toSnakeCase(rawBody);
+    
+    const { data: existing, error: getErr } = await supabase.from('expense_records').select('form_id').eq('id', id).single();
+    if (getErr || !existing) return c.json({ error: 'Record not found' }, 404);
+
+    if (body.form_id && body.form_id !== existing.form_id) {
+      if (!await isAdminOrDev(user.id)) {
+        return c.json({ error: 'Only admin or dev can change the Form ID' }, 403);
+      }
+    }
+
+    const updateData: any = { updated_at: new Date().toISOString() };
+    // status is excluded — always remains 'approved'
+    const allowedFields = [
+      'form_id', 'expense_date', 'details', 'service_date', 'service_type', 'amount',
+      'payment_method_id', 'payment_method_name', 'reference_number',
+      'requested_by_id', 'requested_by_name', 'recommended_by_id', 'recommended_by_name',
+      'approved_by_id', 'approved_by_name'
+    ];
+    for (const f of allowedFields) {
+      if (body[f] !== undefined) updateData[f] = body[f];
+    }
+
+    const { data: updated, error } = await supabase.from('expense_records').update(updateData).eq('id', id).select().single();
+    if (error) {
+      if (error.code === '23505' && error.message.includes('form_id')) {
+        return c.json({ error: 'This Form ID already exists — please change it' }, 409);
+      }
+      return c.json({ error: error.message }, 500);
+    }
+
+    const prof = await getProfileForLog(user.id);
+    await logActivity({
+      userId: user.id, userName: prof.name, userRole: prof.role,
+      action: 'update', entityType: 'expense', entityId: id,
+      description: `Updated expense record ${updated.form_id}`
+    });
+
+    return c.json(toCamelCase(updated));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.delete('/expenses/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    if (!await isAdminOrDev(user.id)) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const id = c.req.param('id');
+    const { data: existing } = await supabase.from('expense_records').select('form_id').eq('id', id).single();
+
+    const { error } = await supabase.from('expense_records').delete().eq('id', id);
+    if (error) return c.json({ error: error.message }, 500);
+
+    const prof = await getProfileForLog(user.id);
+    await logActivity({
+      userId: user.id, userName: prof.name, userRole: prof.role,
+      action: 'delete', entityType: 'expense', entityId: id,
+      description: `Deleted expense record ${existing?.form_id || id}`
+    });
+
+    return c.json({ message: 'Expense deleted successfully' });
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
 });
 
 // ============================================================================

@@ -1593,26 +1593,66 @@ function ColorPicker({
 
 // Backup & Restore Component
 // Available tables for backup/restore
-const BACKUP_TABLES = [
-  { id: 'members', label: 'Members', description: 'Church member records' },
-  { id: 'family_members', label: 'Family Links', description: 'Family relationships between members' },
-  { id: 'visitors', label: 'Visitors', description: 'Visitor records' },
-  { id: 'attendance_records', label: 'Attendance Records', description: 'Service attendance summaries' },
-  { id: 'attendance_entries', label: 'Attendance Entries', description: 'Individual attendance entries' },
-  { id: 'absentee_records', label: 'Absentee Records', description: 'Absent member tracking' },
-  { id: 'member_status_log', label: 'Status History', description: 'Member status change history' },
-  { id: 'giving_records', label: 'Giving Records', description: 'Offering and donation records' },
-  { id: 'custom_services', label: 'Custom Services', description: 'Custom service types' },
-  { id: 'custom_giving_types', label: 'Giving Types', description: 'Custom giving categories' },
-  { id: 'custom_roles', label: 'Custom Roles', description: 'Custom role definitions' },
-  { id: 'profiles', label: 'User Accounts', description: 'User profiles and settings' },
-  { id: 'temporary_permissions', label: 'Temp Permissions', description: 'Temporary user permissions' },
-  { id: 'user_tab_access', label: 'Tab Access', description: 'User tab access settings' },
-  { id: 'user_settings', label: 'User Settings', description: 'User preferences and themes' },
-  { id: 'service_records', label: 'Service Records', description: 'Service records' },
-  { id: 'notifications', label: 'Notifications', description: 'User notifications' },
-  { id: 'activity_log', label: 'Activity Logs', description: 'System activity history' },
+const BACKUP_TABLE_GROUPS = [
+  {
+    title: 'Members & People',
+    tables: [
+      { id: 'members', label: 'Members', description: 'Church member records' },
+      { id: 'family_members', label: 'Family Links', description: 'Family relationships between members' },
+      { id: 'visitors', label: 'Visitors', description: 'Visitor records' },
+      { id: 'absentee_records', label: 'Absentee Records', description: 'Absent member tracking' },
+      { id: 'member_status_log', label: 'Status History', description: 'Member status change history' },
+    ]
+  },
+  {
+    title: 'Attendance & Services',
+    tables: [
+      { id: 'service_records', label: 'Service Records', description: 'Service records' },
+      { id: 'attendance_records', label: 'Attendance Records', description: 'Service attendance summaries' },
+      { id: 'attendance_entries', label: 'Attendance Entries', description: 'Individual attendance entries' },
+      { id: 'custom_services', label: 'Custom Services', description: 'Custom service types' },
+    ]
+  },
+  {
+    title: 'Giving & Finances',
+    tables: [
+      { id: 'giving_records', label: 'Giving Records', description: 'Offering and donation records' },
+      { id: 'custom_giving_types', label: 'Giving Types', description: 'Custom giving categories' },
+    ]
+  },
+  {
+    title: 'Expenses',
+    tables: [
+      { id: 'expense_payment_methods', label: 'Payment Methods', description: 'Expense payment method configurations' },
+      { id: 'expense_records', label: 'Expense Records', description: 'Church expense requisition records' },
+    ]
+  },
+  {
+    title: "Children's Ministry",
+    tables: [
+      { id: 'children_members', label: 'Children Members', description: 'Child member records' },
+      { id: 'children_member_parents', label: 'Children Member Parents', description: 'Guardian links for child members' },
+      { id: 'children_visitors', label: 'Children Visitors', description: 'Child visitor records' },
+      { id: 'children_visitor_guardians', label: 'Children Visitor Guardians', description: 'Guardian links for child visitors' },
+      { id: 'children_attendance_records', label: 'Children Attendance', description: 'Children\'s service attendance' },
+      { id: 'children_giving_records', label: 'Children Giving', description: 'Children\'s giving records' },
+    ]
+  },
+  {
+    title: 'System & Security',
+    tables: [
+      { id: 'custom_roles', label: 'Custom Roles', description: 'Custom role definitions' },
+      { id: 'profiles', label: 'User Accounts', description: 'User profiles and settings' },
+      { id: 'temporary_permissions', label: 'Temp Permissions', description: 'Temporary user permissions' },
+      { id: 'user_tab_access', label: 'Tab Access', description: 'User tab access settings' },
+      { id: 'user_settings', label: 'User Settings', description: 'User preferences and themes' },
+      { id: 'notifications', label: 'Notifications', description: 'User notifications' },
+      { id: 'activity_log', label: 'Activity Logs', description: 'System activity history' },
+    ]
+  }
 ];
+
+const BACKUP_TABLES = BACKUP_TABLE_GROUPS.flatMap(g => g.tables);
 
 function BackupRestore() {
   const [backupHistory, setBackupHistory] = useState<any[]>([]);
@@ -1622,6 +1662,7 @@ function BackupRestore() {
   const [backupType, setBackupType] = useState<'full' | 'differential'>('full');
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge' | 'update'>('merge');
+  const [restoreFailureMode, setRestoreFailureMode] = useState<'partial' | 'atomic'>('partial');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedBackupData, setUploadedBackupData] = useState<any>(null);
   const [previewData, setPreviewData] = useState<any>(null);
@@ -1817,7 +1858,8 @@ function BackupRestore() {
 
     setIsRestoring(true);
     try {
-      const result = await api.backups.restore(uploadedBackupData, restoreMode, selectedRestoreTables);
+      const result = await api.backups.restore(uploadedBackupData, restoreMode, selectedRestoreTables, restoreFailureMode);
+      
       if (result.success) {
         toast.success('Backup restored successfully');
         setUploadedBackupData(null);
@@ -1830,7 +1872,11 @@ function BackupRestore() {
       }
     } catch (error: any) {
       console.error('Failed to restore backup:', error);
-      toast.error(getFriendlyMessage(error));
+      if (error.failedTable) {
+        toast.error(`Restore stopped: table '${error.failedTable}' failed — ${error.message}`);
+      } else {
+        toast.error(getFriendlyMessage(error));
+      }
     } finally {
       setIsRestoring(false);
     }
@@ -1970,27 +2016,34 @@ function BackupRestore() {
                 {selectAllBackup ? 'Deselect All' : 'Select All'}
               </Button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {BACKUP_TABLES.map((table) => (
-                <div
-                  key={table.id}
-                  className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
-                    selectedBackupTables.includes(table.id)
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={() => toggleBackupTable(table.id)}
-                >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                    selectedBackupTables.includes(table.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                  }`}>
-                    {selectedBackupTables.includes(table.id) && (
-                      <CheckCircle className="w-3 h-3 text-primary-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{table.label}</p>
-                    <p className="text-xs text-muted-foreground truncate">{table.description}</p>
+            <div className="space-y-6 mt-4">
+              {BACKUP_TABLE_GROUPS.map((group) => (
+                <div key={group.title} className="space-y-3">
+                  <h4 className="text-sm font-semibold tracking-tight text-foreground/80 uppercase">{group.title}</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {group.tables.map((table) => (
+                      <div
+                        key={table.id}
+                        className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
+                          selectedBackupTables.includes(table.id)
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        onClick={() => toggleBackupTable(table.id)}
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          selectedBackupTables.includes(table.id) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                        }`}>
+                          {selectedBackupTables.includes(table.id) && (
+                            <CheckCircle className="w-3 h-3 text-primary-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{table.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{table.description}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -2157,6 +2210,64 @@ function BackupRestore() {
             </div>
           </div>
 
+          {/* Restore Failure Mode */}
+          <div className="space-y-3">
+            <Label className="text-base font-semibold">Restore Failure Mode</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Partial Mode */}
+              <div
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  restoreFailureMode === 'partial'
+                    ? 'border-primary bg-primary/5 shadow-md'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => setRestoreFailureMode('partial')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    restoreFailureMode === 'partial' ? 'border-primary bg-primary' : 'border-muted-foreground'
+                  }`}>
+                    {restoreFailureMode === 'partial' && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base flex items-center gap-2">
+                      Partial
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Continue restoring other tables if one fails
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Atomic Mode */}
+              <div
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  restoreFailureMode === 'atomic'
+                    ? 'border-primary bg-primary/5 shadow-md'
+                    : 'border-border hover:border-primary/50'
+                }`}
+                onClick={() => setRestoreFailureMode('atomic')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                    restoreFailureMode === 'atomic' ? 'border-primary bg-primary' : 'border-muted-foreground'
+                  }`}>
+                    {restoreFailureMode === 'atomic' && <CheckCircle className="w-3 h-3 text-white" />}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-base flex items-center gap-2">
+                      Atomic
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Stop immediately if any table fails
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Table Selection for Restore */}
           {uploadedBackupData && (
             <div className="space-y-3">
@@ -2166,31 +2277,46 @@ function BackupRestore() {
                   {selectAllRestore ? 'Deselect All' : 'Select All'}
                 </Button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                {Object.entries(uploadedBackupData.data || {}).map(([tableId, tableData]: [string, any]) => {
-                  const tableInfo = BACKUP_TABLES.find(t => t.id === tableId);
-                  const recordCount = (tableData || []).length;
-                  if (recordCount === 0) return null;
+              <div className="space-y-6 mt-4">
+                {BACKUP_TABLE_GROUPS.map((group) => {
+                  const groupTables = group.tables.filter(t => {
+                    const tableData = uploadedBackupData.data?.[t.id];
+                    return tableData && tableData.length > 0;
+                  });
+
+                  if (groupTables.length === 0) return null;
+
                   return (
-                    <div
-                      key={tableId}
-                      className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
-                        selectedRestoreTables.includes(tableId)
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                      onClick={() => toggleRestoreTable(tableId)}
-                    >
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                        selectedRestoreTables.includes(tableId) ? 'bg-primary border-primary' : 'border-muted-foreground'
-                      }`}>
-                        {selectedRestoreTables.includes(tableId) && (
-                          <CheckCircle className="w-3 h-3 text-primary-foreground" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{tableInfo?.label || tableId}</p>
-                        <p className="text-xs text-muted-foreground">{recordCount} records</p>
+                    <div key={group.title} className="space-y-3">
+                      <h4 className="text-sm font-semibold tracking-tight text-foreground/80 uppercase">{group.title}</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {groupTables.map((table) => {
+                          const tableId = table.id;
+                          const recordCount = uploadedBackupData.data[tableId].length;
+                          return (
+                            <div
+                              key={tableId}
+                              className={`flex items-center gap-2 p-2 border rounded cursor-pointer transition-colors ${
+                                selectedRestoreTables.includes(tableId)
+                                  ? 'border-primary bg-primary/5'
+                                  : 'border-border hover:border-primary/50'
+                              }`}
+                              onClick={() => toggleRestoreTable(tableId)}
+                            >
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                                selectedRestoreTables.includes(tableId) ? 'bg-primary border-primary' : 'border-muted-foreground'
+                              }`}>
+                                {selectedRestoreTables.includes(tableId) && (
+                                  <CheckCircle className="w-3 h-3 text-primary-foreground" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{table.label}</p>
+                                <p className="text-xs text-muted-foreground">{recordCount} records</p>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );

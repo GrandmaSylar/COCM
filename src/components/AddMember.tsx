@@ -425,9 +425,12 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
                   style={{
                     width: `${Math.max(progressData.percentage, 3)}%`,
-                    background: progressData.percentage === 0
-                      ? '#ef4444'
+                    backgroundImage: progressData.percentage === 0
+                      ? ''
                       : `linear-gradient(90deg, #ef4444 0%, #f97316 25%, #eab308 50%, #84cc16 75%, #22c55e 100%)`,
+                    backgroundColor: progressData.percentage === 0
+                      ? '#ef4444'
+                      : 'transparent',
                     backgroundSize: '400% 100%',
                     backgroundPosition: `${100 - progressData.percentage}% 0`
                   }}

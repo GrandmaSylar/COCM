@@ -1,16 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
-import { Search, Plus, Users, UserPlus, Calendar, Banknote, Eye, CheckCircle, Clock } from 'lucide-react';
+import { Search, Plus, Users, UserPlus, Calendar, Banknote, Eye, CheckCircle, Clock, Pencil, RefreshCw, Download, BarChart3 } from 'lucide-react';
+import { ChildrenAnalytics } from './ChildrenAnalytics';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport, formatCurrencyForExport } from '../utils/export';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { Skeleton } from './ui/skeleton';
 import { EmptyState } from './EmptyState';
 import { useAuth } from './AuthContext';
 import { useCachedData } from '../hooks/useCachedData';
 import { api } from '../services/api';
 import { sanitizeUrl } from '@braintree/sanitize-url';
+import { toast } from 'sonner';
+import { getFriendlyMessage } from '../utils/error-handler';
 
 // --- Types ---
 
@@ -72,15 +80,25 @@ export interface ChildrenGivingRecord {
   notes?: string;
 }
 
+export interface ChildVisitorGuardian {
+  id: string;
+  fullName: string;
+  residentialLocation?: string;
+  contactInfo?: string;
+}
+
 export interface ChildVisitor {
   id: string;
   firstName: string;
   lastName: string;
-  dateOfVisit: string;
-  parentGuardianName: string;
-  parentGuardianPhone?: string;
-  followUpStatus: 'pending' | 'contacted' | 'converted';
+  visitDate: string;
   notes?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  occupation?: string;
+  contactPhone?: string;
+  referredBy?: string;
+  guardians: ChildVisitorGuardian[];
 }
 
 // --- Helpers ---
@@ -123,7 +141,7 @@ function ChildListSkeleton() {
 
 // --- Components ---
 
-function ChildMembersList({ refreshKey, onAddChild, onViewChild }: { refreshKey: number, onAddChild: () => void, onViewChild: (child: ChildMember) => void }) {
+function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { refreshKey: number, onAddChild: () => void, onViewChild: (child: ChildMember) => void, onRefresh: () => void }) {
   const { canAccess } = useAuth();
   const canAddMembers = canAccess('manage_members');
 
@@ -147,7 +165,74 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild }: { refreshKey:
     });
   }, [children, searchTerm, statusFilter, genderFilter]);
 
-  if (loading) return <ChildListSkeleton />;
+  const handleExportCSV = () => {
+    const data = filteredChildren.map(c => ({
+      ...c,
+      age: calculateAge(c.dateOfBirth),
+      parentName: c.parents?.[0] ? `${c.parents[0].firstName} ${c.parents[0].lastName}` : '',
+      dateOfBirth: formatDateForExport(c.dateOfBirth),
+      joinDate: formatDateForExport(c.joinDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'age', label: 'Age' },
+      { key: 'status', label: 'Status' },
+      { key: 'joinDate', label: 'Join Date' },
+      { key: 'isBaptised', label: 'Baptised' },
+      { key: 'zone', label: 'Zone' },
+      { key: 'parentName', label: 'Parent/Guardian' }
+    ];
+    exportToCSV(data, `children-members-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
+
+  const handleExportPDF = () => {
+    const data = filteredChildren.map(c => ({
+      ...c,
+      age: calculateAge(c.dateOfBirth),
+      parentName: c.parents?.[0] ? `${c.parents[0].firstName} ${c.parents[0].lastName}` : '',
+      dateOfBirth: formatDateForExport(c.dateOfBirth),
+      joinDate: formatDateForExport(c.joinDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'age', label: 'Age' },
+      { key: 'status', label: 'Status' },
+      { key: 'joinDate', label: 'Join Date' },
+      { key: 'isBaptised', label: 'Baptised' },
+      { key: 'zone', label: 'Zone' },
+      { key: 'parentName', label: 'Parent/Guardian' }
+    ];
+    exportToPDF(data, `children-members-${new Date().toISOString().slice(0, 10)}`, 'Children Members', cols);
+  };
+
+  const handleExportXLSX = () => {
+    const data = filteredChildren.map(c => ({
+      ...c,
+      age: calculateAge(c.dateOfBirth),
+      parentName: c.parents?.[0] ? `${c.parents[0].firstName} ${c.parents[0].lastName}` : '',
+      dateOfBirth: formatDateForExport(c.dateOfBirth),
+      joinDate: formatDateForExport(c.joinDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'age', label: 'Age' },
+      { key: 'status', label: 'Status' },
+      { key: 'joinDate', label: 'Join Date' },
+      { key: 'isBaptised', label: 'Baptised' },
+      { key: 'zone', label: 'Zone' },
+      { key: 'parentName', label: 'Parent/Guardian' }
+    ];
+    exportToXLSX(data, `children-members-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
 
   const totalChildren = children?.length || 0;
   const activeChildren = children?.filter(c => c.status === 'active').length || 0;
@@ -164,12 +249,33 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild }: { refreshKey:
           <h2 className="text-2xl font-bold">Members</h2>
           <p className="text-muted-foreground">Manage children's ministry members</p>
         </div>
-        {canAddMembers && (
-          <Button onClick={onAddChild}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Child
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </Button>
-        )}
+          {filteredChildren.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canAddMembers && (
+            <Button onClick={onAddChild}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Child
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -246,7 +352,9 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild }: { refreshKey:
         </Select>
       </div>
 
-      {filteredChildren.length === 0 ? (
+      {loading && !children ? (
+        <ChildListSkeleton />
+      ) : filteredChildren.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
@@ -304,27 +412,89 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild }: { refreshKey:
   );
 }
 
-function ChildVisitorsList({ refreshKey, onAddVisitor }: { refreshKey: number, onAddVisitor: () => void }) {
+function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh }: { refreshKey: number, onAddVisitor: () => void, onRefresh: () => void }) {
   const { data: visitors, loading } = useCachedData<ChildVisitor[]>(
     `children-visitors-${refreshKey}`,
     () => api.children.visitors.getAll()
   );
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const filteredVisitors = useMemo(() => {
     if (!visitors) return [];
     return visitors.filter(v => {
       const matchName = `${v.firstName} ${v.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchParent = v.parentGuardianName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesSearch = searchTerm === '' || matchName || matchParent;
-      const matchesStatus = statusFilter === 'all' || v.followUpStatus === statusFilter;
-      return matchesSearch && matchesStatus;
+      const firstGuardianName = v.guardians?.[0]?.fullName || '';
+      const matchParent = firstGuardianName.toLowerCase().includes(searchTerm.toLowerCase());
+      return searchTerm === '' || matchName || matchParent;
     });
-  }, [visitors, searchTerm, statusFilter]);
+  }, [visitors, searchTerm]);
 
-  if (loading) return <ChildListSkeleton />;
+  const handleExportCSV = () => {
+    const data = filteredVisitors.map(v => ({
+      ...v,
+      guardians: v.guardians?.map(g => g.fullName).join(', ') || '',
+      dateOfBirth: formatDateForExport(v.dateOfBirth),
+      visitDate: formatDateForExport(v.visitDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'visitDate', label: 'Date of Visit' },
+      { key: 'contactPhone', label: 'Contact Phone' },
+      { key: 'occupation', label: 'Occupation' },
+      { key: 'referredBy', label: 'Referred By' },
+      { key: 'guardians', label: 'Guardian(s)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToCSV(data, `children-visitors-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
+
+  const handleExportPDF = () => {
+    const data = filteredVisitors.map(v => ({
+      ...v,
+      guardians: v.guardians?.map(g => g.fullName).join(', ') || '',
+      dateOfBirth: formatDateForExport(v.dateOfBirth),
+      visitDate: formatDateForExport(v.visitDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'visitDate', label: 'Date of Visit' },
+      { key: 'contactPhone', label: 'Contact Phone' },
+      { key: 'occupation', label: 'Occupation' },
+      { key: 'referredBy', label: 'Referred By' },
+      { key: 'guardians', label: 'Guardian(s)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToPDF(data, `children-visitors-${new Date().toISOString().slice(0, 10)}`, 'Children Visitors', cols);
+  };
+
+  const handleExportXLSX = () => {
+    const data = filteredVisitors.map(v => ({
+      ...v,
+      guardians: v.guardians?.map(g => g.fullName).join(', ') || '',
+      dateOfBirth: formatDateForExport(v.dateOfBirth),
+      visitDate: formatDateForExport(v.visitDate)
+    }));
+    const cols = [
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'gender', label: 'Gender' },
+      { key: 'dateOfBirth', label: 'Date of Birth' },
+      { key: 'visitDate', label: 'Date of Visit' },
+      { key: 'contactPhone', label: 'Contact Phone' },
+      { key: 'occupation', label: 'Occupation' },
+      { key: 'referredBy', label: 'Referred By' },
+      { key: 'guardians', label: 'Guardian(s)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToXLSX(data, `children-visitors-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -333,36 +503,48 @@ function ChildVisitorsList({ refreshKey, onAddVisitor }: { refreshKey: number, o
           <h2 className="text-2xl font-bold">Visitors</h2>
           <p className="text-muted-foreground">Manage children's ministry visitors</p>
         </div>
-        <Button onClick={onAddVisitor}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Visitor
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {filteredVisitors.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button onClick={onAddVisitor}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Visitor
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
           <Input 
-            placeholder="Search by child or parent name..." 
+            placeholder="Search by child or parent/guardian name..." 
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Follow-up Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="contacted">Contacted</SelectItem>
-            <SelectItem value="converted">Converted</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {filteredVisitors.length === 0 ? (
+      {loading && !visitors ? (
+        <ChildListSkeleton />
+      ) : filteredVisitors.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
@@ -385,23 +567,19 @@ function ChildVisitorsList({ refreshKey, onAddVisitor }: { refreshKey: number, o
                   <div>
                     <h4 className="font-semibold text-lg">{visitor.firstName} {visitor.lastName}</h4>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(visitor.dateOfVisit).toLocaleDateString()}</span>
+                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(visitor.visitDate).toLocaleDateString()}</span>
                       <span className="text-muted-foreground/30">•</span>
-                      <span className="truncate max-w-[150px]">Parent: {visitor.parentGuardianName}</span>
+                      <span className="capitalize">{visitor.gender ?? '—'}</span>
+                      <span className="text-muted-foreground/30">•</span>
+                      <span>{visitor.dateOfBirth ? calculateAge(visitor.dateOfBirth) + ' yrs' : '—'}</span>
+                      <span className="text-muted-foreground/30">•</span>
+                      <span className="truncate max-w-[200px]" title={visitor.guardians?.map(g => g.fullName).join(', ')}>
+                        Guardians: {visitor.guardians?.map(g => g.fullName).join(', ') || '—'}
+                      </span>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <Badge 
-                    variant="outline"
-                    className={
-                      visitor.followUpStatus === 'pending' ? 'bg-amber-100 text-amber-800' :
-                      visitor.followUpStatus === 'contacted' ? 'bg-blue-100 text-blue-800' :
-                      'bg-green-100 text-green-800'
-                    }
-                  >
-                    {visitor.followUpStatus}
-                  </Badge>
                 </div>
               </CardContent>
             </Card>
@@ -412,13 +590,53 @@ function ChildVisitorsList({ refreshKey, onAddVisitor }: { refreshKey: number, o
   );
 }
 
-function ChildrenAttendanceList({ refreshKey, onMarkAttendance }: { refreshKey: number, onMarkAttendance: () => void }) {
+function ChildrenAttendanceList({ refreshKey, onMarkAttendance, onRefresh }: { refreshKey: number, onMarkAttendance: () => void, onRefresh: () => void }) {
   const { data: records, loading } = useCachedData<ChildrenAttendanceRecord[]>(
     `children-attendance-${refreshKey}`,
     () => api.children.attendance.getAll()
   );
 
-  if (loading) return <ChildListSkeleton />;
+  const handleExportCSV = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      date: formatDateForExport(r.date)
+    }));
+    const cols = [
+      { key: 'date', label: 'Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalCount', label: 'Total Present' }
+    ];
+    exportToCSV(data, `children-attendance-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
+
+  const handleExportPDF = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      date: formatDateForExport(r.date)
+    }));
+    const cols = [
+      { key: 'date', label: 'Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalCount', label: 'Total Present' }
+    ];
+    exportToPDF(data, `children-attendance-${new Date().toISOString().slice(0, 10)}`, 'Children Attendance', cols);
+  };
+
+  const handleExportXLSX = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      date: formatDateForExport(r.date)
+    }));
+    const cols = [
+      { key: 'date', label: 'Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalCount', label: 'Total Present' }
+    ];
+    exportToXLSX(data, `children-attendance-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -427,13 +645,36 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance }: { refreshKey: 
           <h2 className="text-2xl font-bold">Attendance</h2>
           <p className="text-muted-foreground">View children's attendance records</p>
         </div>
-        <Button onClick={onMarkAttendance}>
-          <Calendar className="w-4 h-4 mr-2" />
-          Mark Attendance
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {records && records.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button onClick={onMarkAttendance}>
+            <Calendar className="w-4 h-4 mr-2" />
+            Mark Attendance
+          </Button>
+        </div>
       </div>
 
-      {!records || records.length === 0 ? (
+      {loading && !records ? (
+        <ChildListSkeleton />
+      ) : !records || records.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
@@ -476,13 +717,126 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance }: { refreshKey: 
   );
 }
 
-function ChildrenGivingList() {
-  const { data: records, loading } = useCachedData<ChildrenGivingRecord[]>(
-    'children-giving',
+function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onRefresh: () => void }) {
+  const { data: records, loading, refresh } = useCachedData<ChildrenGivingRecord[]>(
+    `children-giving-${refreshKey}`,
     () => api.children.giving.getAll()
   );
 
-  if (loading) return <ChildListSkeleton />;
+  const { canAccess } = useAuth();
+  const canEdit = canAccess('manage_giving');
+
+  const handleExportCSV = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      serviceDate: formatDateForExport(r.serviceDate),
+      totalAmount: formatCurrencyForExport(r.totalAmount)
+    }));
+    const cols = [
+      { key: 'serviceDate', label: 'Service Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalAmount', label: 'Total Amount (GH₵)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToCSV(data, `children-giving-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
+
+  const handleExportPDF = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      serviceDate: formatDateForExport(r.serviceDate),
+      totalAmount: formatCurrencyForExport(r.totalAmount)
+    }));
+    const cols = [
+      { key: 'serviceDate', label: 'Service Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalAmount', label: 'Total Amount (GH₵)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToPDF(data, `children-giving-${new Date().toISOString().slice(0, 10)}`, 'Children Giving', cols);
+  };
+
+  const handleExportXLSX = () => {
+    if (!records) return;
+    const data = records.map(r => ({
+      ...r,
+      serviceDate: formatDateForExport(r.serviceDate),
+      totalAmount: formatCurrencyForExport(r.totalAmount)
+    }));
+    const cols = [
+      { key: 'serviceDate', label: 'Service Date' },
+      { key: 'serviceType', label: 'Service Type' },
+      { key: 'totalAmount', label: 'Total Amount (GH₵)' },
+      { key: 'notes', label: 'Notes' }
+    ];
+    exportToXLSX(data, `children-giving-${new Date().toISOString().slice(0, 10)}`, cols);
+  };
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<ChildrenGivingRecord | null>(null);
+  const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [serviceType, setServiceType] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [services, setServices] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.services.getAll()
+      .then(data => setServices(data.filter((s: any) => s.isActive)))
+      .catch(console.error);
+  }, []);
+
+  const openCreateDialog = () => {
+    setEditingRecord(null);
+    setServiceDate(new Date().toISOString().split('T')[0]);
+    setServiceType('');
+    setTotalAmount('');
+    setNotes('');
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (record: ChildrenGivingRecord) => {
+    setEditingRecord(record);
+    setServiceDate(record.serviceDate);
+    setServiceType(record.serviceType);
+    setTotalAmount(record.totalAmount.toString());
+    setNotes(record.notes || '');
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditingRecord(null);
+  };
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    try {
+      const payload = {
+        serviceDate,
+        serviceType,
+        totalAmount: parseFloat(totalAmount),
+        notes
+      };
+
+      if (editingRecord) {
+        await api.children.giving.update(editingRecord.id, payload);
+      } else {
+        await api.children.giving.create(payload);
+      }
+
+      closeDialog();
+      refresh();
+      toast.success(editingRecord ? 'Giving record updated' : 'Giving record created');
+    } catch (error) {
+      toast.error(getFriendlyMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -491,15 +845,43 @@ function ChildrenGivingList() {
           <h2 className="text-2xl font-bold">Giving</h2>
           <p className="text-muted-foreground">View children's giving records</p>
         </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {records && records.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <Button onClick={openCreateDialog}>
+            <Banknote className="w-4 h-4 mr-2" />
+            Record Giving
+          </Button>
+        </div>
       </div>
 
-      {!records || records.length === 0 ? (
+      {loading && !records ? (
+        <ChildListSkeleton />
+      ) : !records || records.length === 0 ? (
         <Card>
           <CardContent className="p-0">
             <EmptyState
               icon={Banknote}
               title="No Giving Records"
-              description="Coming soon: You will be able to record children's giving here."
+              description="No giving records yet. Record the first children's offering."
+              action={{ label: "Record Giving", onClick: openCreateDialog }}
             />
           </CardContent>
         </Card>
@@ -525,12 +907,85 @@ function ChildrenGivingList() {
                     <p className="text-xs text-muted-foreground uppercase font-semibold">Total Amount</p>
                     <p className="text-xl font-bold text-emerald-600">GH₵ {record.totalAmount.toFixed(2)}</p>
                   </div>
+                  {canEdit && (
+                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(record)}>
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingRecord ? 'Edit Giving Record' : 'Record Giving'}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Service Date</Label>
+              <Input
+                type="date"
+                value={serviceDate}
+                onChange={(e) => setServiceDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Service Type</Label>
+              <Select value={serviceType} onValueChange={setServiceType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {services.map(s => (
+                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Total Amount</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                  GH₵
+                </span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="pl-12"
+                  value={totalAmount}
+                  onChange={(e) => setTotalAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDialog} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit} 
+              disabled={submitting || !serviceDate || !serviceType || !totalAmount}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -540,8 +995,8 @@ export interface ChildrenProps {
   onViewChild: (child: ChildMember) => void;
   onMarkAttendance: () => void;
   onAddChildVisitor: () => void;
-  refreshKey: number;
-  attendanceRefreshKey: number;
+  activeTab?: 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics';
+  onTabChange?: (tab: 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics') => void;
 }
 
 export function Children({
@@ -549,10 +1004,20 @@ export function Children({
   onViewChild,
   onMarkAttendance,
   onAddChildVisitor,
-  refreshKey,
-  attendanceRefreshKey
+  activeTab = 'members',
+  onTabChange
 }: ChildrenProps) {
-  const [activeTab, setActiveTab] = useState<'members' | 'visitors' | 'attendance' | 'giving'>('members');
+  const [internalTab, setInternalTab] = useState<'members' | 'visitors' | 'attendance' | 'giving' | 'analytics'>(activeTab);
+  const currentTab = onTabChange ? activeTab : internalTab;
+
+  const handleTabChange = (tab: 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics') => {
+    if (onTabChange) onTabChange(tab);
+    else setInternalTab(tab);
+  };
+  const [membersRefreshKey, setMembersRefreshKey] = useState(0);
+  const [visitorsRefreshKey, setVisitorsRefreshKey] = useState(0);
+  const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
+  const [givingRefreshKey, setGivingRefreshKey] = useState(0);
 
   return (
     <div className="space-y-8 animate-fade-in max-w-[1200px] mx-auto">
@@ -563,56 +1028,64 @@ export function Children({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
           { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-violet-100 text-violet-600' },
           { id: 'visitors', title: 'Visitors', label: 'New & visiting children', icon: UserPlus, color: 'bg-amber-100 text-amber-600' },
           { id: 'attendance', title: 'Attendance', label: 'Service attendance records', icon: Calendar, color: 'bg-green-100 text-green-600' },
           { id: 'giving', title: 'Giving', label: "Children's giving records", icon: Banknote, color: 'bg-emerald-100 text-emerald-600' },
+          { id: 'analytics', title: 'Analytics', label: "Children's insights", icon: BarChart3, color: 'bg-blue-100 text-blue-600' },
         ].map((tab) => (
           <button
             key={tab.id}
             className={`rounded-xl p-3 flex items-center gap-3 w-full text-left transition-all ${
-              activeTab === tab.id
+              currentTab === tab.id
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-card border hover:bg-accent/50'
             }`}
-            onClick={() => setActiveTab(tab.id as 'members' | 'visitors' | 'attendance' | 'giving')}
+            onClick={() => handleTabChange(tab.id as 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics')}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${activeTab === tab.id ? 'bg-white/20' : tab.color}`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${currentTab === tab.id ? 'bg-white/20' : tab.color}`}>
               <tab.icon className="w-5 h-5" />
             </div>
             <div>
               <div className="font-semibold text-sm">{tab.title}</div>
-              <div className={`text-xs ${activeTab === tab.id ? 'opacity-75' : 'text-muted-foreground'}`}>{tab.label}</div>
+              <div className={`text-xs ${currentTab === tab.id ? 'opacity-75' : 'text-muted-foreground'}`}>{tab.label}</div>
             </div>
           </button>
         ))}
       </div>
 
       <div className="mt-6 min-h-[400px]">
-        {activeTab === 'members' && (
+        {currentTab === 'members' && (
           <ChildMembersList 
-            refreshKey={refreshKey} 
+            refreshKey={membersRefreshKey} 
+            onRefresh={() => setMembersRefreshKey(k => k + 1)}
             onAddChild={onAddChild} 
             onViewChild={onViewChild} 
           />
         )}
-        {activeTab === 'visitors' && (
+        {currentTab === 'visitors' && (
           <ChildVisitorsList 
-            refreshKey={refreshKey} 
+            refreshKey={visitorsRefreshKey} 
+            onRefresh={() => setVisitorsRefreshKey(k => k + 1)}
             onAddVisitor={onAddChildVisitor} 
           />
         )}
-        {activeTab === 'attendance' && (
+        {currentTab === 'attendance' && (
           <ChildrenAttendanceList 
             refreshKey={attendanceRefreshKey} 
+            onRefresh={() => setAttendanceRefreshKey(k => k + 1)}
             onMarkAttendance={onMarkAttendance} 
           />
         )}
-        {activeTab === 'giving' && (
-          <ChildrenGivingList />
+        {currentTab === 'giving' && (
+          <ChildrenGivingList 
+            refreshKey={givingRefreshKey} 
+            onRefresh={() => setGivingRefreshKey(k => k + 1)}
+          />
         )}
+        {currentTab === 'analytics' && <ChildrenAnalytics />}
       </div>
     </div>
   );

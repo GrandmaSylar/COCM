@@ -16,3 +16,15 @@ export function formatGhanaCedis(amount: number): string {
     maximumFractionDigits: 2 
   })}`;
 }
+
+/**
+ * Generate a uniform key for mapping expenses to a specific service
+ * @param date - The service date (YYYY-MM-DD or similar)
+ * @param type - The service type (e.g. sunday_morning)
+ */
+export function getExpenseKey(date: string, type: string): string {
+  if (!date || !type) return '';
+  // Ensure we just use the date part if it's an ISO string
+  const dateStr = date.includes('T') ? date.split('T')[0] : date;
+  return `${dateStr}_${type}`;
+}
