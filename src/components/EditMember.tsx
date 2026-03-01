@@ -49,7 +49,15 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   const [sabbaticalUntilFurtherNotice, setSabbaticalUntilFurtherNotice] = useState(!member.sabbaticalEndDate && member.status === 'sabbatical');
 
   // Baptism Info State
-  const [baptismInfo, setBaptismInfo] = useState<BaptismInfo>(member.baptismInfo || {
+  const [baptismInfo, setBaptismInfo] = useState<BaptismInfo>(
+    (member.baptismInfo && {
+      ...member.baptismInfo,
+      fullDate: member.baptismInfo.fullDate ?? '',
+      month: member.baptismInfo.month ?? '',
+      year: member.baptismInfo.year ?? '',
+      previousCongregation: member.baptismInfo.previousCongregation ?? '',
+      roleInPreviousCongregation: member.baptismInfo.roleInPreviousCongregation ?? ''
+    }) || {
     dateType: 'full',
     fullDate: '',
     month: '',
@@ -59,12 +67,21 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   });
 
   // Family Info State
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(member.familyMembers || []);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(
+    (member.familyMembers || []).map(fm => ({ ...fm, otherNames: fm.otherNames ?? '', phone: fm.phone ?? '', occupation: fm.occupation ?? '', hometown: fm.hometown ?? '' }))
+  );
   // Track search state per family member
   const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
 
   // Legal Info State
-  const [legalInfo, setLegalInfo] = useState<LegalInfo>(member.legalInfo || {
+  const [legalInfo, setLegalInfo] = useState<LegalInfo>(
+    (member.legalInfo && {
+      ...member.legalInfo,
+      ghanaCardNumber: member.legalInfo.ghanaCardNumber ?? '',
+      ghanaCardExpiryDate: member.legalInfo.ghanaCardExpiryDate ?? '',
+      alternativeIdType: member.legalInfo.alternativeIdType ?? '',
+      alternativeIdNumber: member.legalInfo.alternativeIdNumber ?? ''
+    }) || {
     ghanaCardNumber: '',
     ghanaCardExpiryDate: '',
     alternativeIdType: '',
