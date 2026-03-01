@@ -442,17 +442,17 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                 const status = attendanceStatus[member.id] || 'unmarked';
                 return (
                   <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                         <span className="text-sm font-medium text-primary">
                           {member.firstName[0]}{member.lastName[0]}
                         </span>
                       </div>
-                      <div>
-                        <h4 className="font-medium">
+                      <div className="min-w-0 overflow-hidden">
+                        <h4 className="font-medium truncate">
                           {member.firstName} {member.otherNames} {member.lastName}
                         </h4>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground truncate">
                           <span>{member.zoneNumber} - Zone {member.zone}</span>
                           <span>•</span>
                           <span>{member.phone}</span>
@@ -461,7 +461,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Badge className={getStatusColor(status)}>
+                      <Badge className={`hidden sm:flex ${getStatusColor(status)}`}>
                         {status === 'present' && <Check className="w-3 h-3 mr-1" />}
                         {status === 'absent' && <X className="w-3 h-3 mr-1" />}
                         {status.charAt(0).toUpperCase() + status.slice(1)}
