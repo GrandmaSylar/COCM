@@ -72,7 +72,7 @@ async function checkPermission(userId: string, permission: string): Promise<bool
 
   // Admin role has grant_permissions and manage_giving_types
   if (profile.role === 'admin') {
-    if (['grant_permissions', 'manage_giving_types', 'manage_users', 'manage_settings'].includes(permission)) {
+    if (['grant_permissions', 'manage_giving_types', 'manage_users', 'manage_settings', 'manage_members'].includes(permission)) {
       return true;
     }
   }
@@ -6771,9 +6771,10 @@ app.post('/children/visitors', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!await isAdminOrDev(user.id)) {
-      console.warn('Unauthorized children visitors create attempt by', user.id);
-      return c.json({ error: 'Forbidden' }, 403);
+    const hasPermission = await checkPermission(user.id, 'manage_members');
+    if (!hasPermission) {
+      console.warn('Insufficient manage_members permission for children visitors create by', user.id);
+      return c.json({ error: 'Insufficient permissions' }, 403);
     }
     const body = await c.req.json();
 
@@ -6838,9 +6839,10 @@ app.put('/children/visitors/:id', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!await isAdminOrDev(user.id)) {
-      console.warn('Unauthorized children visitors update attempt by', user.id);
-      return c.json({ error: 'Forbidden' }, 403);
+    const hasPermission = await checkPermission(user.id, 'manage_members');
+    if (!hasPermission) {
+      console.warn('Insufficient manage_members permission for children visitors update by', user.id);
+      return c.json({ error: 'Insufficient permissions' }, 403);
     }
     const id = c.req.param('id');
     const body = await c.req.json();
