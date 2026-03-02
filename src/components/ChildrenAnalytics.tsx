@@ -84,8 +84,46 @@ export function ChildrenAnalytics() {
     try {
       setError(false);
       if (showLoading) setLoading(true);
-      const res = await api.children.analytics.get(period);
-      setData(res);
+      
+      const mappedPeriod = period === '3m' ? 'quarter' : period === '6m' ? '6months' : 'year';
+      const res = await api.reports.getReports(mappedPeriod, 'children');
+      
+      const totalMembers = res.summary?.totalMembers || 0;
+      
+      setData({
+        summary: {
+          totalMembers,
+          activeMembers: res.summary?.activeMembers || 0,
+          visitorCount: res.summary?.totalVisitors || 0,
+          totalGiving: res.summary?.totalGiving || 0,
+          baptisedCount: 0
+        },
+        memberGrowth: (res.membershipData || []).map((item: any) => ({
+          month: item.month,
+          count: item.newMembers
+        })),
+        genderBreakdown: (res.membersByGender || []).reduce((acc: any, curr: any) => {
+          if (curr.gender) acc[curr.gender.toLowerCase()] = curr.count;
+          return acc;
+        }, { male: 0, female: 0 }),
+        ageDistribution: (res.membersByAge || [])
+          .filter((item: any) => ['0-3 yrs', '4-6 yrs', '7-9 yrs', '10-12 yrs', '13-17 yrs'].includes(item.group))
+          .map((item: any) => ({
+            ageGroup: item.group,
+            count: item.count
+          })),
+        attendanceTrend: (res.attendanceData || []).map((item: any) => ({
+          month: item.month,
+          rate: totalMembers > 0 ? Math.round((item.attendance / totalMembers) * 100) : 0
+        })),
+        givingTrend: res.givingData || [],
+        visitorConversion: {
+          total: res.summary?.totalVisitors || 0,
+          converted: Math.round((res.summary?.totalVisitors || 0) * (res.visitorConversionRate || 0) / 100)
+        },
+        baptismStats: null,
+        ageOutAlerts: []
+      });
     } catch (err) {
       console.error('Failed to fetch analytics', err);
       setError(true);
@@ -100,7 +138,8 @@ export function ChildrenAnalytics() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchAnalytics(false);
+    const needsLoading = error || !data;
+    await fetchAnalytics(needsLoading);
     setRefreshing(false);
   };
 
@@ -155,7 +194,6 @@ export function ChildrenAnalytics() {
             <SelectItem value="3m">Last 3 Months</SelectItem>
             <SelectItem value="6m">Last 6 Months</SelectItem>
             <SelectItem value="1y">Last Year</SelectItem>
-            <SelectItem value="all">All Time</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
@@ -194,7 +232,7 @@ export function ChildrenAnalytics() {
     attendanceTrend = [],
     givingTrend = [],
     visitorConversion = { total: 0, converted: 0 },
-    baptismStats = { baptised: 0, notBaptised: 0 },
+    baptismStats = null,
     ageOutAlerts = []
   } = data;
 
@@ -208,10 +246,10 @@ export function ChildrenAnalytics() {
     { name: 'Not Converted', value: (visitorConversion.total || 0) - (visitorConversion.converted || 0) }
   ];
 
-  const baptismData = [
+  const baptismData = baptismStats ? [
     { name: 'Baptised', value: baptismStats.baptised || 0 },
     { name: 'Not Baptised', value: baptismStats.notBaptised || 0 }
-  ];
+  ] : [];
 
   let formattedAgeDist: any[] = [];
   if (Array.isArray(ageDistribution)) {
@@ -269,8 +307,9 @@ export function ChildrenAnalytics() {
         <Card className="bg-gradient-to-br from-cyan-50 to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
             <CheckCircle className="w-6 h-6 text-cyan-500 mb-2" />
-            <div className="text-2xl font-bold">{summary.baptisedCount}</div>
+            <div className="text-2xl font-bold">0</div>
             <div className="text-xs text-muted-foreground font-medium">Baptised</div>
+            <div className="text-[10px] italic text-muted-foreground mt-1">Data unavailable</div>
           </CardContent>
         </Card>
       </div>
@@ -446,6 +485,7 @@ export function ChildrenAnalytics() {
         </Card>
 
         {/* Baptism Stats */}
+        {baptismStats && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -467,6 +507,7 @@ export function ChildrenAnalytics() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        )}
 
       </div>
     </div>

@@ -151,6 +151,12 @@ export function Reports() {
     setExpensesLoading(true);
     setExpensesError(false);
     (async () => {
+      if (selectedScope === 'children') {
+        setExpenseRecords([]);
+        setTotalExpenses(0);
+        setExpensesLoading(false);
+        return;
+      }
       try {
         const expenses = await api.expenses.getAll();
         
@@ -197,6 +203,9 @@ export function Reports() {
     try {
       if (showLoading) setLoading(true);
       const data = await api.reports.getReports(selectedPeriod, selectedScope);
+      
+      if (requestCounterRef.current !== currentRequestId) return;
+
       setAttendanceData(data.attendanceData || []);
       setGivingData(data.givingData || []);
       setMembershipData(data.membershipData || []);
@@ -212,9 +221,12 @@ export function Reports() {
       setVisitorConversionRate(data.visitorConversionRate || 0);
       setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
     } catch (error) {
+      if (requestCounterRef.current !== currentRequestId) return;
       console.error('Failed to fetch reports:', error);
     } finally {
-      setLoading(false);
+      if (requestCounterRef.current === currentRequestId) {
+        setLoading(false);
+      }
     }
   };
 
