@@ -8,6 +8,7 @@ import { RefreshCw, Users, UserPlus, Banknote, CheckCircle, AlertTriangle, BarCh
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { api } from '../services/api';
 import { formatGhanaCedis } from './ui/utils';
+import { EmptyState } from './EmptyState';
 
 const GENDER_COLORS: Record<string, string> = {
   male: '#0ea5e9',
@@ -66,6 +67,7 @@ export function ChildrenAnalytics() {
   const [period, setPeriod] = useState('1y');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(false);
   const [data, setData] = useState<any>(null);
   
   // Custom logic to initialize sets from sessionStorage
@@ -80,11 +82,13 @@ export function ChildrenAnalytics() {
 
   const fetchAnalytics = async (showLoading = true) => {
     try {
+      setError(false);
       if (showLoading) setLoading(true);
       const res = await api.children.analytics.get(period);
       setData(res);
     } catch (err) {
       console.error('Failed to fetch analytics', err);
+      setError(true);
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -136,6 +140,49 @@ export function ChildrenAnalytics() {
     );
   }
 
+  const renderHeader = () => (
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div>
+        <h1 className="text-2xl font-bold">Children's Analytics</h1>
+        <p className="text-muted-foreground">Insights and trends for the Children's Ministry</p>
+      </div>
+      <div className="flex gap-2">
+        <Select value={period} onValueChange={setPeriod}>
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="3m">Last 3 Months</SelectItem>
+            <SelectItem value="6m">Last 6 Months</SelectItem>
+            <SelectItem value="1y">Last Year</SelectItem>
+            <SelectItem value="all">All Time</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        {renderHeader()}
+        <EmptyState
+          icon={AlertTriangle}
+          title="Could not load analytics data"
+          description="Could not load analytics data. Please try again."
+          action={{
+            label: "Retry",
+            onClick: () => fetchAnalytics(true)
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!data) return null;
 
   // The fields in data could be undefined if there was an error in the backend
@@ -183,29 +230,7 @@ export function ChildrenAnalytics() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Children's Analytics</h1>
-          <p className="text-muted-foreground">Insights and trends for the Children's Ministry</p>
-        </div>
-        <div className="flex gap-2">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="3m">Last 3 Months</SelectItem>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="1y">Last Year</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+      {renderHeader()}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-4">
