@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
@@ -95,6 +95,7 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
 };
 
 export function Reports() {
+  const requestCounterRef = useRef(0);
   const [selectedPeriod, setSelectedPeriod] = useState('year');
   const [selectedScope, setSelectedScope] = useState('main');
   const [loading, setLoading] = useState(true);
@@ -114,6 +115,8 @@ export function Reports() {
   const [visitorConversionRate, setVisitorConversionRate] = useState(0);
   const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [expensesLoading, setExpensesLoading] = useState(true);
+  const [expensesError, setExpensesError] = useState(false);
   const [summary, setSummary] = useState({
     totalMembers: 0,
     avgAttendance: 0,
@@ -141,12 +144,59 @@ export function Reports() {
   });
 
   const fetchReports = async (showLoading = true) => {
+    requestCounterRef.current += 1;
+    const currentRequestId = requestCounterRef.current;
+
+    // 1. Kick off expenses fetch concurrently
+    setExpensesLoading(true);
+    setExpensesError(false);
+    (async () => {
+      try {
+        const expenses = await api.expenses.getAll();
+        
+        if (requestCounterRef.current !== currentRequestId) return;
+        
+        setExpenseRecords(expenses || []);
+        const now = new Date();
+        let periodStart: Date;
+        switch (selectedPeriod) {
+          case 'month':
+            periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+          case 'quarter':
+            periodStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            break;
+          case '6months':
+            periodStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+            break;
+          case '2years':
+            periodStart = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+            break;
+          default: // year
+            periodStart = new Date(now.getFullYear(), 0, 1);
+            break;
+        }
+        const filteredExpenses = (expenses || []).filter((exp: any) => {
+          const d = new Date(exp.serviceDate);
+          return d >= periodStart && d <= now;
+        });
+        setTotalExpenses(filteredExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0));
+      } catch (error) {
+        if (requestCounterRef.current !== currentRequestId) return;
+        setExpenseRecords([]);
+        setTotalExpenses(0);
+        setExpensesError(true);
+      } finally {
+        if (requestCounterRef.current === currentRequestId) {
+          setExpensesLoading(false);
+        }
+      }
+    })();
+
+    // 2. Await reports fetch
     try {
       if (showLoading) setLoading(true);
-      const [data, expenses] = await Promise.all([
-        api.reports.getReports(selectedPeriod, selectedScope),
-        api.expenses.getAll()
-      ]);
+      const data = await api.reports.getReports(selectedPeriod, selectedScope);
       setAttendanceData(data.attendanceData || []);
       setGivingData(data.givingData || []);
       setMembershipData(data.membershipData || []);
@@ -161,33 +211,6 @@ export function Reports() {
       setVisitorsByStatus(data.visitorsByStatus || []);
       setVisitorConversionRate(data.visitorConversionRate || 0);
       setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
-
-      // Store expense records and compute totalExpenses for the selected period
-      setExpenseRecords(expenses || []);
-      const now = new Date();
-      let periodStart: Date;
-      switch (selectedPeriod) {
-        case 'month':
-          periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        case 'quarter':
-          periodStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-          break;
-        case '6months':
-          periodStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-          break;
-        case '2years':
-          periodStart = new Date(now.getFullYear() - 2, now.getMonth(), 1);
-          break;
-        default: // year
-          periodStart = new Date(now.getFullYear(), 0, 1);
-          break;
-      }
-      const filteredExpenses = (expenses || []).filter((exp: any) => {
-        const d = new Date(exp.serviceDate);
-        return d >= periodStart && d <= now;
-      });
-      setTotalExpenses(filteredExpenses.reduce((sum: number, exp: any) => sum + (exp.amount || 0), 0));
     } catch (error) {
       console.error('Failed to fetch reports:', error);
     } finally {
@@ -503,9 +526,26 @@ export function Reports() {
             <div className="w-10 h-10 rounded-xl bg-teal-500/40 flex items-center justify-center mb-3 text-teal-600 group-hover:scale-110 transition-transform duration-300">
               <Receipt className="w-5 h-5" />
             </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(netGiving)}</div>
-            <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-            {scopeTotalExpenses > 0 && <div className="text-xs text-red-500 mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
+            {expensesLoading ? (
+              <>
+                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">
+                  <Skeleton className="h-8 w-16 md:w-24" />
+                </div>
+                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
+              </>
+            ) : expensesError ? (
+              <>
+                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving || 0)}</div>
+                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
+                <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(netGiving)}</div>
+                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
+                {scopeTotalExpenses > 0 && <div className="text-xs text-red-500 mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -585,8 +625,12 @@ export function Reports() {
                   <>
                     <Bar dataKey="mainAmount" stackId="giving" fill="#1B4D3E" name="Main" radius={[0, 0, 0, 0]} />
                     <Bar dataKey="childrenAmount" stackId="giving" fill="#6d28d9" name="Children" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                    {!expensesLoading && !expensesError && (
+                      <>
+                        <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                      </>
+                    )}
                   </>
                 ) : (
                   hasData(givingData, 'offering') ? (
@@ -597,19 +641,30 @@ export function Reports() {
                       {hasData(mergedGivingData, 'custom') && (
                         <Bar dataKey="custom" name="Custom" stackId="a" fill="#a855f7" radius={[4, 4, 0, 0]} />
                       )}
-                      <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                      {!expensesLoading && !expensesError && (
+                        <>
+                          <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
                       <Bar dataKey="amount" name="Total Giving" fill="#FFD700" radius={[4, 4, 0, 0]} />
-                      <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                      {!expensesLoading && !expensesError && (
+                        <>
+                          <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="netAmount" name="Net Giving" stroke="#14b8a6" strokeWidth={2} dot={false} />
+                        </>
+                      )}
                     </>
                   )
                 )}
               </ComposedChart>
             </ResponsiveContainer>
+            {expensesError && (
+              <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable — net giving line not shown</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -919,7 +974,7 @@ export function Reports() {
       </div>
 
       {/* Expenses Breakdown by Service Type */}
-      {expensesByServiceType.length > 0 && (
+      {selectedScope !== 'children' && (expensesLoading || expensesError || expensesByServiceType.length > 0) && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
@@ -928,15 +983,21 @@ export function Reports() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={expensesByServiceType} layout="vertical" margin={{ left: 0, right: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={100} />
-                <Tooltip content={<CustomTooltip isCurrency />} />
-                <Bar dataKey="amount" name="Expenses" fill="#ef4444" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {expensesLoading ? (
+              <Skeleton className="h-64 w-full" />
+            ) : expensesError ? (
+              <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={expensesByServiceType} layout="vertical" margin={{ left: 0, right: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="type" type="category" tick={{ fontSize: 10 }} width={100} />
+                  <Tooltip content={<CustomTooltip isCurrency />} />
+                  <Bar dataKey="amount" name="Expenses" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       )}

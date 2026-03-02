@@ -504,9 +504,12 @@ function AppContent() {
 
   const handleUpdateVisitor = async (visitorData: Visitor) => {
     try {
-      await api.visitors.update(visitorData.id, visitorData);
+      const { dateOfBirth, ...updatePayload } = visitorData;
+      await api.visitors.update(visitorData.id, updatePayload as Visitor);
       toast.success('Visitor updated successfully!');
-      setSelectedVisitor(visitorData);
+      
+      setSelectedVisitor(prev => prev ? { ...prev, ...updatePayload } as Visitor : updatePayload as Visitor);
+      
       setVisitorsRefreshKey(prev => prev + 1);
       navigateTo('visitor-profile');
     } catch (error: any) {

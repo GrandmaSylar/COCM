@@ -4859,6 +4859,49 @@ async function enrichAndGroupByDate(records: any[]) {
     }
   }
 
+  const childrenGivingTotalMap: Record<string, number> = {};
+  const childrenAttendanceCountMap: Record<string, number> = {};
+  const childrenVisitorsCountMap: Record<string, number> = {};
+  const expensesTotalMap: Record<string, number> = {};
+
+  if (allDates.length > 0) {
+    const [
+      { data: cgData },
+      { data: caData },
+      { data: cvData },
+      { data: expData }
+    ] = await Promise.all([
+      supabase.from('children_giving_records').select('service_date, service_type, total_amount').in('service_date', allDates),
+      supabase.from('children_attendance_records').select('date, service_type, total_count').in('date', allDates),
+      supabase.from('children_visitors').select('visit_date').in('visit_date', allDates),
+      supabase.from('expense_records').select('service_date, service_type, amount').in('service_date', allDates)
+    ]);
+
+    if (cgData) {
+      for (const rec of cgData) {
+        const key = `${rec.service_date}_${rec.service_type}`;
+        childrenGivingTotalMap[key] = (childrenGivingTotalMap[key] || 0) + (rec.total_amount || 0);
+      }
+    }
+    if (caData) {
+      for (const rec of caData) {
+        const key = `${rec.date}_${rec.service_type}`;
+        childrenAttendanceCountMap[key] = (childrenAttendanceCountMap[key] || 0) + (rec.total_count || 0);
+      }
+    }
+    if (cvData) {
+      for (const rec of cvData) {
+        childrenVisitorsCountMap[rec.visit_date] = (childrenVisitorsCountMap[rec.visit_date] || 0) + 1;
+      }
+    }
+    if (expData) {
+      for (const rec of expData) {
+        const key = `${rec.service_date}_${rec.service_type}`;
+        expensesTotalMap[key] = (expensesTotalMap[key] || 0) + (rec.amount || 0);
+      }
+    }
+  }
+
   // Group by service_date and service_type
   const dateTypeMap: Record<string, any[]> = {};
   for (const sr of sorted) {
@@ -4913,6 +4956,10 @@ async function enrichAndGroupByDate(records: any[]) {
       visitorsCount: totalVisitors, // Just sum what was recorded specifically on these service_records
       membersRegistered: totalNewMembers,
       recordCount: srs.length,
+      childrenGivingTotal: childrenGivingTotalMap[`${date}_${type}`] ?? 0,
+      childrenAttendanceCount: childrenAttendanceCountMap[`${date}_${type}`] ?? 0,
+      childrenVisitorsCount: childrenVisitorsCountMap[date] ?? 0,
+      expensesTotal: expensesTotalMap[`${date}_${type}`] ?? 0,
     };
   });
 
@@ -5132,6 +5179,54 @@ app.get("/service-records/by-date/:date", async (c) => {
       .select('id, first_name, last_name, zone')
       .eq('join_date', date);
 
+    const childrenGivingQuery = supabase.from('children_giving_records').select('*').eq('service_date', date);
+    if (serviceType) childrenGivingQuery.eq('service_type', serviceType);
+
+    const childrenAttendanceQuery = supabase.from('children_attendance_records').select('*').eq('date', date);
+    if (serviceType) childrenAttendanceQuery.eq('service_type', serviceType);
+
+    const expensesQuery = supabase.from('expense_records').select('*').eq('service_date', date);
+    if (serviceType) expensesQuery.eq('service_type', serviceType);
+
+    const [
+      { data: childrenGivingData },
+      { data: childrenAttendanceData },
+      { data: childrenVisitorsData },
+      { data: newChildMembersData },
+      { data: expensesData }
+    ] = await Promise.all([
+      childrenGivingQuery,
+      childrenAttendanceQuery,
+      supabase.from('children_visitors').select('*').eq('visit_date', date),
+      supabase.from('children_members').select('*').eq('join_date', date),
+      expensesQuery
+    ]);
+
+    let childrenEntriesData: any[] = [];
+    const recordIds = (childrenAttendanceData || []).map((r: any) => r.id);
+    if (recordIds.length > 0) {
+      const { data: entriesData } = await supabase.from('children_attendance_entries')
+        .select('*, children_members!inner(first_name, last_name)')
+        .in('attendance_record_id', recordIds);
+      childrenEntriesData = entriesData || [];
+    }
+
+    const childrenAttendanceMap: Record<string, any[]> = {};
+    for (const entry of childrenEntriesData) {
+      if (!childrenAttendanceMap[entry.attendance_record_id]) {
+        childrenAttendanceMap[entry.attendance_record_id] = [];
+      }
+      childrenAttendanceMap[entry.attendance_record_id].push({
+        id: entry.id,
+        childName: `${entry.children_members.first_name} ${entry.children_members.last_name}`
+      });
+    }
+
+    const childrenAttendance = (childrenAttendanceData || []).map((r: any) => ({
+      ...toCamelCase(r),
+      entries: childrenAttendanceMap[r.id] || []
+    }));
+
     return c.json({
       serviceDate: date,
       serviceTypes,
@@ -5143,6 +5238,11 @@ app.get("/service-records/by-date/:date", async (c) => {
       absentees: allAbsentees,
       visitors: (visitors || []).map((v: any) => toCamelCase(v)),
       newMembers: (newMembers || []).map((m: any) => toCamelCase(m)),
+      childrenGiving: (childrenGivingData || []).map((r: any) => toCamelCase(r)),
+      childrenAttendance,
+      childrenVisitors: (childrenVisitorsData || []).map((r: any) => toCamelCase(r)),
+      newChildMembers: (newChildMembersData || []).map((r: any) => toCamelCase(r)),
+      expenses: (expensesData || []).map((r: any) => toCamelCase(r)),
     });
   } catch (error) {
     console.error('Get service record by date error:', error);
@@ -7299,7 +7399,7 @@ app.get('/children/analytics', async (c) => {
     const visitorConversion = { total: visitors.length, converted: convertedCount };
 
     // 8. baptismStats
-    const baptismStats = { baptised: totalBaptised, notBaptised: totalMembers - totalBaptised };
+    const baptismStats = { baptised: baptisedCount, notBaptised: totalMembers - baptisedCount };
 
     // 9. ageOutAlerts
     const ageOutAlerts: any[] = [];

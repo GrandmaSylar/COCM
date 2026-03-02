@@ -792,7 +792,7 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
   const openCreateDialog = () => {
     setEditingRecord(null);
     setServiceDate(new Date().toISOString().split('T')[0]);
-    setServiceType('');
+    setServiceType('Sunday Main Service');
     setTotalAmount('');
     setNotes('');
     setDialogOpen(true);
@@ -941,6 +941,7 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
                   <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
                   {services.map(s => (
                     <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                   ))}

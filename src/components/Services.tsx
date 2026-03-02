@@ -16,6 +16,10 @@ interface ServiceDateSummary {
   visitorsCount: number;
   membersRegistered: number;
   recordCount: number;
+  childrenAttendanceCount?: number;
+  childrenGivingTotal?: number;
+  childrenVisitorsCount?: number;
+  expensesTotal?: number;
 }
 
 interface ServiceDetail {
@@ -41,6 +45,9 @@ interface ServiceDateDetail {
   newMembers: { id: string; firstName: string; lastName: string; zone: string }[];
   childrenAttendance?: any[];
   childrenGiving?: any[];
+  childrenVisitors?: any[];
+  newChildMembers?: any[];
+  expenses?: any[];
 }
 
 interface ServicesProps {
@@ -213,6 +220,23 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           </div>
         ))}
 
+        {/* Expenses */}
+        {sr.expenses && sr.expenses.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Expenses ({sr.expenses.length})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {sr.expenses.map((expense: any) => (
+                  <div key={expense.id} className="text-sm flex justify-between items-center px-2 py-1 box-warning rounded border-none">
+                    <span>{expense.details}</span>
+                    <span className="font-medium">{formatGhanaCedis(expense.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Combined Absentees */}
         {sr.absentees && sr.absentees.length > 0 && (
           <Card>
@@ -255,6 +279,22 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           </Card>
         )}
 
+        {/* New Members */}
+        {sr.newMembers && sr.newMembers.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">New Members Registered ({sr.newMembers.length})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {sr.newMembers.map((m) => (
+                  <div key={m.id} className="text-sm px-2 py-1 badge-success rounded">
+                    {m.firstName} {m.lastName} — Zone {m.zone}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Children Attendance (for this service date) */}
         {sr.childrenAttendance && sr.childrenAttendance.length > 0 && (
           <Card>
@@ -274,13 +314,29 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
         {/* Children Giving (for this service date) */}
         {sr.childrenGiving && sr.childrenGiving.length > 0 && (
           <Card>
-            <CardHeader><CardTitle className="text-sm">Children Giving ({formatGhanaCedis(sr.childrenGiving.reduce((sum: number, g: any) => sum + (g.amount || 0), 0))})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm">Children Giving ({formatGhanaCedis(sr.childrenGiving.reduce((sum: number, g: any) => sum + (g.totalAmount || 0), 0))})</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-1">
+              <div className="space-y-4">
                 {sr.childrenGiving.map((g: any) => (
-                  <div key={g.id} className="text-sm px-2 py-1 rounded flex justify-between">
-                    <span>{g.givingType || 'Offering'}</span>
-                    <span className="font-medium">{formatGhanaCedis(g.amount)}</span>
+                  <div key={g.id} className="space-y-1">
+                    {(g.offeringAmount || 0) > 0 && (
+                      <div className="text-sm px-2 py-1 rounded flex justify-between">
+                        <span>Offering</span>
+                        <span className="font-medium">{formatGhanaCedis(g.offeringAmount || 0)}</span>
+                      </div>
+                    )}
+                    {(g.cashAmount || 0) > 0 && (
+                      <div className="text-sm px-2 py-1 rounded flex justify-between">
+                        <span>Cash</span>
+                        <span className="font-medium">{formatGhanaCedis(g.cashAmount || 0)}</span>
+                      </div>
+                    )}
+                    {(g.mobileMoneyAmount || 0) > 0 && (
+                      <div className="text-sm px-2 py-1 rounded flex justify-between">
+                        <span>Mobile Money</span>
+                        <span className="font-medium">{formatGhanaCedis(g.mobileMoneyAmount || 0)}</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -288,15 +344,31 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
           </Card>
         )}
 
-        {/* New Members */}
-        {sr.newMembers && sr.newMembers.length > 0 && (
+        {/* Children Visitors */}
+        {sr.childrenVisitors && sr.childrenVisitors.length > 0 && (
           <Card>
-            <CardHeader><CardTitle className="text-sm">New Members Registered ({sr.newMembers.length})</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm">Children Visitors ({sr.childrenVisitors.length})</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-1">
-                {sr.newMembers.map((m) => (
+                {sr.childrenVisitors.map((v: any) => (
+                  <div key={v.id} className="text-sm px-2 py-1 badge-purple rounded">
+                    {v.firstName} {v.lastName}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* New Child Members */}
+        {sr.newChildMembers && sr.newChildMembers.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">New Child Members ({sr.newChildMembers.length})</CardTitle></CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {sr.newChildMembers.map((m: any) => (
                   <div key={m.id} className="text-sm px-2 py-1 badge-success rounded">
-                    {m.firstName} {m.lastName} — Zone {m.zone}
+                    {m.firstName} {m.lastName}
                   </div>
                 ))}
               </div>
@@ -336,7 +408,7 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                     </div>
                     <ChevronRight className="w-4 h-4 text-secondary" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-secondary" />
                       <span>{sr.totalAttendance} attended</span>
@@ -353,7 +425,31 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                       <UserPlus className="w-4 h-4 text-purple-500" />
                       <span>{sr.visitorsCount} visitors</span>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Banknote className="w-4 h-4 text-rose-500" />
+                      <span>{formatGhanaCedis(sr.expensesTotal || 0)}</span>
+                    </div>
                   </div>
+                  {((sr.childrenAttendanceCount || 0) > 0 || (sr.childrenGivingTotal || 0) > 0 || (sr.childrenVisitorsCount || 0) > 0) && (
+                    <>
+                      <hr className="my-3 border-border" />
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">CHILDREN</div>
+                      <div className="grid grid-cols-3 gap-3 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-secondary" />
+                          <span>{sr.childrenAttendanceCount || 0}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Banknote className="w-4 h-4 text-teal-500" />
+                          <span>{formatGhanaCedis(sr.childrenGivingTotal || 0)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <UserPlus className="w-4 h-4 text-purple-500" />
+                          <span>{sr.childrenVisitorsCount || 0}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -383,6 +479,12 @@ export function Services({ onViewRecord, onViewMember }: ServicesProps) {
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1"><Users className="w-3 h-3" />{sr.totalAttendance}</span>
                       <span className="flex items-center gap-1"><Banknote className="w-3 h-3" />{formatGhanaCedis(sr.totalGiving)}</span>
+                      {(sr.childrenGivingTotal || 0) > 0 && (
+                        <span className="flex items-center gap-1"><Banknote className="w-3 h-3 text-teal-500" />{formatGhanaCedis(sr.childrenGivingTotal || 0)}</span>
+                      )}
+                      {(sr.expensesTotal || 0) > 0 && (
+                        <span className="flex items-center gap-1"><Banknote className="w-3 h-3 text-rose-500" />{formatGhanaCedis(sr.expensesTotal || 0)}</span>
+                      )}
                       <ChevronRight className="w-4 h-4" />
                     </div>
                   </button>

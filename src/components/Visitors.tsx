@@ -364,7 +364,6 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     phone: '',
     secondPhone: '',
     gender: '' as 'male' | 'female' | '',
-    dateOfBirth: '',
     residenceLocation: '',
     visitDate: new Date().toISOString().split('T')[0],
     serviceType: 'Sunday Main Service',
@@ -480,7 +479,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="gender">Gender</Label>
                   <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}>
@@ -492,15 +491,6 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                       <SelectItem value="female">Female</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                  <Input
-                    id="dateOfBirth"
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                  />
                 </div>
               </div>
             </div>
@@ -690,7 +680,6 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
     phone: visitor.phone,
     secondPhone: visitor.secondPhone || '',
     gender: visitor.gender || '' as 'male' | 'female' | '',
-    dateOfBirth: visitor.dateOfBirth || '',
     residenceLocation: visitor.residenceLocation,
     visitDate: visitor.visitDate,
     serviceType: visitor.serviceType,
@@ -733,11 +722,14 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
 
     setIsLoading(true);
     try {
-      onSave({
-        ...visitor,
+      const payload: any = {
+        id: visitor.id,
         ...formData,
         potentialZone: formData.potentialZone || undefined
-      } as Visitor);
+      };
+      delete payload.dateOfBirth;
+
+      onSave(payload as Visitor);
     } catch (error) {
       console.error('Failed to update visitor:', error);
       setIsLoading(false);
@@ -799,7 +791,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-gender">Gender</Label>
                   <Select value={formData.gender} onValueChange={(value: 'male' | 'female') => setFormData(prev => ({ ...prev, gender: value }))}>
@@ -811,15 +803,6 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                       <SelectItem value="female">Female</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-dateOfBirth">Date of Birth</Label>
-                  <Input
-                    id="edit-dateOfBirth"
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                  />
                 </div>
               </div>
             </div>
