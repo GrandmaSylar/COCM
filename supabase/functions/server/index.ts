@@ -167,15 +167,16 @@ async function recalculateMemberStatuses(changedByUserId?: string) {
     const { data: members } = await supabase
       .from('members')
       .select('id, status, join_date, leave_end_date')
-      .not('status', 'eq', 'blacklisted');
+      .neq('status', 'blacklisted')
+      .neq('status', 'not baptised');
 
     if (!members) return;
 
     const today = new Date().toISOString().split('T')[0];
     const updates: { id: string; oldStatus: string; newStatus: string }[] = [];
 
-    // Batch: find which on-leave (sick/studies/traveled) members (with ended leave) have attendance
-    const ON_LEAVE_STATUSES = ['sick', 'studies', 'traveled'];
+    // Batch: find which on-leave (sick/schooling/traveled) members (with ended leave) have attendance
+    const ON_LEAVE_STATUSES = ['sick', 'schooling', 'traveled'];
     const endedLeaveIds = members
       .filter(m => ON_LEAVE_STATUSES.includes(m.status) && m.leave_end_date && m.leave_end_date < today)
       .map(m => m.id);
@@ -862,14 +863,16 @@ app.post("/auth/heartbeat", async (c) => {
     const { deviceId } = body;
 
     if (!user) {
-      return c.json({ error: 'Unauthorized' }, 401);
+      // Return 200 OK to prevent browser console from logging a 401 error. 
+      // The frontend logic handles the semantic error payload.
+      return c.json({ ok: false, error: 'Unauthorized' }, 200);
     }
 
     // Check device ID matches active device
     if (deviceId) {
       const { data: profile } = await supabase.from('profiles').select('active_device_id').eq('id', user.id).single();
       if (profile && profile.active_device_id && profile.active_device_id !== deviceId) {
-        return c.json({ error: 'logged_in_elsewhere' }, 401);
+        return c.json({ ok: false, error: 'logged_in_elsewhere' }, 200);
       }
     }
 
@@ -877,7 +880,7 @@ app.post("/auth/heartbeat", async (c) => {
     return c.json({ ok: true });
   } catch (error) {
     console.error('Heartbeat error:', error);
-    return c.json({ error: 'Internal server error' }, 500);
+    return c.json({ ok: false, error: 'Internal server error' }, 200);
   }
 });
 
@@ -1762,8 +1765,10 @@ app.post("/members", async (c)=>{
       dbMemberData.join_date = new Date().toISOString().split('T')[0];
     }
 
-    // Force 'new' status for all newly created members
-    dbMemberData.status = 'new';
+    // Force 'new' status for newly created members, unless they are 'not baptised'
+    if (dbMemberData.status !== 'not baptised') {
+      dbMemberData.status = 'new';
+    }
 
     const { data: member, error: memberError } = await supabase.from('members').insert({
       ...dbMemberData,
@@ -1847,7 +1852,7 @@ app.put("/members/:id", async (c)=>{
       'first_name', 'last_name', 'other_names', 'email', 'phone', 'second_phone',
       'gender', 'date_of_birth', 'marital_status', 'residence_location', 'digital_address',
       'zone', 'zone_number', 'notes', 'status', 'join_date', 'photo_url',
-      'baptism_info', 'legal_info', 'ministries',
+      'baptism_info', 'legal_info', 'ministries', 'position_held',
       'sabbatical_start_date', 'sabbatical_end_date', 'sabbatical_reason'
     ];
     const updatePayload = {};
@@ -2441,8 +2446,8 @@ app.post("/attendance/:id/absentees", async (c) => {
       return c.json({ error: 'Failed to save absentee records: ' + error.message }, 500);
     }
 
-    // Update member status + leave dates for reason-mapped absences (sick/studies/traveled)
-    const VALID_LEAVE_STATUSES = ['sick', 'studies', 'traveled'];
+    // Update member status + leave dates for reason-mapped absences (sick/schooling/traveled)
+    const VALID_LEAVE_STATUSES = ['sick', 'schooling', 'traveled'];
     for (const a of absentees) {
       if (a.memberStatus && VALID_LEAVE_STATUSES.includes(a.memberStatus)) {
         try {
@@ -4800,6 +4805,17 @@ app.put("/users/:id/tab-access", async (c) => {
 // Get today's (or most recent) service records
 // Helper: enrich and group service records by date, combining multiple service types
 // Uses batch queries instead of per-record to avoid N+1
+// Normalise legacy enum-style service types to their canonical display names
+function normalizeServiceType(type: string): string {
+  const map: Record<string, string> = {
+    sunday_morning: 'Sunday Main Service',
+    sunday_evening: 'Sunday Evening',
+    midweek: 'Midweek Service',
+    special: 'Special Service',
+  };
+  return map[type] || type;
+}
+
 async function enrichAndGroupByDate(records: any[]) {
   if (!records || records.length === 0) return [];
 
@@ -4879,13 +4895,13 @@ async function enrichAndGroupByDate(records: any[]) {
 
     if (cgData) {
       for (const rec of cgData) {
-        const key = `${rec.service_date}_${rec.service_type}`;
+        const key = `${rec.service_date}_${normalizeServiceType(rec.service_type)}`;
         childrenGivingTotalMap[key] = (childrenGivingTotalMap[key] || 0) + (rec.total_amount || 0);
       }
     }
     if (caData) {
       for (const rec of caData) {
-        const key = `${rec.date}_${rec.service_type}`;
+        const key = `${rec.date}_${normalizeServiceType(rec.service_type)}`;
         childrenAttendanceCountMap[key] = (childrenAttendanceCountMap[key] || 0) + (rec.total_count || 0);
       }
     }
@@ -4896,16 +4912,16 @@ async function enrichAndGroupByDate(records: any[]) {
     }
     if (expData) {
       for (const rec of expData) {
-        const key = `${rec.service_date}_${rec.service_type}`;
+        const key = `${rec.service_date}_${normalizeServiceType(rec.service_type)}`;
         expensesTotalMap[key] = (expensesTotalMap[key] || 0) + (rec.amount || 0);
       }
     }
   }
 
-  // Group by service_date and service_type
+  // Group by service_date and NORMALISED service_type
   const dateTypeMap: Record<string, any[]> = {};
   for (const sr of sorted) {
-    const key = `${sr.service_date}_${sr.service_type}`;
+    const key = `${sr.service_date}_${normalizeServiceType(sr.service_type)}`;
     if (!dateTypeMap[key]) dateTypeMap[key] = [];
     dateTypeMap[key].push(sr);
   }
@@ -4913,7 +4929,7 @@ async function enrichAndGroupByDate(records: any[]) {
   const grouped = Object.entries(dateTypeMap).map(([key, srs]) => {
     // key is date_type, we can get date from the first record
     const date = srs[0].service_date;
-    const type = srs[0].service_type;
+    const type = normalizeServiceType(srs[0].service_type);
 
     let totalAttendance = 0;
     let totalGiving = 0;
@@ -4934,18 +4950,6 @@ async function enrichAndGroupByDate(records: any[]) {
       totalNewMembers += sr.members_registered || 0;
     }
 
-    // Since visitors and new members are recorded by date, not specifically by service,
-    // we might need to distribute them or just show them for the primary service.
-    // For now, if there's only one service type for the date, show all. If multiple, perhaps we only show the ones explicitly attached to this record in UI.
-    // Let's keep the existing logic but just scoped to the records in this group.
-    
-    // We shouldn't use the bulk visitor table count if we are separating by service type
-    // because visitors in the visitors table don't have a service_type.
-    // BUT we will just use the sum of sr.visitors_count which is already specific to the service_record.
-    
-    // Also note: the original DB visitor/member queries didn't map to service types.
-    // We will just stick to what is in the service_records table directly.
-
     return {
       serviceDate: date,
       serviceTypes,
@@ -4953,7 +4957,7 @@ async function enrichAndGroupByDate(records: any[]) {
       totalAttendance,
       totalGiving,
       absenteesCount: totalAbsentees,
-      visitorsCount: totalVisitors, // Just sum what was recorded specifically on these service_records
+      visitorsCount: totalVisitors,
       membersRegistered: totalNewMembers,
       recordCount: srs.length,
       childrenGivingTotal: childrenGivingTotalMap[`${date}_${type}`] ?? 0,
@@ -5074,13 +5078,33 @@ app.get("/service-records/by-date/:date", async (c) => {
 
     const date = c.req.param('date');
     const serviceType = c.req.query('serviceType');
+
+    const reverseMap: Record<string, string> = {
+      'Sunday Main Service': 'sunday_morning',
+      'Sunday Evening': 'sunday_evening',
+      'Midweek Service': 'midweek',
+      'Special Service': 'special',
+    };
+
+    let candidateTypes: string[] = [];
+    if (serviceType) {
+      const normalizedType = normalizeServiceType(serviceType);
+      const legacyType = reverseMap[normalizedType];
+      
+      const typeSet = new Set<string>();
+      typeSet.add(serviceType);
+      if (normalizedType) typeSet.add(normalizedType);
+      if (legacyType) typeSet.add(legacyType);
+      
+      candidateTypes = Array.from(typeSet);
+    }
     
     let query = supabase.from('service_records')
       .select('*')
       .eq('service_date', date);
       
-    if (serviceType) {
-      query = query.eq('service_type', serviceType);
+    if (candidateTypes.length > 0) {
+      query = query.in('service_type', candidateTypes);
     }
     
     const { data: records, error } = await query.order('created_at', { ascending: false });
@@ -5094,8 +5118,9 @@ app.get("/service-records/by-date/:date", async (c) => {
 
     // Process each service record (newest first = overwrites)
     for (const sr of records) {
-      if (sr.service_type && !serviceTypes.includes(sr.service_type)) {
-        serviceTypes.push(sr.service_type);
+      const normType = normalizeServiceType(sr.service_type);
+      if (normType && !serviceTypes.includes(normType)) {
+        serviceTypes.push(normType);
       }
 
       let attendance = null;
@@ -5180,13 +5205,19 @@ app.get("/service-records/by-date/:date", async (c) => {
       .eq('join_date', date);
 
     const childrenGivingQuery = supabase.from('children_giving_records').select('*').eq('service_date', date);
-    if (serviceType) childrenGivingQuery.eq('service_type', serviceType);
+    if (candidateTypes.length > 0) {
+      childrenGivingQuery.in('service_type', candidateTypes);
+    }
 
     const childrenAttendanceQuery = supabase.from('children_attendance_records').select('*').eq('date', date);
-    if (serviceType) childrenAttendanceQuery.eq('service_type', serviceType);
+    if (candidateTypes.length > 0) {
+      childrenAttendanceQuery.in('service_type', candidateTypes);
+    }
 
     const expensesQuery = supabase.from('expense_records').select('*').eq('service_date', date);
-    if (serviceType) expensesQuery.eq('service_type', serviceType);
+    if (candidateTypes.length > 0) {
+      expensesQuery.in('service_type', candidateTypes);
+    }
 
     const [
       { data: childrenGivingData },
@@ -5227,6 +5258,46 @@ app.get("/service-records/by-date/:date", async (c) => {
       entries: childrenAttendanceMap[r.id] || []
     }));
 
+    const extra: Record<string, any> = {};
+    const effectiveCandidateTypes = candidateTypes.length > 0 
+      ? candidateTypes 
+      : (serviceTypes && serviceTypes.length > 0 ? serviceTypes.flatMap(st => {
+          const norm = normalizeServiceType(st);
+          const leg = reverseMap[norm];
+          return [st, norm, leg].filter(Boolean) as string[];
+        }) : []);
+        
+    if (effectiveCandidateTypes.length > 0) {
+      // De-duplicate types
+      const lookupTypes = Array.from(new Set(effectiveCandidateTypes));
+      
+      const { data: prevServiceRecs } = await supabase
+        .from('service_records')
+        .select('service_date, giving_record_id')
+        .in('service_type', lookupTypes)
+        .lt('service_date', date)
+        .order('service_date', { ascending: false })
+        .limit(1);
+
+      if (prevServiceRecs && prevServiceRecs.length > 0) {
+        const prevRecord = prevServiceRecs[0];
+        if (prevRecord.giving_record_id) {
+          const { data: prevGiving } = await supabase
+            .from('giving_records')
+            .select('total_amount')
+            .eq('id', prevRecord.giving_record_id)
+            .single();
+
+          if (prevGiving && typeof prevGiving.total_amount === 'number') {
+            extra.previousServiceGiving = {
+              totalGivingAmount: prevGiving.total_amount,
+              serviceDate: prevRecord.service_date
+            };
+          }
+        }
+      }
+    }
+
     return c.json({
       serviceDate: date,
       serviceTypes,
@@ -5243,6 +5314,7 @@ app.get("/service-records/by-date/:date", async (c) => {
       childrenVisitors: (childrenVisitorsData || []).map((r: any) => toCamelCase(r)),
       newChildMembers: (newChildMembersData || []).map((r: any) => toCamelCase(r)),
       expenses: (expensesData || []).map((r: any) => toCamelCase(r)),
+      ...extra
     });
   } catch (error) {
     console.error('Get service record by date error:', error);
@@ -7467,8 +7539,7 @@ app.post('/expenses/payment-methods', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    if (!await isAdminOrDev(user.id)) return c.json({ error: 'Forbidden' }, 403);
 
     const body = await c.req.json();
     const { data, error } = await supabase.from('expense_payment_methods').insert({
@@ -7487,8 +7558,7 @@ app.patch('/expenses/payment-methods/:id', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    if (!await isAdminOrDev(user.id)) return c.json({ error: 'Forbidden' }, 403);
 
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -7507,8 +7577,7 @@ app.delete('/expenses/payment-methods/:id', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    if (!await isAdminOrDev(user.id)) return c.json({ error: 'Forbidden' }, 403);
 
     const id = c.req.param('id');
     const { count, error: countErr } = await supabase.from('expense_records').select('*', { count: 'exact', head: true }).eq('payment_method_id', id);
@@ -7688,6 +7757,40 @@ app.delete('/expenses/:id', async (c) => {
   } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
 });
 
+// --- GET single expense record ---
+// NOTE: This route MUST remain registered after /expenses/next-form-id and
+// /expenses/payment-methods to prevent /:id param from greedily capturing
+// those literal paths.
+app.get('/expenses/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const id = c.req.param('id');
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return c.json({ error: 'Invalid expense ID format' }, 400);
+    }
+
+    const { data, error } = await supabase.from('expense_records').select('*').eq('id', id).single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return c.json({ error: 'Expense record not found' }, 404);
+      }
+      if (error.code === '22P02') {
+        return c.json({ error: 'Invalid expense ID format' }, 400);
+      }
+      return c.json({ error: error.message }, 500);
+    }
+
+    return c.json(toCamelCase(data));
+  } catch (e) {
+    console.error('GET /expenses/:id error:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
 // ============================================================================
 // ADMIN: NOTIFICATION CONFIG (dev only)
 // ============================================================================
@@ -7772,7 +7875,7 @@ app.get('/options', async (c) => {
     const { data, error } = await supabase
       .from('system_dropdown_options')
       .select('*')
-      .eq('is_active', true)
+      .or('is_active.eq.true,is_active.is.null')
       .order('category')
       .order('label');
       
@@ -7856,7 +7959,10 @@ app.delete('/admin/options/:id', async (c) => {
     if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
     
     const id = c.req.param('id');
-    const { error } = await supabase.from('system_dropdown_options').delete().eq('id', id);
+    const { error } = await supabase.from('system_dropdown_options').update({
+      is_active: false,
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
     if (error) return c.json({ error: error.message }, 500);
     return c.json({ ok: true });
   } catch (e) { return c.json({ error: 'Internal server error' }, 500); }

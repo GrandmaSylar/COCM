@@ -5,8 +5,8 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, User, Phone, MapPin, Droplets, Users, FileText, StickyNote, ChevronDown, Check } from 'lucide-react';
-import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, MINISTRIES } from './Members';
+import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, User, Phone, MapPin, Droplets, Users, FileText, StickyNote, ChevronDown, Check, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType } from './Members';
 import { Visitor } from './Visitors';
 import type { ChildMember } from './Children';
 import { Badge } from './ui/badge';
@@ -104,6 +104,46 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
   // Ministries State
   const [selectedMinistries, setSelectedMinistries] = useState<string[]>([]);
 
+  // Position Held State
+  const [selectedPositionHeld, setSelectedPositionHeld] = useState<string[]>([]);
+
+  // Dropdown Options
+  const [dropdownOptions, setDropdownOptions] = useState<any[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+
+  const fetchOptions = async () => {
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      const _options = await api.options.getAll();
+      setDropdownOptions(_options);
+    } catch (error: any) {
+      console.error('Failed to fetch options:', error);
+      setOptionsError(error.message || 'Failed to load options');
+    } finally {
+      setOptionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOptions();
+  }, []);
+
+  const ministriesList = useMemo(() => {
+    return dropdownOptions
+      .filter(o => o.category === 'ministries')
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.label.localeCompare(b.label))
+      .map(o => o.label);
+  }, [dropdownOptions]);
+
+  const positionHeldList = useMemo(() => {
+    return dropdownOptions
+      .filter(o => o.category === 'position_held')
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.label.localeCompare(b.label))
+      .map(o => o.label);
+  }, [dropdownOptions]);
+
   // State for existing zone numbers (for sequential numbering)
   const [existingZoneNumbers, setExistingZoneNumbers] = useState<Record<Zone, number[]>>({
     A: [], B: [], F: [], K: [], M: [], R: []
@@ -148,7 +188,9 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
   // Check if baptism date is filled based on dateType
   const isBaptismDateFilled = useMemo(() => {
-    if (baptismInfo.dateType === 'full') {
+    if (baptismInfo.dateType === 'not_baptised') {
+      return true; // Not required
+    } else if (baptismInfo.dateType === 'full') {
       return !!baptismInfo.fullDate;
     } else if (baptismInfo.dateType === 'monthYear') {
       return !!baptismInfo.month && !!baptismInfo.year;
@@ -208,11 +250,12 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
         gender: formData.gender as 'male' | 'female',
         zone: formData.zone as Zone,
         maritalStatus: formData.maritalStatus || undefined,
-        status: 'new' as MemberStatus, // Default status for new members - auto-evaluated after 4 Sundays
-        baptismInfo,
+        status: (baptismInfo.dateType === 'not_baptised' ? 'not baptised' : 'new') as MemberStatus, // Auto-evaluate next steps
+        baptismInfo: baptismInfo.dateType === 'not_baptised' ? { dateType: 'not_baptised' } : baptismInfo,
         familyMembers,
         legalInfo,
-        ministries: selectedMinistries
+        ministries: selectedMinistries,
+        positionHeld: selectedPositionHeld
       });
     } catch (error) {
       console.error('Error saving member:', error);
@@ -774,6 +817,10 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       <RadioGroupItem value="yearOnly" id="year-only" />
                       <Label htmlFor="year-only" className="font-normal">Year Only</Label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="not_baptised" id="not-baptised" />
+                      <Label htmlFor="not-baptised" className="font-normal">Not Baptised</Label>
+                    </div>
                   </RadioGroup>
                 </div>
 
@@ -866,48 +913,126 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Assign Ministry</Label>
-                  <p className="text-xs text-muted-foreground mb-3">
-                    Select all ministries/groups this member will be part of
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto border rounded-lg p-4">
-                    {MINISTRIES.map((ministry) => (
-                      <div key={ministry} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`ministry-${ministry}`}
-                          checked={selectedMinistries.includes(ministry)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedMinistries([...selectedMinistries, ministry]);
-                            } else {
-                              setSelectedMinistries(selectedMinistries.filter(m => m !== ministry));
-                            }
-                          }}
-                          className="h-4 w-4 rounded border-gray-300"
-                        />
-                        <Label
-                          htmlFor={`ministry-${ministry}`}
-                          className="font-normal cursor-pointer"
-                        >
-                          {ministry}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  {selectedMinistries.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {selectedMinistries.map((ministry) => (
-                        <Badge key={ministry} variant="secondary" className="gap-1">
-                          {ministry}
-                          <X
-                            className="w-3 h-3 cursor-pointer"
-                            onClick={() => setSelectedMinistries(selectedMinistries.filter(m => m !== ministry))}
-                          />
-                        </Badge>
-                      ))}
+                <div className="space-y-4">
+                  {optionsLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-sm text-muted-foreground">Loading options...</span>
                     </div>
+                  ) : optionsError ? (
+                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 p-4 rounded-lg flex flex-col items-center justify-center space-y-3 border border-red-200 dark:border-red-900/30">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 mr-2" />
+                        <span className="text-sm font-medium">{optionsError}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={fetchOptions} className="bg-white hover:bg-red-50 dark:bg-transparent dark:border-red-800 dark:text-red-300 dark:hover:bg-red-900/40">
+                        Retry Loading Options
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Assign Ministry</Label>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Select all ministries/groups this member will be part of
+                        </p>
+                        {ministriesList.length === 0 ? (
+                          <div className="border border-dashed rounded-lg p-6 text-center text-sm text-muted-foreground">
+                            No ministries configured. Add them in Settings.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto border rounded-lg p-4">
+                            {ministriesList.map((ministry) => (
+                              <div key={ministry} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  id={`ministry-${ministry}`}
+                                  checked={selectedMinistries.includes(ministry)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedMinistries([...selectedMinistries, ministry]);
+                                    } else {
+                                      setSelectedMinistries(selectedMinistries.filter(m => m !== ministry));
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                />
+                                <Label
+                                  htmlFor={`ministry-${ministry}`}
+                                  className="font-normal cursor-pointer"
+                                >
+                                  {ministry}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {selectedMinistries.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {selectedMinistries.map((ministry) => (
+                              <Badge key={ministry} variant="secondary" className="gap-1">
+                                {ministry}
+                                <X
+                                  className="w-3 h-3 cursor-pointer"
+                                  onClick={() => setSelectedMinistries(selectedMinistries.filter(m => m !== ministry))}
+                                />
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 pt-4 border-t">
+                        <Label>Position Held</Label>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Select any key leadership or volunteer positions held by this member
+                        </p>
+                        {positionHeldList.length === 0 ? (
+                          <div className="border border-dashed rounded-lg p-6 text-center text-sm text-muted-foreground">
+                            No positions configured. Add them in Settings.
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-y-auto border rounded-lg p-4">
+                            {positionHeldList.map((pos) => (
+                              <div key={pos} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  id={`position-${pos}`}
+                                  checked={selectedPositionHeld.includes(pos)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedPositionHeld([...selectedPositionHeld, pos]);
+                                    } else {
+                                      setSelectedPositionHeld(selectedPositionHeld.filter(p => p !== pos));
+                                    }
+                                  }}
+                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                />
+                                <Label 
+                                  htmlFor={`position-${pos}`} 
+                                  className="font-normal cursor-pointer"
+                                >
+                                  {pos}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {selectedPositionHeld.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {selectedPositionHeld.map((pos) => (
+                              <Badge key={pos} variant="secondary" className="gap-1">
+                                {pos}
+                                <X 
+                                  className="w-3 h-3 cursor-pointer" 
+                                  onClick={() => setSelectedPositionHeld(selectedPositionHeld.filter(p => p !== pos))}
+                                />
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </CardContent>
