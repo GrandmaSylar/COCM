@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from 'sonner';
 import { ArrowLeft, Edit, Trash2, UserCheck, Phone, MapPin, Calendar, User, Users, CheckCircle2, XCircle, BarChart3, ExternalLink } from 'lucide-react';
+import { getCloudinaryUrl } from '../utils/cloudinary';
 
 interface ChildProfileProps {
   child: ChildMember;
@@ -114,12 +115,12 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
               {child.photo ? (
                 <Dialog>
                   <DialogTrigger asChild>
-                    <img src={child.photo} alt={`${child.firstName} ${child.lastName}`} className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" />
+                    <img src={getCloudinaryUrl(child.photo, 'avatar') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" />
                   </DialogTrigger>
                   <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
                     <DialogTitle className="sr-only">Profile Picture</DialogTitle>
                     <DialogDescription className="sr-only">Full size profile picture of {child.firstName} {child.lastName}</DialogDescription>
-                    <img src={child.photo} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+                    <img src={getCloudinaryUrl(child.photo, 'original') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
                   </DialogContent>
                 </Dialog>
               ) : (

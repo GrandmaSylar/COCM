@@ -535,6 +535,59 @@ app.use("/*", cors({
   maxAge: 600
 }));
 // ============================================================================
+// CLOUDINARY UPLOAD ROUTE
+// ============================================================================
+app.post("/cloudinary/sign", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const apiKey = Deno.env.get('CLOUDINARY_API_KEY');
+    const apiSecret = Deno.env.get('CLOUDINARY_API_SECRET');
+    const cloudName = Deno.env.get('CLOUDINARY_CLOUD_NAME');
+    const uploadPreset = Deno.env.get('CLOUDINARY_UPLOAD_PRESET');
+
+    if (!apiKey || !apiSecret || !cloudName) {
+      return c.json({ 
+        error: 'Cloudinary credentials missing',
+        details: 'API credentials or cloud name not set'
+      }, 500);
+    }
+
+    const timestamp = Math.round(Date.now() / 1000);
+    const folder = 'member-photos';
+    
+    // Sort parameters alphabetically per Cloudinary docs
+    let sortedParams = `folder=${folder}&timestamp=${timestamp}`;
+    if (uploadPreset) {
+      sortedParams += `&upload_preset=${uploadPreset}`;
+    }
+    const stringToSign = `${sortedParams}${apiSecret}`;
+
+    // Generate SHA-1 hash for the signature
+    const encoder = new TextEncoder();
+    const data = encoder.encode(stringToSign);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    return c.json({
+      apiKey,
+      timestamp,
+      signature,
+      folder,
+      cloudName,
+      uploadPreset
+    });
+  } catch (error: any) {
+    console.error('Cloudinary sign error:', error);
+    return c.json({ error: error.message || 'Failed to sign request' }, 500);
+  }
+});
+
+// ============================================================================
 // HEALTH CHECK
 // ============================================================================
 app.get("/health", (c)=>{
@@ -7967,6 +8020,9 @@ app.delete('/admin/options/:id', async (c) => {
     return c.json({ ok: true });
   } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
 });
+
+// ============================================================================
+// (Removed duplicate Cloudinary signature route)
 
 // DEBUG: Global 404 Handler
 app.notFound((c)=>{

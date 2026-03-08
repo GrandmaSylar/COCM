@@ -142,8 +142,8 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
         alert('Please select an image file.');
         return;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB.');
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB.');
         return;
       }
 
@@ -461,7 +461,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                           {photoPreview ? 'Change Photo' : 'Upload Photo'}
                         </Button>
                         <p className="text-xs text-muted-foreground">
-                          Passport size photo recommended. Max 5MB.
+                          Passport size photo recommended. Max 10MB.
                         </p>
                       </div>
                     </div>

@@ -13,6 +13,7 @@ import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport } from '../utils/export';
+import { getCloudinaryUrl } from '../utils/cloudinary';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -907,7 +908,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                       <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
                         {member.photo ? (
                           <img
-                            src={member.photo}
+                            src={getCloudinaryUrl(member.photo, 'thumbnail') ?? ''}
                             alt={`${member.firstName} ${member.lastName}`}
                             className="w-full h-full object-cover"
                           />

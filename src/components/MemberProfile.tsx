@@ -11,6 +11,7 @@ import { api } from '../services/api';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from './ui/dialog';
 import { getFriendlyMessage } from '../utils/error-handler';
+import { getCloudinaryUrl } from '../utils/cloudinary';
 
 interface MemberProfileProps {
   member: Member;
@@ -209,7 +210,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               <Dialog>
                 <DialogTrigger asChild>
                    <img 
-                    src={member.photo} 
+                    src={getCloudinaryUrl(member.photo, 'avatar') ?? ''} 
                     alt={`${member.firstName} ${member.lastName}`} 
                     className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
                   />
@@ -221,7 +222,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   </DialogDescription>
                   <div className="relative w-full h-full flex items-center justify-center">
                     <img 
-                      src={member.photo} 
+                      src={getCloudinaryUrl(member.photo, 'original') ?? ''} 
                       alt={`${member.firstName} ${member.lastName}`} 
                       className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" 
                     />

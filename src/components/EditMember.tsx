@@ -194,9 +194,9 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         return;
       }
       
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB.');
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB.');
         return;
       }
       
@@ -374,7 +374,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                         {photoPreview ? 'Change Photo' : 'Upload Photo'}
                       </Button>
                       <p className="text-xs text-muted-foreground">
-                        Passport size photo recommended. Max 5MB.
+                        Passport size photo recommended. Max 10MB.
                       </p>
                     </div>
                   </div>
