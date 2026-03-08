@@ -31,7 +31,7 @@ interface AbsenteeReviewProps {
   onSkip: () => void;
 }
 
-const ABSENCE_REASONS = ['Sick', 'Travel', 'Work', 'Family Emergency', 'Other'];
+const ABSENCE_REASONS = ['Sick', 'Traveled', 'Schooling', 'Work', 'Family Emergency', 'Other'];
 
 export function AbsenteeReview({
   attendanceRecordId,

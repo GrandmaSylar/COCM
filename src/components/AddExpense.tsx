@@ -6,24 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { ArrowLeft, Save, Search, X } from 'lucide-react';
+import { ArrowLeft, Save, Search, X, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
-
-// Simplified Hook for Cache
-function useCachedData<T>(fetchFn: () => Promise<T>, deps: any[] = []): { data: T | null; loading: boolean; error: Error | null } {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  useEffect(() => {
-    let isMounted = true;
-    fetchFn().then(res => { if (isMounted) setData(res); })
-    .catch(err => { if (isMounted) setError(err); })
-    .finally(() => { if (isMounted) setLoading(false); });
-    return () => { isMounted = false; };
-  }, deps);
-  return { data, loading, error };
-}
+import { useCachedData } from '../hooks/useCachedData';
+import { ExpenseReceipt } from './ExpenseReceipt';
 
 // Reusable Member Combobox
 function MemberCombobox({ label, value, onChange, members }: { label: string, value: string, onChange: (id: string, name: string) => void, members: any[] }) {
@@ -117,7 +104,8 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
   const [formData, setFormData] = useState({
     formId: '',
     serviceDate: '',
-    serviceType: '',
+    expenseDate: '',
+    serviceType: 'Sunday Main Service',
     details: '',
     amount: '',
     paymentMethodId: '',
@@ -132,27 +120,38 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
   });
 
   const [formIdError, setFormIdError] = useState('');
+  const [isFormIdLoading, setIsFormIdLoading] = useState(true);
+  const [formIdLoadError, setFormIdLoadError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Cached data
-  const { data: servicesData } = useCachedData(() => api.services.getAll());
-  const { data: membersData } = useCachedData(() => api.members.getAll());
-  const { data: pmData } = useCachedData(() => api.expenses.paymentMethods.getAll());
+  const { data: servicesData } = useCachedData('custom-services', () => api.services.getAll());
+  const { data: membersData } = useCachedData('members-list', () => api.members.getAll());
+  const { data: pmData } = useCachedData('expenses-payment-methods', () => api.expenses.paymentMethods.getAll());
 
-  const activeServices = servicesData?.filter((s: any) => s.is_active) || [];
-  const activeMethods = pmData?.filter((pm: any) => pm.is_active) || [];
+  const activeServices = servicesData?.filter((s: any) => s.isActive && s.name !== 'Sunday Main Service') || [];
+  const activeMethods = pmData?.filter((pm: any) => pm.isActive) || [];
   const members = membersData || [];
 
-  useEffect(() => {
-    let isMounted = true;
-    api.expenses.getNextFormId().then(res => {
-      if (isMounted && res.nextFormId) {
+  const fetchFormId = async () => {
+    setIsFormIdLoading(true);
+    setFormIdLoadError('');
+    try {
+      const res = await api.expenses.getNextFormId();
+      if (res.nextFormId) {
         setFormData(prev => ({ ...prev, formId: res.nextFormId }));
       }
-    }).catch(err => {
+    } catch (err) {
       console.error('Failed to get next form ID:', err);
-    });
-    return () => { isMounted = false; };
+      setFormIdLoadError('Failed to load Form ID. Click Retry.');
+    } finally {
+      setIsFormIdLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFormId();
   }, []);
 
   const isCashSelected = formData.paymentMethodName.toLowerCase() === 'cash' || !formData.paymentMethodId;
@@ -168,6 +167,11 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
       return;
     }
 
+    // Instead of immediately creating, show the preview
+    setShowPreview(true);
+  };
+  
+  const handleSavePreview = async () => {
     setIsSubmitting(true);
     setFormIdError('');
 
@@ -180,7 +184,17 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
     } catch (error: any) {
       console.error('Error creating expense:', error);
       if (error?.status === 409) {
-        setFormIdError('This Form ID already exists — please change it');
+        // Auto-fetch a fresh Form ID on collision
+        try {
+          const res = await api.expenses.getNextFormId();
+          if (res.nextFormId) {
+            setFormData(prev => ({ ...prev, formId: res.nextFormId }));
+            setFormIdError('');
+            toast.info('Form ID collision resolved — please resubmit.');
+          }
+        } catch (retryErr) {
+          setFormIdError('Duplicate Form ID detected and auto-recovery failed. Click Retry next to the Form ID field.');
+        }
       } else {
         toast.error(error?.message || 'Failed to create expense. Please try again.');
       }
@@ -189,13 +203,29 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
     }
   };
 
+  if (showPreview) {
+    return (
+      <ExpenseReceipt
+        expenseData={{
+          ...formData, // local state form data
+          amount: parseFloat(formData.amount) || 0,
+          expenseDate: formData.expenseDate || new Date().toISOString()
+        }}
+        onBack={() => setShowPreview(false)}
+        onEdit={() => setShowPreview(false)}
+        onSave={handleSavePreview}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Add Expense Requisition</h1>
+        <h1 className="text-2xl font-bold tracking-tight min-w-0 flex-1 truncate">Add Expense Requisition</h1>
       </div>
 
       <Card>
@@ -208,16 +238,21 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
               
               <div className="space-y-2">
                 <Label htmlFor="formId">Form ID <span className="text-destructive">*</span></Label>
-                <Input 
-                  id="formId" 
-                  value={formData.formId}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, formId: e.target.value }));
-                    setFormIdError('');
-                  }}
-                  className={formIdError ? 'border-red-500 focus-visible:ring-red-500' : ''}
-                  required
-                />
+                <div className="flex gap-2 items-center">
+                  <Input 
+                    id="formId" 
+                    value={isFormIdLoading ? 'Loading...' : formData.formId}
+                    readOnly
+                    className={`bg-muted flex-1 ${formIdError || formIdLoadError ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                    required
+                  />
+                  {formIdLoadError && (
+                    <Button type="button" variant="outline" size="icon" onClick={fetchFormId} disabled={isFormIdLoading} title="Retry loading Form ID">
+                      <RefreshCw className={`h-4 w-4 ${isFormIdLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  )}
+                </div>
+                {formIdLoadError && <p className="text-sm text-red-500 mt-1 font-medium">{formIdLoadError}</p>}
                 {formIdError && <p className="text-sm text-red-500 mt-1 font-medium">{formIdError}</p>}
               </div>
 
@@ -250,6 +285,7 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
                     {activeServices.map((s: any) => (
                       <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                     ))}
@@ -364,11 +400,11 @@ export function AddExpense({ onBack, onSaved }: AddExpenseProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t mt-8">
               <Button type="button" variant="outline" onClick={onBack}>Cancel</Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || !formData.formId}>
                 <Save className="w-4 h-4 mr-2" />
-                {isSubmitting ? 'Saving...' : 'Save Requisition'}
+                Preview
               </Button>
             </div>
           </form>

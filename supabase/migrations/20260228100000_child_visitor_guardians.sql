@@ -4,7 +4,7 @@ ALTER TABLE children_visitors ADD COLUMN IF NOT EXISTS contact_phone TEXT;
 
 -- Create children_visitor_guardians table
 CREATE TABLE IF NOT EXISTS children_visitor_guardians (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     visitor_id uuid NOT NULL REFERENCES children_visitors(id) ON DELETE CASCADE,
     full_name text NOT NULL,
     residential_location text,

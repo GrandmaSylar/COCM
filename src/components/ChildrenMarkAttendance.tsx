@@ -65,7 +65,7 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
 
   const availableServices = [
     SUNDAY_MAIN_SERVICE.name,
-    ...customServices.filter((s: any) => s.isActive).map((s: any) => s.name)
+    ...customServices.filter((s: any) => s.isActive && s.name !== SUNDAY_MAIN_SERVICE.name).map((s: any) => s.name)
   ];
 
   const handleServiceTypeChange = (value: string) => {

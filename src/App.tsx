@@ -92,6 +92,7 @@ const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
 function AppContent() {
   const { isAuthenticated, completeLogin, isInitializing, user } = useAuth();
   const isNavigatingRef = useRef(false);
+  const convertOriginRef = useRef<'visitors' | 'services'>('visitors');
 
   // Restore page from sessionStorage
   const getInitialPage = (): AppPage => {
@@ -526,6 +527,13 @@ function AppContent() {
 
   const handleConvertVisitorToMember = (visitor: Visitor) => {
     setSelectedVisitor(visitor);
+    convertOriginRef.current = 'visitors';
+    navigateTo('convert-visitor');
+  };
+
+  const handleConvertVisitorFromServices = (visitor: any) => {
+    setSelectedVisitor(visitor as Visitor);
+    convertOriginRef.current = 'services';
     navigateTo('convert-visitor');
   };
 
@@ -556,7 +564,8 @@ function AppContent() {
       toast.success('Visitor converted to member successfully!');
       setMembersRefreshKey(prev => prev + 1);
       setSelectedVisitor(null);
-      navigateTo('members');
+      navigateTo(convertOriginRef.current === 'services' ? 'services' : 'visitors');
+      convertOriginRef.current = null;
     } catch (error) {
       console.error('Failed to convert visitor:', error);
       toast.error('Failed to convert visitor. Please try again.');
@@ -844,7 +853,7 @@ function AppContent() {
         if (!selectedVisitor) { navigateTo('visitors', false); return null; }
         return (
           <AddMember
-            onBack={() => navigateTo('visitor-profile')}
+            onBack={() => navigateTo(convertOriginRef.current === 'services' ? 'services' : 'visitor-profile')}
             onSave={handleSaveConvertedMember}
             visitorData={selectedVisitor}
           />
@@ -935,6 +944,8 @@ function AppContent() {
           <ExpenseReceipt
             expenseId={selectedExpenseId}
             onBack={() => navigateTo('expenses')}
+            onEdit={() => navigateTo('edit-expense')}
+            onSave={() => navigateTo('expenses')}
           />
         );
 
@@ -942,7 +953,7 @@ function AppContent() {
         return <Reports />;
 
       case 'services':
-        return <Services onViewMember={handleViewMemberById} />;
+        return <Services onViewMember={handleViewMemberById} onConvertVisitor={handleConvertVisitorFromServices} />;
 
       case 'activity-log':
         return <ActivityLog />;

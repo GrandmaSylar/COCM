@@ -226,8 +226,15 @@ export const api = {
     signOut: () =>
       fetchApi('/auth/signout', { method: 'POST' }),
 
-    heartbeat: () =>
-      fetchApi('/auth/heartbeat', { method: 'POST', body: JSON.stringify({ deviceId: getDeviceId() }) }),
+    heartbeat: async () => {
+      const response = await fetchApi<any>('/auth/heartbeat', { method: 'POST', body: JSON.stringify({ deviceId: getDeviceId() }) });
+      if (response && response.ok === false) {
+        const error = new ApiError(401, response.error || 'Unauthorized');
+        error.errorObj = response;
+        throw error;
+      }
+      return response;
+    },
 
     getSession: () =>
       fetchApi('/auth/session'),
@@ -734,6 +741,8 @@ export const api = {
     getAll: () => fetchApi('/expenses'),
 
     getNextFormId: () => fetchApi('/expenses/next-form-id'),
+
+    getById: (id: string) => fetchApi(`/expenses/${id}`),
 
     create: (data: ExpenseCreatePayload) => fetchApi('/expenses', {
       method: 'POST',

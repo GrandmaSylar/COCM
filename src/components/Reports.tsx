@@ -19,7 +19,10 @@ const STATUS_COLORS: Record<string, string> = {
   'semi-active': '#eab308',
   inactive: '#ef4444',
   new: '#3b82f6',
-  sabbatical: '#a855f7',
+  sick: '#a855f7',
+  traveled: '#a855f7',
+  schooling: '#a855f7',
+  'not baptised': '#94a3b8',
   blacklisted: '#6b7280',
   unknown: '#9ca3af',
 };

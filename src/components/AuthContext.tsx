@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase/client';
 import { clearAllCache } from '../hooks/useCachedData';
-import { invalidateApiCache } from '../services/api';
+import { invalidateApiCache, ApiError } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
+import { toast } from 'sonner';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
@@ -240,8 +241,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { api } = await import('../services/api');
         await api.auth.heartbeat();
-      } catch {
-        // Silently ignore heartbeat failures
+      } catch (err) {
+        if (err instanceof ApiError && err.errorObj?.error === 'logged_in_elsewhere') {
+          toast.error('You have been signed in on another device. Only one active session is allowed.');
+        }
+        // All other errors (expired JWT, network failures, etc.) are silently ignored
       }
     };
 

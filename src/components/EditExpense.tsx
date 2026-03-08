@@ -10,21 +10,8 @@ import { ArrowLeft, Save, Search, X } from 'lucide-react';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
-
-// Simplified Hook for Cache
-function useCachedData<T>(fetchFn: () => Promise<T>, deps: any[] = []): { data: T | null; loading: boolean; error: Error | null } {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  useEffect(() => {
-    let isMounted = true;
-    fetchFn().then(res => { if (isMounted) setData(res); })
-    .catch(err => { if (isMounted) setError(err); })
-    .finally(() => { if (isMounted) setLoading(false); });
-    return () => { isMounted = false; };
-  }, deps);
-  return { data, loading, error };
-}
+import { useCachedData } from '../hooks/useCachedData';
+import { ExpenseReceipt } from './ExpenseReceipt';
 
 // Reusable Member Combobox
 function MemberCombobox({ label, value, onChange, members }: { label: string, value: string, onChange: (id: string, name: string) => void, members: any[] }) {
@@ -139,22 +126,22 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
   const [loading, setLoading] = useState(true);
   const [formIdError, setFormIdError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Cached data
-  const { data: servicesData } = useCachedData(() => api.services.getAll());
-  const { data: membersData } = useCachedData(() => api.members.getAll());
-  const { data: pmData } = useCachedData(() => api.expenses.paymentMethods.getAll());
+  const { data: servicesData } = useCachedData('custom-services', () => api.services.getAll());
+  const { data: membersData } = useCachedData('members-list', () => api.members.getAll());
+  const { data: pmData } = useCachedData('expenses-payment-methods', () => api.expenses.paymentMethods.getAll());
 
-  const activeServices = servicesData?.filter((s: any) => s.is_active) || [];
-  const activeMethods = pmData?.filter((pm: any) => pm.is_active) || [];
+  const activeServices = servicesData?.filter((s: any) => s.isActive && s.name !== 'Sunday Main Service') || [];
+  const activeMethods = pmData?.filter((pm: any) => pm.isActive) || [];
   const members = membersData || [];
 
   useEffect(() => {
     let isMounted = true;
     const fetchExpense = async () => {
       try {
-        const records = await api.expenses.getAll();
-        const record = records.find((r: any) => r.id === expenseId);
+        const record = await api.expenses.getById(expenseId);
         if (record && isMounted) {
           // Response is camelCase from the API
           setFormData({
@@ -190,13 +177,17 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
   const isCashSelected = formData.paymentMethodName.toLowerCase() === 'cash' || !formData.paymentMethodId;
   const canEditFormId = user?.role === 'admin' || user?.role === 'dev';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.formId || !formData.serviceDate || !formData.details || !formData.amount || !formData.paymentMethodId) {
       toast.error('Please fill in all required fields');
       return;
     }
 
+    setShowPreview(true);
+  };
+
+  const handleSavePreview = async () => {
     setIsSubmitting(true);
     setFormIdError('');
 
@@ -232,13 +223,30 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
     return null;
   }
 
+  if (showPreview) {
+    return (
+      <ExpenseReceipt
+        expenseId={expenseId} // Pass ID as fallback
+        expenseData={{
+          ...formData, // local state form data
+          amount: parseFloat(formData.amount) || 0,
+          expenseDate: formData.expenseDate || new Date().toISOString()
+        }}
+        onBack={() => setShowPreview(false)}
+        onEdit={() => setShowPreview(false)}
+        onSave={handleSavePreview}
+        isSubmitting={isSubmitting}
+      />
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Edit Expense Requisition</h1>
+        <h1 className="text-2xl font-bold tracking-tight min-w-0 flex-1 truncate">Edit Expense Requisition</h1>
       </div>
 
       <Card>
@@ -293,10 +301,11 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="Sunday Main Service">Sunday Main Service</SelectItem>
                     {activeServices.map((s: any) => (
                       <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
                     ))}
-                    {formData.serviceType && !activeServices.some((s:any) => s.name === formData.serviceType) && (
+                    {formData.serviceType && formData.serviceType !== 'Sunday Main Service' && !activeServices.some((s:any) => s.name === formData.serviceType) && (
                       <SelectItem value={formData.serviceType}>{formData.serviceType} (Inactive)</SelectItem>
                     )}
                   </SelectContent>
@@ -413,11 +422,11 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t mt-8">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-6 border-t mt-8">
               <Button type="button" variant="outline" onClick={onBack}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 <Save className="w-4 h-4 mr-2" />
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                Preview
               </Button>
             </div>
           </form>

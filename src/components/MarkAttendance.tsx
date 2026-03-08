@@ -73,7 +73,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
 
   const availableServices = [
     SUNDAY_MAIN_SERVICE.name,
-    ...customServices.filter((s: any) => s.isActive).map((s: any) => s.name)
+    ...customServices.filter((s: any) => s.isActive && s.name !== SUNDAY_MAIN_SERVICE.name).map((s: any) => s.name)
   ];
 
   const handleServiceTypeChange = (value: string) => {
@@ -94,7 +94,8 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
     const fetchMembers = async () => {
       try {
         const membersData = await api.members.getAll();
-        setMembers(membersData || []);
+        const activeMembers = membersData?.filter((m: Member) => m.status !== 'blacklisted' && m.status !== 'not baptised') || [];
+        setMembers(activeMembers);
       } catch (error) {
         console.error('Failed to fetch members:', error);
       } finally {

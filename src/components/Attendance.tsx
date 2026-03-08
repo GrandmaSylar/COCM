@@ -14,6 +14,7 @@ import { api } from '../services/api';
 import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
+import { AbsenteeReview } from './AbsenteeReview';
 
 interface AttendanceRecord {
   id: string;
@@ -134,7 +135,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   // Get all available service types
   const allServiceTypes = [
     SUNDAY_MAIN_SERVICE.name,
-    ...customServices.filter(s => s.isActive).map(s => s.name)
+    ...customServices.filter(s => s.isActive && s.name !== SUNDAY_MAIN_SERVICE.name).map(s => s.name)
   ];
 
   const filteredRecords = records.filter(record => {
@@ -817,7 +818,7 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
   // Get available service types
   const availableServices = [
     SUNDAY_MAIN_SERVICE.name,
-    ...customServices.filter(s => s.isActive).map(s => s.name)
+    ...customServices.filter(s => s.isActive && s.name !== SUNDAY_MAIN_SERVICE.name).map(s => s.name)
   ];
 
   const handleServiceTypeChange = (value: string) => {
@@ -1091,6 +1092,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
   const [editChildrenCount, setEditChildrenCount] = useState('');
   const [editVisitorsCount, setEditVisitorsCount] = useState('');
   const [canEdit, setCanEdit] = useState(false);
+  const [showAbsenteeReview, setShowAbsenteeReview] = useState(false);
   const { user, canAccess } = useAuth();
 
   const isDev = user?.role === 'dev';
@@ -1114,7 +1116,8 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
 
         if (recordData.attendanceType === 'individual') {
           const membersData = await api.members.getAll();
-          setMembers(membersData || []);
+          const activeMembers = membersData?.filter((m: Member) => m.status !== 'blacklisted' && m.status !== 'not baptised') || [];
+          setMembers(activeMembers);
         }
       } catch (error) {
         console.error('Failed to fetch attendance record:', error);
@@ -1193,6 +1196,19 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
 
   const presentMembers = members.filter(m => editAttendees.includes(m.id));
   const absentMembers = members.filter(m => !editAttendees.includes(m.id));
+
+  if (showAbsenteeReview && record) {
+    return (
+      <AbsenteeReview
+        attendanceRecordId={recordId}
+        absentMemberIds={absentMembers.map(m => m.id)}
+        allMembers={members}
+        serviceDate={record.date}
+        onComplete={() => setShowAbsenteeReview(false)}
+        onSkip={() => setShowAbsenteeReview(false)}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -1508,10 +1524,17 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
               {/* Absent Members */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <X className="w-5 h-5 text-red-600" />
-                    Absent ({absentMembers.length})
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <X className="w-5 h-5 text-red-600" />
+                      Absent ({absentMembers.length})
+                    </CardTitle>
+                    {canEdit && absentMembers.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={() => setShowAbsenteeReview(true)}>
+                        Review Absentees
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {absentMembers.length === 0 ? (

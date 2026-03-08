@@ -785,7 +785,7 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
 
   useEffect(() => {
     api.services.getAll()
-      .then(data => setServices(data.filter((s: any) => s.isActive)))
+      .then(data => setServices(data.filter((s: any) => s.isActive && s.name !== 'Sunday Main Service')))
       .catch(console.error);
   }, []);
 

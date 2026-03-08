@@ -386,7 +386,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
           api.services.getAll()
         ]);
         setMembers(membersData || []);
-        setCustomServices((servicesData || []).filter((s: any) => s.isActive));
+        setCustomServices((servicesData || []).filter((s: any) => s.isActive && s.name !== 'Sunday Main Service'));
       } catch (error) {
         console.error('Failed to fetch data:', error);
       }
@@ -702,7 +702,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
           api.services.getAll()
         ]);
         setMembers(membersData || []);
-        setCustomServices((servicesData || []).filter((s: any) => s.isActive));
+        setCustomServices((servicesData || []).filter((s: any) => s.isActive && s.name !== 'Sunday Main Service'));
       } catch (error) {
         console.error('Failed to fetch data:', error);
       }

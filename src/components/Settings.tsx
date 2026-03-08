@@ -187,6 +187,100 @@ export function Settings({ onAddUser }: SettingsProps) {
   const [userStatsOpen, setUserStatsOpen] = useState(false);
   const [tabAccessOpen, setTabAccessOpen] = useState<Record<string, boolean>>({});
 
+  // Dropdown Options state
+  const [dropdownOptions, setDropdownOptions] = useState<any[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [editingOptionId, setEditingOptionId] = useState<string | null>(null);
+  const [editingLabel, setEditingLabel] = useState('');
+  const [newOptionInputs, setNewOptionInputs] = useState<Record<string, string>>({});
+
+  const fetchDropdownOptions = async () => {
+    if (!isDev) return;
+    setOptionsLoading(true);
+    try {
+      const data = await api.admin.getOptions();
+      setDropdownOptions(data);
+      setOptionsError(null);
+    } catch (err: any) {
+      setOptionsError(err?.message || 'Failed to fetch options');
+    } finally {
+      setOptionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isDev) {
+      fetchDropdownOptions();
+    }
+  }, [isDev]);
+
+  const handleAddOption = async (category: string) => {
+    const label = newOptionInputs[category]?.trim();
+    if (!label) return;
+    
+    // Convert label to snake_case for the value
+    const value = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+    
+    try {
+      const newOpt = await api.admin.createOption({ category, label, value });
+      setDropdownOptions(prev => [...prev, newOpt]);
+      setNewOptionInputs(prev => ({ ...prev, [category]: '' }));
+      toast.success('Option added');
+      invalidateApiCache('/options');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to add option');
+    }
+  };
+
+  const handleSaveOptionEdit = async (id: string, category: string) => {
+    const label = editingLabel.trim();
+    if (!label) return;
+    
+    const value = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+    
+    try {
+      const updated = await api.admin.updateOption(id, { label, value, isActive: true });
+      setDropdownOptions(prev => prev.map(o => o.id === id ? updated : o));
+      setEditingOptionId(null);
+      setEditingLabel('');
+      toast.success('Option updated');
+      invalidateApiCache('/options');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to update option');
+    }
+  };
+
+  const handleDeactivateOption = async (id: string) => {
+    try {
+      const updated = await api.admin.updateOption(id, { isActive: false });
+      setDropdownOptions(prev => prev.map(o => o.id === id ? updated : o));
+      toast.success('Option deactivated');
+      invalidateApiCache('/options');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to deactivate option');
+    }
+  };
+
+  const handleReactivateOption = async (id: string) => {
+    try {
+      const updated = await api.admin.updateOption(id, { isActive: true });
+      setDropdownOptions(prev => prev.map(o => o.id === id ? updated : o));
+      toast.success('Option reactivated');
+      invalidateApiCache('/options');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to reactivate option');
+    }
+  };
+
+  const optionCategories = [
+    { id: 'ministries', title: 'Ministries' },
+    { id: 'position_held', title: 'Position Held' },
+    { id: 'id_types', title: 'ID Types' },
+    { id: 'service_types', title: 'Service Types' },
+    { id: 'giving_types', title: 'Giving Types' }
+  ];
+
   // Sync theme inputs when customColors changes from server
   useEffect(() => {
     if (customColors) {
@@ -525,6 +619,7 @@ export function Settings({ onAddUser }: SettingsProps) {
           {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
           {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
           {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
+          {isDev && <TabsTrigger value="dropdown-options">Dropdown Options</TabsTrigger>}
           <TabsTrigger value="theme">Theme</TabsTrigger>
           {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
           <TabsTrigger value="security">Security</TabsTrigger>
@@ -1252,6 +1347,147 @@ export function Settings({ onAddUser }: SettingsProps) {
                   <Crown className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>Custom role management will be available in the next update.</p>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {/* Dropdown Options Tab (Dev Only) */}
+        {isDev && (
+          <TabsContent value="dropdown-options" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardList className="w-5 h-5" />
+                      Dropdown Options
+                    </CardTitle>
+                    <CardDescription>
+                      Manage options for dropdown menus across the system. 
+                      Adding a new option makes it immediately available.
+                    </CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={fetchDropdownOptions} disabled={optionsLoading}>
+                    <RefreshCw className={`w-4 h-4 mr-2 ${optionsLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {optionsError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>{optionsError}</AlertDescription>
+                  </Alert>
+                ) : optionsLoading && dropdownOptions.length === 0 ? (
+                  <div className="flex justify-center py-8">
+                    <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {optionCategories.map((cat) => {
+                      const catOptions = dropdownOptions
+                        .filter(o => o.category === cat.id)
+                        .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+                      
+                      const activeOptions = catOptions.filter(o => o.isActive);
+                      const inactiveOptions = catOptions.filter(o => !o.isActive);
+
+                      return (
+                        <div key={cat.id} className="space-y-4">
+                          <h3 className="text-lg font-semibold flex items-center gap-2">
+                            {cat.title}
+                            <Badge variant="secondary">{activeOptions.length} Active</Badge>
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            {catOptions.map(opt => (
+                              <div 
+                                key={opt.id} 
+                                className={`flex items-center justify-between p-3 rounded-md border ${
+                                  opt.isActive 
+                                    ? 'bg-card' 
+                                    : 'bg-muted/50 border-muted opacity-70'
+                                }`}
+                              >
+                                {editingOptionId === opt.id ? (
+                                  <div className="flex items-center gap-1 w-full">
+                                    <Input
+                                      value={editingLabel}
+                                      onChange={(e) => setEditingLabel(e.target.value)}
+                                      className="h-8 text-sm"
+                                      autoFocus
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleSaveOptionEdit(opt.id, cat.id);
+                                        if (e.key === 'Escape') {
+                                          setEditingOptionId(null);
+                                          setEditingLabel('');
+                                        }
+                                      }}
+                                    />
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-green-600" onClick={() => handleSaveOptionEdit(opt.id, cat.id)}>
+                                      <CheckCircle className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-red-600" onClick={() => {
+                                      setEditingOptionId(null);
+                                      setEditingLabel('');
+                                    }}>
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      {opt.isActive ? null : (
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">Off</Badge>
+                                      )}
+                                      <span className={`text-sm truncate font-medium ${!opt.isActive && 'line-through text-muted-foreground'}`}>
+                                        {opt.label}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 flex-shrink-0">
+                                      {opt.isActive ? (
+                                        <>
+                                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => {
+                                            setEditingOptionId(opt.id);
+                                            setEditingLabel(opt.label);
+                                          }}>
+                                            <Edit className="h-3 w-3" />
+                                          </Button>
+                                          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Deactivate" onClick={() => handleDeactivateOption(opt.id)}>
+                                            <Trash2 className="h-3 w-3" />
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={() => handleReactivateOption(opt.id)}>
+                                          Restore
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-2 p-1">
+                              <Input
+                                placeholder={`Add ${cat.title}...`}
+                                className="h-8 text-sm"
+                                value={newOptionInputs[cat.id] || ''}
+                                onChange={(e) => setNewOptionInputs(prev => ({ ...prev, [cat.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleAddOption(cat.id);
+                                }}
+                              />
+                              <Button size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleAddOption(cat.id)}>
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

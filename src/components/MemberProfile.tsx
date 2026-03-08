@@ -184,7 +184,11 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     new: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
     active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
     'semi-active': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-    sabbatical: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    inactive: 'bg-neutral-100 text-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-300',
+    sick: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    traveled: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    schooling: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    'not baptised': 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300',
     blacklisted: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
   };
 
@@ -234,7 +238,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               <h1 className="text-2xl font-bold">{member.firstName} {member.otherNames && `${member.otherNames} `}{member.lastName}</h1>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
                 <Badge className={statusColorMap[member.status] || ''}>
-                  {member.status === 'sabbatical' && member.sabbaticalEndDate && new Date(member.sabbaticalEndDate) < new Date() ? 'Sabbatical (Ended)' : member.status}
+                  {member.status}
                 </Badge>
                 <span className="text-sm text-muted-foreground">Zone {member.zone}</span>
                 <span className="text-sm text-muted-foreground">&middot;</span>
@@ -300,53 +304,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   <label className="text-sm font-medium text-muted-foreground">Age</label>
                   <p>{calculateAge(member.dateOfBirth)} years old</p>
                 </div>
-                {member.status === 'sabbatical' && (
-                  <div className="col-span-full p-3 border rounded-lg bg-purple-50/50 space-y-2">
-                    <label className="text-sm font-medium text-purple-800">Sabbatical Details</label>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {member.sabbaticalStartDate && (
-                        <div>
-                          <span className="text-muted-foreground">Start: </span>
-                          {new Date(member.sabbaticalStartDate).toLocaleDateString()}
-                        </div>
-                      )}
-                      <div>
-                        <span className="text-muted-foreground">End: </span>
-                        {member.sabbaticalEndDate
-                          ? new Date(member.sabbaticalEndDate).toLocaleDateString()
-                          : 'Until further notice'}
-                      </div>
-                      {member.sabbaticalReason && (
-                        <div className="col-span-2">
-                          <span className="text-muted-foreground">Reason: </span>
-                          {member.sabbaticalReason}
-                        </div>
-                      )}
-                    </div>
-                    {canEdit && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-2"
-                        onClick={async () => {
-                          try {
-                            await api.members.endSabbatical(member.id);
-                            const updated = await api.members.getById(member.id);
-                            if (updated) {
-                              setMember(updated);
-                            }
-                            toast.success('Sabbatical ended. Status will be recalculated based on attendance.');
-                          } catch (error: any) {
-                            console.error('Failed to end sabbatical:', error);
-                            toast.error(error?.message || 'Failed to end sabbatical');
-                          }
-                        }}
-                      >
-                        End Sabbatical
-                      </Button>
-                    )}
-                  </div>
-                )}
+                {/* Removed Sabbatical specific UI */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
                   <p>{formatDate(member.dateOfBirth)}</p>
@@ -463,23 +421,40 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
             </Card>
           )}
 
-          {/* Ministries */}
-          {member.ministries && member.ministries.length > 0 && (
+          {/* Ministries and Positions */}
+          {( (member.ministries && member.ministries.length > 0) || (member.positionHeld && member.positionHeld.length > 0) ) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="w-5 h-5" />
-                  Ministries & Groups
+                  Ministries & Positions
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {member.ministries.map((ministry) => (
-                    <Badge key={ministry} variant="secondary">
-                      {ministry}
-                    </Badge>
-                  ))}
-                </div>
+              <CardContent className="space-y-4">
+                {member.ministries && member.ministries.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Ministries</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {member.ministries.map((ministry) => (
+                        <Badge key={ministry} variant="secondary">
+                          {ministry}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {member.positionHeld && member.positionHeld.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Positions Held</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {member.positionHeld.map((pos) => (
+                        <Badge key={pos} variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                          {pos}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

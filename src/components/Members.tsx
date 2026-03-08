@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown, Droplets } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -21,7 +21,7 @@ import {
 } from './ui/dropdown-menu';
 
 export type Zone = 'A' | 'B' | 'F' | 'K' | 'M' | 'R';
-export type MemberStatus = 'new' | 'active' | 'semi-active' | 'inactive' | 'sabbatical' | 'blacklisted';
+export type MemberStatus = 'new' | 'active' | 'semi-active' | 'inactive' | 'sick' | 'traveled' | 'schooling' | 'not baptised' | 'blacklisted';
 
 // Member status definitions
 export const MEMBER_STATUS_DEFINITIONS = {
@@ -29,11 +29,14 @@ export const MEMBER_STATUS_DEFINITIONS = {
   active: 'Present in 3-4 of last 4 Sunday Main Services',
   'semi-active': 'Present in 1-2 of last 4 Sunday Main Services',
   inactive: 'Absent from all last 4 Sunday Main Services',
-  sabbatical: 'Absent for a long period but with permission of absence',
+  sick: 'Absent for a long period due to verified illness',
+  traveled: 'Absent for a long period due to travel/relocation with notification',
+  schooling: 'Absent for a long period due directly to educational reasons',
+  'not baptised': 'Member has not undergone water baptism. Excluded from normal status calculations',
   blacklisted: 'Sacked or removed'
 } as const;
 
-export type BaptismDateType = 'full' | 'monthYear' | 'yearOnly';
+export type BaptismDateType = 'full' | 'monthYear' | 'yearOnly' | 'not_baptised';
 
 export interface BaptismInfo {
   dateType: BaptismDateType;
@@ -89,6 +92,7 @@ export interface Member {
   familyMembers?: FamilyMember[]; // Computed from family_members table JOIN
   legalInfo?: LegalInfo;
   ministries?: string[]; // Member can be in multiple ministries
+  positionHeld?: string[]; // Member positions
   // Sabbatical fields
   sabbaticalStartDate?: string;
   sabbaticalEndDate?: string;
@@ -257,7 +261,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
         comparison = a.zoneNumber.localeCompare(b.zoneNumber);
         break;
       case 'status':
-        const statusOrder = { new: 0, active: 1, 'semi-active': 2, inactive: 3, sabbatical: 4, blacklisted: 5 };
+        const statusOrder = { new: 0, active: 1, 'semi-active': 2, inactive: 3, sick: 4, traveled: 5, schooling: 6, 'not baptised': 7, blacklisted: 8 };
         comparison = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
         break;
       case 'joinDate':
@@ -480,7 +484,8 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
               <strong>Active:</strong> Present in 3-4 of last 4 Sunday Main Services<br />
               <strong>Semi-Active:</strong> Present in 1-2 of last 4 Sunday Main Services<br />
               <strong>Inactive:</strong> Absent from all last 4 Sunday Main Services<br />
-              <strong>Sabbatical:</strong> Absent for a long period but with permission<br />
+              <strong>Sick/Traveled/Schooling:</strong> Absent for a long period due to verified reason<br />
+              <strong>Not Baptised:</strong> Excluded from normal status calculations<br />
               <strong>Blacklisted:</strong> Sacked or removed
             </AlertDescription>
           </Alert>
@@ -571,8 +576,20 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                 <div className="w-8 h-8 rounded-lg bg-purple-500/40 flex items-center justify-center mb-2 text-purple-600 group-hover:scale-110 transition-transform duration-300">
                   <Users className="w-4 h-4" />
                 </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'sabbatical').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Sabbatical</div>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => ['sick', 'traveled', 'schooling'].includes(m.status)).length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Excused</div>
+              </div>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-slate-500/50 via-slate-500/40 to-transparent border border-slate-500/50 transition-all duration-300 hover:shadow-md hover:shadow-slate-500/50 hover:-translate-y-0.5">
+              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
+                <Droplets className="w-12 h-12 text-slate-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="w-8 h-8 rounded-lg bg-slate-500/40 flex items-center justify-center mb-2 text-slate-600 group-hover:scale-110 transition-transform duration-300">
+                  <Droplets className="w-4 h-4" />
+                </div>
+                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'not baptised').length}</div>
+                <div className="text-xs font-medium text-muted-foreground mt-0.5">Not Baptised</div>
               </div>
             </div>
           </div>
@@ -632,7 +649,10 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="semi-active">Semi-Active</SelectItem>
                       <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="sabbatical">Sabbatical</SelectItem>
+                      <SelectItem value="sick">Sick</SelectItem>
+                      <SelectItem value="traveled">Traveled</SelectItem>
+                      <SelectItem value="schooling">Schooling</SelectItem>
+                      <SelectItem value="not baptised">Not Baptised</SelectItem>
                       <SelectItem value="blacklisted">Blacklisted</SelectItem>
                     </SelectContent>
                   </Select>
@@ -911,11 +931,12 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                               member.status === 'new' ? 'bg-cyan-100 text-cyan-800' :
                               member.status === 'active' ? 'bg-green-100 text-green-800' :
                               member.status === 'semi-active' ? 'bg-blue-100 text-blue-800' :
-                              member.status === 'sabbatical' ? 'bg-purple-100 text-purple-800' :
+                              member.status === 'sick' || member.status === 'traveled' || member.status === 'schooling' ? 'bg-purple-100 text-purple-800' :
+                              member.status === 'not baptised' ? 'bg-slate-100 text-slate-800' :
                               member.status === 'blacklisted' ? 'bg-red-100 text-red-800' : ''
                             }
                           >
-                            {member.status === 'sabbatical' && member.sabbaticalEndDate && new Date(member.sabbaticalEndDate) < new Date() ? 'Sabbatical (Ended)' : member.status}
+                            {member.status}
                           </Badge>
                         </div>
                       </div>

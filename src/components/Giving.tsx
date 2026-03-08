@@ -73,11 +73,11 @@ interface GivingProps {
 }
 
 const serviceTypeLabels = {
-  sunday_morning: 'Sunday Morning',
+  sunday_morning: 'Sunday Main Service',
   sunday_evening: 'Sunday Evening',
   midweek: 'Midweek Service',
   special: 'Special Service',
-  other: 'Other'
+  other: 'Custom Service'
 };
 
 const paymentMethodLabels = {
@@ -275,7 +275,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
     return filteredRecords.map(record => ({
       serviceName: record.serviceName,
       serviceDate: formatDateForExport(record.serviceDate),
-      serviceType: serviceTypeLabels[record.serviceType],
+      serviceType: record.serviceName,
       offering: formatCurrencyForExport(record.offerings.offering),
       donation: formatCurrencyForExport(record.offerings.donation),
       thanksgiving: formatCurrencyForExport(record.offerings.thanksgiving),
@@ -520,7 +520,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                         <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceName}</h3>
                         <div className="flex flex-wrap items-center gap-1 mt-1">
                           <Badge className={`text-[10px] sm:text-xs ${getServiceTypeColor(record.serviceType)}`}>
-                            {serviceTypeLabels[record.serviceType]}
+                            {record.serviceName}
                           </Badge>
                         </div>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -14,30 +14,7 @@ import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { formatCurrencyForExport, exportToCSV, exportToPDF, exportToXLSX, exportGroupedToCSV, exportGroupedToPDF, exportGroupedToXLSX } from '../utils/export';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-
-// Simple cached data hook
-function useCachedData<T>(fetchFn: () => Promise<T>, deps: any[] = []): { data: T | null; loading: boolean; refresh: () => Promise<void> } {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchFn();
-      setData(res);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    refresh();
-  }, deps);
-
-  return { data, loading, refresh };
-}
+import { useCachedData } from '../hooks/useCachedData';
 
 interface ExpensesProps {
   onAddExpense: () => void;
@@ -53,9 +30,9 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
   const [showTypeManager, setShowTypeManager] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
-  const { data: expensesData, loading: loading1, refresh: refresh1 } = useCachedData(() => api.expenses.getAll(), [refreshKey]);
-  const { data: pmData, loading: loading2, refresh: refresh2 } = useCachedData(() => api.expenses.paymentMethods.getAll(), [refreshKey]);
-  const { data: givingData, loading: loading3, refresh: refresh3 } = useCachedData(() => api.giving.getAll(), [refreshKey]);
+  const { data: expensesData, loading: loading1, refresh: refresh1 } = useCachedData(`expenses-list-${refreshKey}`, () => api.expenses.getAll());
+  const { data: pmData, loading: loading2, refresh: refresh2 } = useCachedData(`expenses-payment-methods-${refreshKey}`, () => api.expenses.paymentMethods.getAll());
+  const { data: givingData, loading: loading3, refresh: refresh3 } = useCachedData('giving-records', () => api.giving.getAll());
 
   const loading = loading1 || loading2 || loading3;
   const isDevOrAdmin = user?.role === 'dev' || user?.role === 'admin';
@@ -179,18 +156,18 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
           <h1>Finance &amp; Expenses</h1>
           <p className="text-muted-foreground">Manage expenditure and payment authorisations</p>
         </div>
-        <div className="flex gap-2 flex-wrap w-full sm:w-auto">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={handleRefresh} className="flex-1 sm:flex-none">
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          {(isDevOrAdmin && canAccess('settingsProfileAccess')) && (
-            <Button variant="outline" size="sm" onClick={() => setShowTypeManager(true)}>
+          {isDevOrAdmin && (
+            <Button variant="outline" size="sm" onClick={() => setShowTypeManager(true)} className="flex-1 sm:flex-none">
               <Settings className="w-4 h-4 mr-2" />
               Payment Methods
             </Button>
           )}
-          <Button size="sm" onClick={onAddExpense}>
+          <Button size="sm" onClick={onAddExpense} className="flex-1 sm:flex-none">
             <Plus className="w-4 h-4 mr-2" />
             New Requisition
           </Button>
@@ -202,21 +179,21 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
           <CardContent className="p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Receipt className="w-16 h-16 text-red-500" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (All Time)</p>
-            <p className="text-3xl font-bold">GH₵ {totalAllTime.toFixed(2)}</p>
+            <p className="text-xl sm:text-3xl font-bold">GH₵ {totalAllTime.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-orange-500/10 to-transparent border-orange-500/20">
           <CardContent className="p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Calendar className="w-16 h-16 text-orange-500" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (This Month)</p>
-            <p className="text-3xl font-bold">GH₵ {totalThisMonth.toFixed(2)}</p>
+            <p className="text-xl sm:text-3xl font-bold">GH₵ {totalThisMonth.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card className="bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
           <CardContent className="p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10"><Banknote className="w-16 h-16 text-blue-500" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Requisitions</p>
-            <p className="text-3xl font-bold">{expenses.length}</p>
+            <p className="text-xl sm:text-3xl font-bold">{expenses.length}</p>
           </CardContent>
         </Card>
       </div>
@@ -268,7 +245,45 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
               </div>
 
               <TabsContent value="flat" className="mt-0">
-                <div className="overflow-x-auto rounded-lg border">
+                <div className="block md:hidden space-y-2 mb-4">
+                  {filteredExpenses.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground border rounded-lg">No requisitions found.</div>
+                  ) : (
+                    filteredExpenses.map((exp: any) => (
+                      <div key={exp.id} className="border rounded-lg p-3 space-y-2 hover:bg-muted/50">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-primary">{exp.formId}</span>
+                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">{exp.serviceType || 'General'}</span>
+                          <span className="text-xs text-muted-foreground">{new Date(exp.serviceDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="line-clamp-2 text-sm">{exp.details}</div>
+                        <div className="flex justify-between items-center mt-1">
+                          <span className="font-bold text-red-600">GH₵ {exp.amount?.toFixed(2)}</span>
+                          <Badge variant="outline">{exp.paymentMethodName}</Badge>
+                        </div>
+                        {exp.requestedByName && (
+                          <div className="text-xs text-muted-foreground mt-1">Req: {exp.requestedByName}</div>
+                        )}
+                        <div className="flex gap-1 justify-end mt-2">
+                          <Button variant="ghost" size="icon" onClick={() => onViewReceipt(exp.id)} title="View Receipt">
+                            <Eye className="w-4 h-4 text-blue-500" />
+                          </Button>
+                          {isDevOrAdmin && (
+                            <Button variant="ghost" size="icon" onClick={() => onEditExpense(exp.id)} title="Edit">
+                              <Edit className="w-4 h-4 text-slate-500" />
+                            </Button>
+                          )}
+                          {isDevOrAdmin && (
+                            <Button variant="ghost" size="icon" disabled={isDeleting === exp.id} onClick={() => handleDelete(exp.id, exp.formId)} title="Delete">
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="hidden md:block overflow-x-auto rounded-lg border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-muted text-muted-foreground uppercase text-xs">
                       <tr>
@@ -329,9 +344,9 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                 ) : (
                   groupedData.map((group, i) => (
                     <div key={i} className="border rounded-lg overflow-hidden shadow-sm">
-                      <div className="bg-muted px-4 py-3 border-b flex justify-between items-center text-sm">
+                      <div className="bg-muted px-4 py-3 border-b flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-0 text-sm">
                         <div className="font-semibold">{group.label}</div>
-                        <div className="flex items-center space-x-6 text-sm">
+                        <div className="flex flex-wrap gap-2 sm:gap-6 sm:items-center text-sm">
                           {group.relatedGiving > 0 && (
                             <div className="flex items-center space-x-2">
                               <span className="text-green-600 font-medium">+ Giving: GH₵ {group.relatedGiving.toFixed(2)}</span>

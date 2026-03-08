@@ -1,6 +1,6 @@
 -- Create expense_payment_methods table
 CREATE TABLE IF NOT EXISTS expense_payment_methods (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name text UNIQUE NOT NULL,
     is_active boolean DEFAULT true,
     created_by uuid REFERENCES profiles(id),
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS expense_payment_methods (
 
 -- Create expense_records table
 CREATE TABLE IF NOT EXISTS expense_records (
-    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     form_id text UNIQUE NOT NULL,
     expense_date date NOT NULL,
     details text NOT NULL,

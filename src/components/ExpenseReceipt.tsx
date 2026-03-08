@@ -1,25 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, Printer, Download } from 'lucide-react';
+import { ArrowLeft, Printer, Download, Edit, Save } from 'lucide-react';
 import { api } from '../services/api';
 import { formatGhanaCedis as formatCurrency } from './ui/utils';
 
 interface ExpenseReceiptProps {
-  expenseId: string;
+  expenseId?: string;
+  expenseData?: any;
   onBack: () => void;
+  onEdit?: () => void;
+  onSave?: () => Promise<void> | void;
+  isSubmitting?: boolean;
 }
 
-export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
+export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave, isSubmitting = false }: ExpenseReceiptProps) {
   const [expense, setExpense] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!expenseData && !!expenseId);
   const [isDownloading, setIsDownloading] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (expenseData) {
+      setExpense(expenseData);
+      setLoading(false);
+      return;
+    }
+
+    if (!expenseId) {
+      setLoading(false);
+      return;
+    }
+
     const fetchExpense = async () => {
       try {
-        const records = await api.expenses.getAll();
-        const record = records.find((r: any) => r.id === expenseId);
+        const record = await api.expenses.getById(expenseId);
         setExpense(record);
       } catch (error) {
         console.error('Failed to fetch expense receipt:', error);
@@ -28,7 +42,7 @@ export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
       }
     };
     fetchExpense();
-  }, [expenseId]);
+  }, [expenseId, expenseData]);
 
   const handleDownloadPDF = async () => {
     if (!receiptRef.current || !expense) return;
@@ -44,6 +58,7 @@ export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
         scale: 2,
         useCORS: true,
         logging: false,
+        windowWidth: 800,
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -83,7 +98,7 @@ export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4">
+    <div className="max-w-3xl mx-auto py-8 px-4 overflow-x-auto">
       {/* Action Buttons - Hidden when printing */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4 no-print print:hidden">
         <Button variant="ghost" onClick={onBack} className="self-start sm:self-auto">
@@ -91,102 +106,140 @@ export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
           Back
         </Button>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => window.print()}>
-            <Printer className="w-4 h-4 mr-2" />
-            Print
+          {onEdit && (
+            <Button variant="outline" onClick={onEdit} disabled={isSubmitting}>
+              <Edit className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">Edit</span>
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => window.print()} disabled={isSubmitting}>
+            <Printer className="w-4 h-4" />
+            <span className="hidden sm:inline ml-2">Print</span>
           </Button>
-          <Button onClick={handleDownloadPDF} disabled={isDownloading}>
-            <Download className="w-4 h-4 mr-2" />
-            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
+          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading || isSubmitting}>
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline ml-2">{isDownloading ? 'Generating PDF...' : 'Download PDF'}</span>
           </Button>
+          {onSave && (
+            <Button onClick={onSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white">
+              <Save className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">{isSubmitting ? 'Saving...' : 'Save Requisition'}</span>
+            </Button>
+          )}
         </div>
       </div>
 
       {/* Receipt Content */}
       <div 
         ref={receiptRef}
-        className="bg-white text-black p-8 sm:p-12 border rounded-xl shadow-sm mx-auto"
-        style={{ maxWidth: '800px', minHeight: '1000px' }}
+        className="bg-white text-black p-12 border rounded-xl shadow-sm mx-auto print:border-none print:shadow-none"
+        style={{ width: '800px', maxWidth: 'none', minHeight: '1000px', margin: '0 auto' }}
       >
         {/* Header */}
-        <div className="flex flex-col items-center text-center space-y-2 mb-10 pb-8 border-b-2 border-gray-200">
-          <img src="/newlogo.png" alt="Church Logo" className="w-24 h-24 object-contain mb-2" crossOrigin="anonymous" />
-          <h1 className="text-2xl font-bold uppercase tracking-wide">Church of Christ - Mataheko Congregation (CoC.M)</h1>
-          <p className="text-gray-600">P.O BOX KN 1050, Accra</p>
-          <h2 className="text-xl font-bold mt-6 pt-4 underline underline-offset-4">EXPENSE REQUISITION FORM</h2>
-          <p className="text-sm font-semibold mt-2">Receipt No: <span className="text-primary">{expense.formId}</span></p>
-        </div>
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-12">
-          <div className="space-y-1">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Date</p>
-            <p className="text-lg font-semibold">{new Date(expense.expenseDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Service Date</p>
-            <p className="text-lg font-semibold">{new Date(expense.serviceDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Service Type</p>
-            <p className="text-lg font-semibold">{expense.serviceType || 'N/A'}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Amount</p>
-            <p className="text-xl font-bold text-primary">{formatCurrency(expense.amount)}</p>
-          </div>
-          <div className="space-y-1 md:col-span-2">
-            <p className="text-sm text-gray-500 font-medium uppercase tracking-wider">Details</p>
-            <p className="text-lg whitespace-pre-wrap">{expense.details}</p>
-          </div>
-        </div>
-
-        {/* Payment Details */}
-        <div className="bg-gray-50 p-6 rounded-lg mb-12">
-          <h3 className="text-md font-bold text-gray-800 uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">Payment Information</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Method</p>
-              <p className="font-semibold">{expense.paymentMethodName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-500 mb-1">Reference</p>
-              <p className="font-semibold">{expense.referenceNumber || 'N/A'}</p>
+        <div className="flex justify-between items-start mb-6">
+          {/* Logo & Church Name */}
+          <div className="flex flex-row items-center gap-5">
+            <img src="/newlogo.png" alt="Church Logo" className="w-[100px] h-[100px] object-contain" crossOrigin="anonymous" />
+            <div className="flex flex-col items-start text-left font-sans">
+              <h1 className="text-2xl font-bold uppercase tracking-wide text-black m-0 leading-tight">Church of Christ</h1>
+              <h2 className="text-[26px] font-bold uppercase tracking-wider text-black m-0 leading-tight">Mataheko</h2>
             </div>
           </div>
-        </div>
-
-        {/* Personnel */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-16 px-4">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-8">Requested By</p>
-            <div className="border-b-2 border-dashed border-gray-300 w-full mb-2"></div>
-            <p className="font-semibold">{expense.requestedByName || 'N/A'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-8">Recommended By</p>
-            <div className="border-b-2 border-dashed border-gray-300 w-full mb-2"></div>
-            <p className="font-semibold">{expense.recommendedByName || 'N/A'}</p>
-          </div>
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-8">Approved By</p>
-            <div className="border-b-2 border-dashed border-gray-300 w-full mb-2"></div>
-            <p className="font-semibold">{expense.approvedByName || 'N/A'}</p>
+          
+          {/* Right Address */}
+          <div className="flex flex-col items-end text-right text-[13px] font-bold text-black space-y-[4px] pt-1">
+            <p className="m-0">Church of Christ, Mataheko</p>
+            <p className="m-0 font-normal">P.O BOX KN 1050</p>
+            <p className="m-0 font-normal">Accra</p>
+            <p className="mt-4 text-xs text-gray-400 font-normal">No: {expense.formId}</p>
           </div>
         </div>
 
-        {/* Footer info */}
-        <div className="flex justify-between items-center border-t-2 border-gray-200 pt-6 mt-auto">
-          <div className="flex items-center space-x-2">
-            <span className="text-gray-500 font-medium">Status:</span>
-            <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm">
-              ✓ Approved
-            </span>
+        {/* Title Banner */}
+        <div className="bg-[#18182b] text-white text-center py-2.5 rounded mb-10">
+          <h3 className="text-xl font-bold uppercase tracking-wide m-0">Expense Requisition Form</h3>
+        </div>
+
+        {/* Details of Expenditure */}
+        <div className="mb-14">
+          <h4 className="font-bold text-[14px] mb-5 text-black tracking-wide uppercase">Details of Expenditure</h4>
+          
+          <div className="relative w-full">
+            {/* Underlines background */}
+            <div className="absolute inset-0 z-0 flex flex-col justify-start pointer-events-none">
+              <div className="border-b border-gray-400 w-full h-[40px]"></div>
+              <div className="border-b border-gray-400 w-full h-[40px]"></div>
+              <div className="border-b border-gray-400 w-full h-[40px]"></div>
+              <div className="border-b border-gray-400 w-full h-[40px]"></div>
+            </div>
+            
+            {/* Content text */}
+            <div 
+              className="relative z-10 w-full font-normal text-base leading-[40px] pt-1 px-1 whitespace-pre-wrap break-words min-h-[160px]" 
+            >
+              {expense.details}
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-gray-500 mb-8">Authorizing Signature</p>
-            <div className="border-b border-black w-48"></div>
+        </div>
+
+        {/* Amount and Date row */}
+        <div className="flex flex-row justify-between mb-16 gap-8 px-1">
+          <div className="flex font-bold text-sm flex-1 items-end">
+            <span className="whitespace-nowrap mr-6 tracking-wide">AMOUNT GHS</span>
+            <div className="border-b border-gray-400 flex-1 text-center font-normal pb-0.5 text-lg">
+              {formatCurrency(expense.amount).replace('₵', '').trim()} 
+            </div>
           </div>
+          <div className="flex font-bold text-sm flex-1 items-end">
+            <span className="whitespace-nowrap mr-6 ml-8 tracking-wide">DATE</span>
+            <div className="border-b border-gray-400 flex-1 text-center font-normal pb-0.5 text-lg">
+              {expense.expenseDate ? new Date(expense.expenseDate).toLocaleDateString('en-GB') : ''}
+            </div>
+          </div>
+        </div>
+
+        {/* Signatures stack */}
+        <div className="space-y-10 mb-20 px-1">
+          <div className="flex font-bold text-[13px] items-end">
+            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Requested By</span>
+            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
+              {expense.requestedByName}
+            </div>
+          </div>
+          
+          <div className="flex font-bold text-[13px] items-end">
+            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Recommended By:</span>
+            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
+              {expense.recommendedByName}
+            </div>
+          </div>
+
+          <div className="flex font-bold text-[13px] items-end">
+            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Approved By</span>
+            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
+              {expense.approvedByName}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Signature Row */}
+        <div className="flex flex-row justify-between mb-20 gap-8 px-1">
+          <div className="flex font-bold text-[13px] w-[35%] items-end">
+            <span className="whitespace-nowrap mr-6 tracking-wide">DATE</span>
+            <div className="border-b border-gray-400 flex-1 pb-2"></div>
+          </div>
+          <div className="flex font-bold text-[13px] flex-1 items-end ml-12">
+            <span className="whitespace-nowrap mr-6 tracking-wide">SIGNATURE</span>
+            <div className="border-b border-gray-400 flex-1 pb-2"></div>
+          </div>
+        </div>
+        
+        {/* Bottom thick lines */}
+        <div className="flex justify-between mt-auto gap-4 pt-4 px-1 pb-8">
+           <div className="border-b-[4px] border-black flex-1"></div>
+           <div className="border-b-[4px] border-black flex-1"></div>
+           <div className="border-b-[4px] border-black flex-1"></div>
+           <div className="border-b-[4px] border-black flex-1"></div>
         </div>
       </div>
       
@@ -196,8 +249,10 @@ export function ExpenseReceipt({ expenseId, onBack }: ExpenseReceiptProps) {
           body { background-color: white !important; }
           #sidebar-nav, #mobile-fab-nav, header, .no-print { display: none !important; }
           .content-watermark { background: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
-          main { padding: 0 !important; margin: 0 !important; }
+          main { padding: 0 !important; margin: 0 !important; overflow: visible !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          @page { size: portrait; margin: 10mm; }
+          #root { width: 800px !important; overflow: visible !important; }
         }
       `}</style>
     </div>
