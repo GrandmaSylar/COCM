@@ -13,7 +13,7 @@ export function getCloudinaryUrl(photoUrl: string | null | undefined, variant: C
 
   const transformation =
     variant === 'thumbnail'
-      ? 'w_56,h_56,c_crop,g_face'
+      ? 'w_56,h_56,c_fill,g_center'
       : 'w_160,h_160,c_fill,g_center';
 
   return `${beforeUpload}/upload/${transformation}/${afterUpload}`;

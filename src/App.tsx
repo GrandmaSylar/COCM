@@ -385,7 +385,7 @@ function AppContent() {
           const blob = await res.blob();
           const file = new File([blob], 'photo.jpg', { type: blob.type });
           const photoUrl = await api.members.uploadPhoto(createdMember.id, file);
-          await api.members.update(createdMember.id, { ...createdMember, photoUrl });
+          await api.members.update(createdMember.id, { ...createdMember, photo: undefined, photoUrl });
         } catch (uploadError) {
           console.error('Photo upload failed:', uploadError);
           toast.error('Member added, but photo upload failed.');
@@ -548,7 +548,7 @@ function AppContent() {
           const blob = await res.blob();
           const file = new File([blob], 'photo.jpg', { type: blob.type });
           const photoUrl = await api.members.uploadPhoto(createdMember.id, file);
-          await api.members.update(createdMember.id, { ...createdMember, photoUrl });
+          await api.members.update(createdMember.id, { ...createdMember, photo: undefined, photoUrl });
         } catch (uploadError) {
           console.error('Photo upload failed:', uploadError);
         }
@@ -598,7 +598,7 @@ function AppContent() {
           const blob = await res.blob();
           const file = new File([blob], 'photo.jpg', { type: blob.type });
           const photoUrl = await api.children.members.uploadPhoto(createdChild.id, file);
-          await api.children.members.update(createdChild.id, { ...createdChild, photoUrl });
+          await api.children.members.update(createdChild.id, { ...createdChild, photo: undefined, photoUrl });
         } catch (uploadError) {
           console.error('Photo upload failed:', uploadError);
           toast.error('Member created, but photo upload failed.');

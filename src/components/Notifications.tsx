@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { Bell, CheckCheck, Users, Calendar, Banknote, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
+import { supabase } from '../utils/supabase/client';
 
 interface Notification {
   id: string;
@@ -58,6 +59,21 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
 
   useEffect(() => {
     fetchNotifications();
+
+    // Subscribe to realtime updates
+    const channel = supabase.channel('user-notifications')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications' },
+        () => {
+          fetchNotifications(false); // Fetch silently on new data
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [page, showUnreadOnly]);
 
   const fetchNotifications = async (showLoading = true) => {

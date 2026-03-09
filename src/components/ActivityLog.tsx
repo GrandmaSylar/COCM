@@ -8,6 +8,7 @@ import { Download, LogIn, LogOut, Plus, Pencil, Trash2, CheckCircle, XCircle, Sh
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
 import { exportToCSV, exportToPDF, exportToXLSX } from '../utils/export';
+import { supabase } from '../utils/supabase/client';
 
 interface ActivityEntry {
   id: string;
@@ -61,6 +62,21 @@ export function ActivityLog() {
 
   useEffect(() => {
     fetchLogs();
+
+    // Subscribe to realtime updates
+    const channel = supabase.channel('activity-log-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_log' },
+        () => {
+          fetchLogs(false); // Fetch silently on new data
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [page, actionFilter, entityFilter, startDate, endDate]);
 
   const fetchLogs = async (showLoading = true) => {

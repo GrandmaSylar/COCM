@@ -5,11 +5,11 @@ import { EmptyState } from './EmptyState';
 import { Users, Calendar, Banknote, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
 import { useTutorial } from './TutorialContext';
-import { useEffect } from 'react';
+import { supabase } from '../utils/supabase/client';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -110,7 +110,52 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
     canAccess(action.permission) && hasTabAccess(action.tab)
   );
 
-  const recentActivity: any[] = [];
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchRecentActivity = async () => {
+      try {
+        const data = await api.activityLog.getAll({ limit: 5 });
+        if (data?.logs) {
+          const formatted = data.logs.map((log: any) => {
+            const date = new Date(log.createdAt);
+            const today = new Date();
+            const isToday = date.getDate() === today.getDate() && 
+                            date.getMonth() === today.getMonth() && 
+                            date.getFullYear() === today.getFullYear();
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return {
+              id: log.id,
+              message: log.description || `${log.userName} performed ${log.action}`,
+              time: isToday ? timeStr : `${date.toLocaleDateString()} ${timeStr}`
+            };
+          });
+          setRecentActivity(formatted);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recent activity:', err);
+      }
+    };
+
+    fetchRecentActivity();
+
+    // Subscribe to realtime updates for recent activity
+    const channel = supabase.channel('dashboard-activity-log')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'activity_log' },
+        () => {
+          fetchRecentActivity();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const timeOfDay = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening';
 
