@@ -96,7 +96,6 @@ export function ChildrenAnalytics() {
           activeMembers: res.summary?.activeMembers || 0,
           visitorCount: res.summary?.totalVisitors || 0,
           totalGiving: res.summary?.totalGiving || 0,
-          baptisedCount: 0
         },
         memberGrowth: (res.membershipData || []).map((item: any) => ({
           month: item.month,
@@ -121,7 +120,6 @@ export function ChildrenAnalytics() {
           total: res.summary?.totalVisitors || 0,
           converted: Math.round((res.summary?.totalVisitors || 0) * (res.visitorConversionRate || 0) / 100)
         },
-        baptismStats: null,
         ageOutAlerts: []
       });
     } catch (err) {
@@ -162,8 +160,8 @@ export function ChildrenAnalytics() {
             <Skeleton className="h-10 w-28" />
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-4">
-          {[...Array(5)].map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
+          {[...Array(4)].map((_, i) => (
             <Card key={i}><CardContent className="p-4"><Skeleton className="h-16 w-full" /></CardContent></Card>
           ))}
         </div>
@@ -225,14 +223,13 @@ export function ChildrenAnalytics() {
 
   // The fields in data could be undefined if there was an error in the backend
   const {
-    summary = { totalMembers: 0, activeMembers: 0, visitorCount: 0, totalGiving: 0, baptisedCount: 0 },
+    summary = { totalMembers: 0, activeMembers: 0, visitorCount: 0, totalGiving: 0 },
     memberGrowth = [],
     genderBreakdown = { male: 0, female: 0 },
     ageDistribution = { '0-5': 0, '6-10': 0, '11-14': 0, '15-17': 0 },
     attendanceTrend = [],
     givingTrend = [],
     visitorConversion = { total: 0, converted: 0 },
-    baptismStats = null,
     ageOutAlerts = []
   } = data;
 
@@ -246,10 +243,7 @@ export function ChildrenAnalytics() {
     { name: 'Not Converted', value: (visitorConversion.total || 0) - (visitorConversion.converted || 0) }
   ];
 
-  const baptismData = baptismStats ? [
-    { name: 'Baptised', value: baptismStats.baptised || 0 },
-    { name: 'Not Baptised', value: baptismStats.notBaptised || 0 }
-  ] : [];
+
 
   let formattedAgeDist: any[] = [];
   if (Array.isArray(ageDistribution)) {
@@ -271,7 +265,7 @@ export function ChildrenAnalytics() {
       {renderHeader()}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
             <Users className="w-6 h-6 text-blue-500 mb-2" />
@@ -304,14 +298,7 @@ export function ChildrenAnalytics() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-cyan-50 to-white">
-          <CardContent className="p-4 flex flex-col items-center text-center">
-            <CheckCircle className="w-6 h-6 text-cyan-500 mb-2" />
-            <div className="text-2xl font-bold">0</div>
-            <div className="text-xs text-muted-foreground font-medium">Baptised</div>
-            <div className="text-[10px] italic text-muted-foreground mt-1">Data unavailable</div>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Age-Out Alerts */}
@@ -484,30 +471,7 @@ export function ChildrenAnalytics() {
           </CardContent>
         </Card>
 
-        {/* Baptism Stats */}
-        {baptismStats && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <PieChartIcon className="w-4 h-4 text-primary" />
-              Baptism Stats
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={baptismData} cx="50%" cy="50%" innerRadius={50} outerRadius={100} dataKey="value" nameKey="name" label={renderCustomLabel} labelLine={false}>
-                  {baptismData.map((_, index) => (
-                    <Cell key={index} fill={PIE_COLORS[(index + 2) % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<PieTooltip />} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-        )}
+
 
       </div>
     </div>

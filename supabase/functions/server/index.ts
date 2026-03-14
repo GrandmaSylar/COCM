@@ -7137,10 +7137,22 @@ app.post('/children/members', async (c) => {
       dbData.join_date = new Date().toISOString().split('T')[0];
     }
 
-    const { data, error } = await supabase.from('children_members').insert({
-      ...dbData,
-      created_by: user.id,
-    }).select().single();
+    // Only pass columns that exist on children_members table
+    const allowedColumns = [
+      'first_name', 'last_name', 'other_names', 'gender', 'date_of_birth',
+      'phone', 'second_phone', 'email', 'digital_address', 'occupation', 'hometown',
+      'zone', 'status', 'residence_location', 'notes', 'photo_url', 'ministries',
+      'join_date', 'converted_to_member', 'converted_member_id'
+    ];
+    const insertPayload: any = {};
+    for (const key of allowedColumns) {
+      if (dbData[key] !== undefined) {
+        insertPayload[key] = dbData[key];
+      }
+    }
+    insertPayload.created_by = user.id;
+
+    const { data, error } = await supabase.from('children_members').insert(insertPayload).select().single();
 
     if (error) {
       console.error('Error creating child member:', error);
@@ -7723,7 +7735,7 @@ app.get('/children/analytics', async (c) => {
     }
 
     const [membersRes, visitorsRes, givingRes, attendanceRes] = await Promise.all([
-      supabase.from('children_members').select('id, first_name, last_name, date_of_birth, gender, status, is_baptised, join_date'),
+      supabase.from('children_members').select('id, first_name, last_name, date_of_birth, gender, status, join_date'),
       supabase.from('children_visitors').select('id, visit_date, converted_member_id'),
       givingQuery,
       attendanceQuery
@@ -7763,14 +7775,11 @@ app.get('/children/analytics', async (c) => {
     const activeMembers = members.filter(m => m.status === 'active').length;
     const visitorCount = visitors.length;
     const totalGiving = giving.reduce((sum, g) => sum + (Number(g.total_amount) || 0), 0);
-    const baptisedCount = members.filter(m => m.is_baptised === true).length;
-    
     const summary = {
       totalMembers,
       activeMembers,
       visitorCount,
-      totalGiving,
-      baptisedCount
+      totalGiving
     };
 
     // 2. memberGrowth

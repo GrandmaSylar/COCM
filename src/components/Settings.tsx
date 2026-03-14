@@ -15,7 +15,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
@@ -156,7 +156,8 @@ export const TAB_OPTIONS = [
   { id: 'reports', label: 'Reports', icon: BarChart3 },
   { id: 'services', label: 'Services', icon: Church },
   { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
-  { id: 'children', label: 'Children', icon: Baby }
+  { id: 'children', label: 'Children', icon: Baby },
+  { id: 'expenses', label: 'Expenses', icon: Receipt }
 ];
 
 export const WIDGET_OPTIONS = [
@@ -1218,7 +1219,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       </div>
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-muted-foreground">
-                                          {(systemUser.tabAccess || []).length} of 8 tabs
+                                          {(systemUser.tabAccess || []).length} of {TAB_OPTIONS.length} tabs
                                         </span>
                                         <ChevronDown
                                           className="h-4 w-4 text-muted-foreground transition-transform duration-300 ease-in-out"
@@ -1238,6 +1239,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         { id: 'services', label: 'Services', icon: Church },
                                         { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
                                           { id: 'children', label: 'Children', icon: Baby },
+                                          { id: 'expenses', label: 'Expenses', icon: Receipt },
                                         ].map(tab => {
                                         const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
                                         return (

@@ -288,7 +288,6 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
           isLinked: p.isLinked || false,
           linkedMemberId: p.linkedMemberId || undefined
         })),
-        isBaptised: false,
       } as Omit<ChildMember, 'id' | 'joinDate'> & { photo?: string });
     } catch (error) {
       console.error('Error saving child member:', error);

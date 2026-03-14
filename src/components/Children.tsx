@@ -49,7 +49,7 @@ export interface ChildMember {
   residenceLocation?: string;
   photo?: string;
   joinDate: string;
-  isBaptised: boolean;
+
   zone?: string;
   notes?: string;
   email?: string;
@@ -182,7 +182,7 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
       { key: 'age', label: 'Age' },
       { key: 'status', label: 'Status' },
       { key: 'joinDate', label: 'Join Date' },
-      { key: 'isBaptised', label: 'Baptised' },
+
       { key: 'zone', label: 'Zone' },
       { key: 'parentName', label: 'Parent/Guardian' }
     ];
@@ -394,11 +394,7 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
                   <Badge variant={child.status === 'active' ? 'default' : 'secondary'} className="ml-auto sm:ml-0">
                     {child.status}
                   </Badge>
-                  {child.isBaptised && (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      Baptised ✓
-                    </Badge>
-                  )}
+
                   <Button variant="outline" size="sm" onClick={() => onViewChild(child)}>
                     <Eye className="w-4 h-4 mr-2" />
                     View
