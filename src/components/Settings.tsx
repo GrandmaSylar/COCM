@@ -10,13 +10,19 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from './ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from './ui/sheet';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from './ui/alert-dialog';
+import { Checkbox } from './ui/checkbox';
+import { Separator } from './ui/separator';
+import { Textarea } from './ui/textarea';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2 } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
 import { api, invalidateApiCache } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { THEME_PRESETS } from '../utils/themePresets';
+import { DevSettings } from './DevSettings';
 
 interface SystemUser {
   id: string;
@@ -121,6 +127,45 @@ function applyThemeToDom(colors: ThemeColors | null) {
   }
 }
 
+export interface CustomRoleDefinition {
+  id: string;
+  name: string;
+  description: string;
+  permissions: string[];
+  tabAccess: string[];
+  dashboardWidgets: string[];
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt: string;
+  users: { id: string; name: string }[];
+}
+
+export const PERMISSION_GROUPS = {
+  Members: ['manage_users', 'manage_roles', 'manage_permissions', 'manage_members', 'view_members', 'edit_members', 'delete_members'],
+  Attendance: ['manage_attendance', 'view_attendance', 'record_attendance', 'manage_services'],
+  Giving: ['manage_giving', 'view_giving', 'record_giving', 'manage_giving_types'],
+  System: ['view_all', 'edit_all', 'delete_all', 'view_reports', 'manage_settings', 'manage_theme', 'grant_permissions']
+};
+
+export const TAB_OPTIONS = [
+  { id: 'members', label: 'Members', icon: Users },
+  { id: 'visitors', label: 'Visitors', icon: UserPlus },
+  { id: 'attendance', label: 'Attendance', icon: Calendar },
+  { id: 'giving', label: 'Giving', icon: Banknote },
+  { id: 'reports', label: 'Reports', icon: BarChart3 },
+  { id: 'services', label: 'Services', icon: Church },
+  { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
+  { id: 'children', label: 'Children', icon: Baby }
+];
+
+export const WIDGET_OPTIONS = [
+  { id: 'widget_total_members', label: 'Total Members' },
+  { id: 'widget_attendance_week', label: 'Weekly Attendance' },
+  { id: 'widget_giving_month', label: 'Monthly Giving' },
+  { id: 'widget_quick_actions', label: 'Quick Actions' }
+];
+
 export function Settings({ onAddUser }: SettingsProps) {
   const {
     user,
@@ -134,13 +179,19 @@ export function Settings({ onAddUser }: SettingsProps) {
     revokeTemporaryPermission,
     getUserTemporaryPermissions,
     assignRoleToUser,
-    customRoles,
-    addCustomRole,
-    deleteCustomRole,
     allUsers
   } = useAuth();
 
   const { customColors, setCustomColors, resetColors, isSyncing } = useTheme();
+
+  const [customRoles, setCustomRoles] = useState<CustomRoleDefinition[]>([]);
+  const [isRolesLoading, setIsRolesLoading] = useState(false);
+  const [isRoleSheetOpen, setIsRoleSheetOpen] = useState(false);
+  const [editingRole, setEditingRole] = useState<CustomRoleDefinition | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomRoleDefinition | null>(null);
+  const [reassignments, setReassignments] = useState<Record<string, string>>({});
+  const [expandedSystemRole, setExpandedSystemRole] = useState<string | null>(null);
+  const [expandedCustomRole, setExpandedCustomRole] = useState<string | null>(null);
 
   const [selectedUserForPermission, setSelectedUserForPermission] = useState<string | null>(null);
   const [permissionToGrant, setPermissionToGrant] = useState('');
@@ -209,9 +260,23 @@ export function Settings({ onAddUser }: SettingsProps) {
     }
   };
 
+  const fetchCustomRoles = async () => {
+    if (!isDev) return;
+    setIsRolesLoading(true);
+    try {
+      const data = await api.customRoles.getAll();
+      setCustomRoles(data || []);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to fetch custom roles');
+    } finally {
+      setIsRolesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (isDev) {
       fetchDropdownOptions();
+      fetchCustomRoles();
     }
   }, [isDev]);
 
@@ -545,11 +610,12 @@ export function Settings({ onAddUser }: SettingsProps) {
     }
   };
 
-  const handleChangeUserRole = async (userId: string, newRole: UserRole) => {
+  const handleChangeUserRole = async (userId: string, newRole: string) => {
     try {
-      const result = await api.users.updateRole(userId, newRole);
+      const result = await api.users.updateRole(userId, newRole as any);
       console.log('Role update result:', result);
-      toast.success(`User role updated to ${roleLabels[newRole]}`);
+      const roleName = newRole in roleLabels ? (roleLabels as any)[newRole] : newRole;
+      toast.success(`User role updated to ${roleName}`);
       // Update the user in allSystemUsers
       setAllSystemUsers(prev => prev.map(u =>
         u.id === userId
@@ -561,11 +627,44 @@ export function Settings({ onAddUser }: SettingsProps) {
       toast.error(error?.message || 'Failed to update user role. Please try again.');
     }
   };
+  const handleCreateRole = () => {
+    setEditingRole(null);
+    setIsRoleSheetOpen(true);
+  };
+
+  const handleEditRole = (role: CustomRoleDefinition) => {
+    setEditingRole(role);
+    setIsRoleSheetOpen(true);
+  };
+
+  const handleDeleteRole = (role: CustomRoleDefinition) => {
+    setDeleteTarget(role);
+    setReassignments({});
+  };
+
+  const handleRoleSaved = (role: CustomRoleDefinition) => {
+    setCustomRoles(prev => {
+      const idx = prev.findIndex(r => r.id === role.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = role;
+        return next;
+      }
+      return [...prev, role];
+    });
+    fetchCustomRoles();
+  };
+
+  const handleRoleDeleted = (roleId: string) => {
+    setCustomRoles(prev => prev.filter(r => r.id !== roleId));
+    setDeleteTarget(null);
+  };
 
   const hasAdminAccess = canManageUsers || canManageSettings;
 
   return (
-    <div className="space-y-6 w-full overflow-x-hidden">
+    <>
+      <div className="space-y-6 w-full overflow-x-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full overflow-hidden">
         <div>
@@ -614,16 +713,24 @@ export function Settings({ onAddUser }: SettingsProps) {
         </Alert>
       )}
 
-      <Tabs defaultValue={hasAdminAccess ? "users" : "security"} className="space-y-6 w-full">
-        <TabsList className="w-full overflow-x-auto flex flex-wrap h-auto">
-          {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
-          {hasAdminAccess && <TabsTrigger value="roles">Role Permissions</TabsTrigger>}
-          {isDev && <TabsTrigger value="custom-roles">Custom Roles</TabsTrigger>}
-          {isDev && <TabsTrigger value="dropdown-options">Dropdown Options</TabsTrigger>}
-          <TabsTrigger value="theme">Theme</TabsTrigger>
-          {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
+        <Tabs 
+          defaultValue={hasAdminAccess ? "users" : "security"} 
+          className="space-y-6 w-full"
+          onValueChange={(value) => {
+            if (value === "roles-and-permissions") {
+              fetchCustomRoles();
+            }
+          }}
+        >
+          <TabsList className="w-full overflow-x-auto flex flex-wrap h-auto">
+            {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
+            {isDev && <TabsTrigger value="roles-and-permissions">Roles & Permissions</TabsTrigger>}
+            {isDev && <TabsTrigger value="dropdown-options">Dropdown Options</TabsTrigger>}
+            {isDev && <TabsTrigger value="dev-settings">Dev Settings</TabsTrigger>}
+            <TabsTrigger value="theme">Theme</TabsTrigger>
+            {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
+            <TabsTrigger value="security">Security</TabsTrigger>
+          </TabsList>
 
         {/* Users & Permissions Tab */}
         <TabsContent value="users" className="space-y-6 w-full overflow-hidden">
@@ -648,8 +755,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{pendingUser.name}</h3>
-                              <Badge className={roleColors[pendingUser.role as UserRole]}>
-                                {roleLabels[pendingUser.role as UserRole]}
+                              <Badge className={(roleColors as any)[pendingUser.role] || "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"}>
+                                {(roleLabels as any)[pendingUser.role] || pendingUser.role}
                               </Badge>
                               <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
                                 Pending Approval
@@ -926,8 +1033,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{systemUser.name}</h3>
-                              <Badge className={roleColors[systemUser.role as UserRole]}>
-                                {roleLabels[systemUser.role as UserRole]}
+                              <Badge className={(roleColors as any)[systemUser.role] || "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"}>
+                                {(roleLabels as any)[systemUser.role] || systemUser.role}
                               </Badge>
                               {systemUser.approvalStatus === 'pending' && (
                                 <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
@@ -1024,17 +1131,32 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   <span className="text-xs text-muted-foreground flex-shrink-0">Change Role:</span>
                                   <Select
                                     value={systemUser.role}
-                                    onValueChange={(newRole) => handleChangeUserRole(systemUser.id, newRole as UserRole)}
+                                    onValueChange={(newRole) => handleChangeUserRole(systemUser.id, newRole)}
                                   >
                                     <SelectTrigger className="h-7 text-xs w-full sm:w-40 min-w-0">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
+                                      <div className="text-xs font-semibold px-2 py-1.5 text-muted-foreground uppercase">System Roles</div>
                                       {Object.entries(roleLabels).map(([value, label]) => (
                                         <SelectItem key={value} value={value}>
                                           {label}
                                         </SelectItem>
                                       ))}
+                                      {customRoles.length > 0 && (
+                                        <>
+                                          <div className="h-px bg-muted my-1" />
+                                          <div className="text-xs font-semibold px-2 py-1.5 text-muted-foreground uppercase">Custom Roles</div>
+                                          {customRoles.slice().sort((a,b) => a.name.localeCompare(b.name)).map((cr: any) => (
+                                            <SelectItem key={cr.id} value={cr.name}>
+                                              <div className="flex items-center gap-2">
+                                                {cr.name}
+                                                <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300">Custom</Badge>
+                                              </div>
+                                            </SelectItem>
+                                          ))}
+                                        </>
+                                      )}
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -1253,102 +1375,77 @@ export function Settings({ onAddUser }: SettingsProps) {
           </div>
         </TabsContent>
 
-        {/* Role Permissions Tab */}
-        <TabsContent value="roles" className="space-y-6 w-full overflow-hidden">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+        {/* Roles & Permissions Tab */}
+        {isDev && (
+          <TabsContent value="roles-and-permissions" className="space-y-6 w-full overflow-hidden">
+            {/* System Roles */}
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
                 <Shield className="w-5 h-5" />
-                Role Permissions
-                {isDev && (
-                  <Badge variant="outline" className="text-xs">
-                    Click to toggle permissions
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                {isDev 
-                  ? "Manage default permissions for each role. Dev role always has supreme access."
-                  : "View the permissions assigned to each role."
-                }
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {Object.entries(roleLabels).map(([role, label]) => (
-                  <div key={role}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge className={roleColors[role as UserRole]}>
-                        {label}
-                      </Badge>
-                      {role === 'dev' && (
-                        <span className="text-sm text-purple-600 dark:text-purple-400">Supreme Access</span>
-                      )}
-                      {(role === 'pastor' || role === 'elder') && (isAdmin || isDev) && (
-                        <span className="text-sm text-muted-foreground">
-                          View-only by default. Grant temporary permissions as needed.
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
-                      {allPermissions.map(permission => {
-                        const hasPermission = rolePermissions[role]?.includes(permission) || false;
-                        const isDevRole = role === 'dev';
-                        
-                        return (
-                          <div
-                            key={permission}
-                            className={`flex items-center space-x-2 p-2 rounded border min-w-0 ${
-                              isDev && !isDevRole ? 'cursor-pointer hover:bg-muted/50' : ''
-                            } ${
-                              hasPermission ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 
-                              'bg-gray-50 border-gray-200 dark:bg-gray-900/20 dark:border-gray-800'
-                            }`}
-                            onClick={() => !isDevRole && handleTogglePermission(role as UserRole, permission)}
-                          >
-                            {isDev && !isDevRole && (
-                              <Switch
-                                checked={hasPermission}
-                                onCheckedChange={() => handleTogglePermission(role as UserRole, permission)}
-                                disabled={isDevRole}
-                              />
-                            )}
-                            <span className={`text-xs truncate ${
-                              hasPermission ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'
-                            }`}>
-                              {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
-                            </span>
-                            {isDevRole && (
-                              <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                System Roles
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                {(['dev', 'admin', 'pastor', 'elder'] as UserRole[]).map((role) => (
+                  <SystemRoleCard
+                    key={role}
+                    role={role}
+                    label={(roleLabels as any)[role]}
+                    permissions={rolePermissions[role] || []}
+                    users={allSystemUsers.filter((u: any) => u.role === role)}
+                    isExpanded={expandedSystemRole === role}
+                    onToggleExpand={() => setExpandedSystemRole(expandedSystemRole === role ? null : role)}
+                    onTogglePermission={(permission: string) => handleTogglePermission(role, permission)}
+                  />
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
 
-        {/* Custom Roles Tab (Dev Only) */}
-        {isDev && (
-          <TabsContent value="custom-roles" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom Roles</CardTitle>
-                <CardDescription>
-                  Create custom roles with specific permission sets. This feature is coming soon.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <Crown className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>Custom role management will be available in the next update.</p>
+            <Separator />
+
+            {/* Custom Roles */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Crown className="w-5 h-5" />
+                  Custom Roles
+                </h2>
+                <Button onClick={handleCreateRole} size="sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Role
+                </Button>
+              </div>
+
+              {isRolesLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-6 h-40 bg-muted/20" />
+                    </Card>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              ) : customRoles.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="text-center py-8 text-muted-foreground">
+                    <Shield className="w-12 h-12 mx-auto mb-4 opacity-20" />
+                    <p>No custom roles created yet.</p>
+                    <Button variant="link" onClick={handleCreateRole}>Create your first custom role</Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {customRoles.map((role) => (
+                    <CustomRoleCard
+                      key={role.id}
+                      role={role}
+                      isExpanded={expandedCustomRole === role.id}
+                      onToggleExpand={() => setExpandedCustomRole(expandedCustomRole === role.id ? null : role.id)}
+                      onEdit={() => handleEditRole(role)}
+                      onDelete={() => handleDeleteRole(role)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
         )}
 
@@ -1490,6 +1587,13 @@ export function Settings({ onAddUser }: SettingsProps) {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+        )}
+
+        {/* Dev Settings Tab (Dev Only) */}
+        {isDev && (
+          <TabsContent value="dev-settings" className="space-y-6 w-full overflow-hidden">
+            <DevSettings />
           </TabsContent>
         )}
 
@@ -1783,6 +1887,24 @@ export function Settings({ onAddUser }: SettingsProps) {
         </DialogContent>
       </Dialog>
     </div>
+
+      <RoleFormSheet 
+        open={isRoleSheetOpen}
+        onOpenChange={setIsRoleSheetOpen}
+        editingRole={editingRole}
+        existingRoles={customRoles}
+        onSaved={handleRoleSaved}
+      />
+      
+      <DeleteRoleDialog
+        open={!!deleteTarget}
+        onOpenChange={(open: boolean) => !open && setDeleteTarget(null)}
+        deleteTarget={deleteTarget}
+        allRoles={customRoles}
+        allSystemUsers={allSystemUsers}
+        onDeleted={handleRoleDeleted}
+      />
+    </>
   );
 }
 
@@ -2851,7 +2973,14 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
     twoFaMethod: 'none' as 'none' | 'email' | 'phone'
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [customRoles, setCustomRoles] = useState<any[]>([]);
   const { isDev } = useAuth();
+
+  useEffect(() => {
+    if (isDev) {
+      api.customRoles.getAll().then(setCustomRoles).catch(console.error);
+    }
+  }, [isDev]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2951,6 +3080,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                     <SelectValue placeholder="Select user role" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="text-[10px] font-semibold px-2 py-1 text-muted-foreground uppercase">System</div>
                     {Object.entries(roleLabels).map(([value, label]) => (
                       <SelectItem 
                         key={value} 
@@ -2963,6 +3093,18 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                         </div>
                       </SelectItem>
                     ))}
+
+                    {isDev && customRoles.length > 0 && (
+                      <>
+                        <Separator className="my-1" />
+                        <div className="text-[10px] font-semibold px-2 py-1 text-muted-foreground uppercase">Custom</div>
+                        {customRoles.map((cr) => (
+                          <SelectItem key={cr.id} value={cr.name}>
+                            {cr.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 {formData.role === 'dev' && !isDev && (
@@ -3043,5 +3185,480 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ----- New Components for Custom Roles -----
+
+function SystemRoleCard({ role, label, permissions, users, isExpanded, onToggleExpand, onTogglePermission }: any) {
+  const { isDev } = useAuth();
+  const isDevRole = role === 'dev';
+  
+  return (
+    <Card className="w-full">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <Badge className={(roleColors as any)[role]}>{label}</Badge>
+            {isDevRole && <span className="text-sm text-purple-600 dark:text-purple-400">Supreme Access</span>}
+          </div>
+          <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80" onClick={onToggleExpand}>
+            <Users className="w-3 h-3 mr-1" />
+            {users.length} Users
+          </Badge>
+        </div>
+        
+        {isExpanded && users.length > 0 && (
+          <div className="text-sm text-muted-foreground bg-muted/20 p-2 rounded-md">
+            {users.map((u: any) => u.name).join(', ')}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {allPermissions.map((permission: string) => {
+            const hasPermission = permissions.includes(permission);
+            return (
+              <div
+                key={permission}
+                className={`flex items-center space-x-2 p-2 rounded border min-w-0 ${isDev && !isDevRole ? 'cursor-pointer hover:bg-muted/50' : ''} ${hasPermission ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-900/20 dark:border-gray-800'}`}
+                onClick={() => !isDevRole && isDev && onTogglePermission(permission)}
+              >
+                {isDev && !isDevRole && (
+                  <Checkbox
+                    checked={hasPermission}
+                    onCheckedChange={() => onTogglePermission(permission)}
+                    disabled={isDevRole}
+                  />
+                )}
+                <span className={`text-xs truncate ${hasPermission ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}`}>
+                  {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                </span>
+                {isDevRole && <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CustomRoleCard({ role, isExpanded, onToggleExpand, onEdit, onDelete }: any) {
+  return (
+    <Card className="flex flex-col h-full">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">{role.name}</CardTitle>
+            {role.description && <CardDescription className="text-xs line-clamp-2 mt-1">{role.description}</CardDescription>}
+          </div>
+          <div className="flex gap-1 shrink-0">
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onEdit}>
+              <Edit className="h-3.5 w-3.5" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={onDelete}>
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-1 space-y-4">
+        <div className="space-y-2">
+          {role.permissions?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {role.permissions.slice(0, 3).map((p: string) => (
+                <Badge key={p} className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px] px-1.5 py-0">
+                  {p.replace(/_/g, ' ')}
+                </Badge>
+              ))}
+              {role.permissions.length > 3 && (
+                <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">+{role.permissions.length - 3}</Badge>
+              )}
+            </div>
+          )}
+          {role.tabAccess?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {role.tabAccess.slice(0, 3).map((t: string) => (
+                <Badge key={t} className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-[10px] px-1.5 py-0">
+                  {t}
+                </Badge>
+              ))}
+              {role.tabAccess.length > 3 && (
+                <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{role.tabAccess.length - 3}</Badge>
+              )}
+            </div>
+          )}
+          {role.dashboardWidgets?.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {role.dashboardWidgets.slice(0, 3).map((w: string) => (
+                <Badge key={w} className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-[10px] px-1.5 py-0 dark:bg-gray-800 dark:text-gray-300">
+                  {w.replace(/-/g, ' ')}
+                </Badge>
+              ))}
+              {role.dashboardWidgets.length > 3 && (
+                <Badge className="bg-gray-100 text-gray-800 text-[10px] px-1.5 py-0">+{role.dashboardWidgets.length - 3}</Badge>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="pt-2 mt-auto border-t text-xs text-muted-foreground flex items-center justify-between">
+          <span title={new Date(role.createdAt).toLocaleString()}>
+            Created by {role.createdByName || role.createdBy || 'System'} · {new Date(role.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </span>
+          <Badge variant="secondary" className="cursor-pointer text-[10px] h-5" onClick={onToggleExpand}>
+            <Users className="w-3 h-3 mr-1" />
+            {role.users?.length || 0}
+          </Badge>
+        </div>
+        
+        {isExpanded && role.users?.length > 0 && (
+          <div className="text-xs bg-muted/30 p-2 rounded mt-2 max-h-24 overflow-y-auto">
+            {role.users.map((u: any) => u.name).join(', ')}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved }: any) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [selectedTabs, setSelectedTabs] = useState<string[]>([]);
+  const [selectedWidgets, setSelectedWidgets] = useState<string[]>([]);
+  const [nameError, setNameError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (editingRole) {
+      setName(editingRole.name);
+      setDescription(editingRole.description || '');
+      setSelectedPermissions(editingRole.permissions || []);
+      setSelectedTabs(editingRole.tabAccess || []);
+      setSelectedWidgets(editingRole.dashboardWidgets || []);
+    } else {
+      setName('');
+      setDescription('');
+      setSelectedPermissions([]);
+      setSelectedTabs([]);
+      setSelectedWidgets([]);
+    }
+    setNameError('');
+  }, [editingRole, open]);
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setNameError('Role name is required');
+      return;
+    }
+    
+    const conflict = existingRoles.find((r: any) => r.name.toLowerCase() === name.trim().toLowerCase() && r.id !== editingRole?.id);
+    if (conflict) {
+      setNameError('A role with this name already exists');
+      return;
+    }
+    
+    setIsSaving(true);
+    setNameError('');
+    
+    try {
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        permissions: selectedPermissions,
+        tabAccess: selectedTabs,
+        dashboardWidgets: selectedWidgets
+      };
+      
+      let result;
+      if (editingRole) {
+        result = await api.customRoles.update(editingRole.id, payload);
+      } else {
+        result = await api.customRoles.create(payload);
+      }
+      
+      toast.success(editingRole ? `Role '${name.trim()}' updated.` : `Role '${name.trim()}' created.`);
+      onSaved(result);
+      onOpenChange(false);
+    } catch (err: any) {
+      const isNameConflict = err?.message?.toLowerCase().includes('already exists') || err?.message?.toLowerCase().includes('duplicate');
+      if (isNameConflict) {
+        setNameError(err?.message || 'A role with this name already exists');
+      } else {
+        toast.error(err?.message || 'Failed to save role');
+        setNameError(err?.message || 'Failed to save role');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleGroupPermissions = (groupPerms: string[]) => {
+    const allSelected = groupPerms.every(p => selectedPermissions.includes(p));
+    if (allSelected) {
+      setSelectedPermissions(prev => prev.filter(p => !groupPerms.includes(p)));
+    } else {
+      setSelectedPermissions(prev => Array.from(new Set([...prev, ...groupPerms])));
+    }
+  };
+
+  const toggleTab = (tabId: string) => {
+    setSelectedTabs(prev => prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]);
+  };
+
+  const toggleWidget = (widgetId: string) => {
+    setSelectedWidgets(prev => prev.includes(widgetId) ? prev.filter(w => w !== widgetId) : [...prev, widgetId]);
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="mb-6">
+          <SheetTitle>{editingRole ? `Edit Role — ${editingRole.name}` : 'Create Custom Role'}</SheetTitle>
+        </SheetHeader>
+        
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="role-name">Role Name <span className="text-red-500">*</span></Label>
+              <Input 
+                id="role-name" 
+                value={name} 
+                onChange={e => { setName(e.target.value); setNameError(''); }}
+                placeholder="e.g. Finance Team"
+              />
+              {nameError && <p className="text-xs text-red-500">{nameError}</p>}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="role-desc">Description</Label>
+              <Textarea 
+                id="role-desc" 
+                value={description} 
+                onChange={e => setDescription(e.target.value)}
+                placeholder="What can users with this role do?"
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <Separator />
+          
+          <div className="space-y-4">
+            <h3 className="font-semibold text-sm">Function Permissions</h3>
+            {Object.entries(PERMISSION_GROUPS).map(([groupName, perms]: any) => (
+              <div key={groupName} className="space-y-2 border rounded-lg p-3">
+                <div className="flex items-center justify-between pb-2 border-b">
+                  <span className="font-medium text-sm">{groupName}</span>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 text-xs px-2"
+                    onClick={() => toggleGroupPermissions(perms)}
+                  >
+                    {perms.every((p: string) => selectedPermissions.includes(p)) ? 'Clear all' : 'Select all'}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {perms.map((p: string) => (
+                    <div key={p} className="flex items-start space-x-2">
+                      <Checkbox 
+                        id={`perm-${p}`}
+                        checked={selectedPermissions.includes(p)}
+                        onCheckedChange={(checked) => {
+                          setSelectedPermissions(prev => 
+                            checked ? [...prev, p] : prev.filter(x => x !== p)
+                          );
+                        }}
+                      />
+                      <label htmlFor={`perm-${p}`} className="text-xs font-medium leading-none cursor-pointer">
+                        {p.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm">Tab Access</h3>
+            <div className="flex flex-wrap gap-2">
+              {TAB_OPTIONS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => toggleTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-colors ${
+                    selectedTabs.includes(tab.id) 
+                      ? 'bg-blue-100 border-blue-200 text-blue-800 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-300' 
+                      : 'bg-transparent border-border text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3 pb-8">
+            <h3 className="font-semibold text-sm">Dashboard Widgets</h3>
+            <div className="flex flex-wrap gap-2">
+              {WIDGET_OPTIONS.map(widget => (
+                <button
+                  key={widget.id}
+                  onClick={() => toggleWidget(widget.id)}
+                  className={`px-3 py-1.5 rounded-full border text-xs transition-colors ${
+                    selectedWidgets.includes(widget.id) 
+                      ? 'bg-purple-100 border-purple-200 text-purple-800 dark:bg-purple-900/40 dark:border-purple-800 dark:text-purple-300' 
+                      : 'bg-transparent border-border text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  {widget.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <SheetFooter className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t">
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {editingRole ? 'Save Changes' : 'Save Role'}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function DeleteRoleDialog({ open, onOpenChange, deleteTarget, allRoles, allSystemUsers, onDeleted }: any) {
+  const [reassignments, setReassignments] = useState<Record<string, string>>({});
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setReassignments({});
+    }
+  }, [open]);
+
+  const hasUsers = deleteTarget?.users?.length > 0;
+  
+  const handleConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    
+    try {
+      if (hasUsers) {
+        const payload = Object.entries(reassignments).map(([userId, newRole]) => ({ userId, newRole }));
+        await api.customRoles.delete(deleteTarget.id, payload);
+        toast.success(`Role '${deleteTarget.name}' deleted. ${payload.length} users reassigned.`);
+      } else {
+        await api.customRoles.delete(deleteTarget.id);
+        toast.success(`Role '${deleteTarget.name}' deleted.`);
+      }
+      onDeleted(deleteTarget.id);
+      onOpenChange(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete role');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!deleteTarget) return null;
+
+  if (!hasUsers) {
+    return (
+      <AlertDialog open={open} onOpenChange={onOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the role <strong>{deleteTarget.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
+              {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Delete Role
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  }
+
+  const isFormValid = Object.keys(reassignments).length === deleteTarget.users.length && 
+                      Object.values(reassignments).every(v => v !== '');
+
+  const otherCustomRoles = allRoles.filter((r: any) => r.id !== deleteTarget.id);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete Role & Reassign Users</DialogTitle>
+          <DialogDescription>
+            The role <strong>{deleteTarget.name}</strong> has {deleteTarget.users.length} users assigned to it. 
+            You must reassign them to a new role before it can be deleted.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <Alert variant="destructive" className="py-2">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>This action cannot be undone.</AlertDescription>
+        </Alert>
+
+        <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+          {deleteTarget.users.map((u: any) => (
+            <div key={u.id} className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium truncate">{u.name}</span>
+              <Select 
+                value={reassignments[u.id] || ''} 
+                onValueChange={(val) => setReassignments(prev => ({ ...prev, [u.id]: val }))}
+              >
+                <SelectTrigger className="w-32 h-8 text-xs">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="text-[10px] font-semibold px-2 py-1 text-muted-foreground uppercase">System</div>
+                  <SelectItem value="dev">Developer</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="pastor">Pastor</SelectItem>
+                  <SelectItem value="elder">Elder</SelectItem>
+                  
+                  {otherCustomRoles.length > 0 && (
+                    <>
+                      <Separator className="my-1" />
+                      <div className="text-[10px] font-semibold px-2 py-1 text-muted-foreground uppercase">Custom</div>
+                      {otherCustomRoles.map((cr: any) => (
+                        <SelectItem key={cr.id} value={cr.name}>{cr.name}</SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="destructive" onClick={handleConfirm} disabled={!isFormValid || isDeleting}>
+            {isDeleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            Reassign & Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

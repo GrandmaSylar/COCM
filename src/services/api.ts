@@ -42,6 +42,14 @@ export interface ExpenseUpdatePayload {
   approvedByName?: string;
 }
 
+export interface CustomRolePayload {
+  name: string;
+  description?: string;
+  permissions: string[];
+  tabAccess: string[];
+  dashboardWidgets: string[];
+}
+
 export const api = {
   // ============================================================================
   // AUTH
@@ -575,6 +583,17 @@ export const api = {
   },
 
   // ============================================================================
+  // CUSTOM ROLES
+  // ============================================================================
+
+  customRoles: {
+    getAll: () => fetchApi('/custom-roles'),
+    create: (data: CustomRolePayload) => fetchApi('/custom-roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: CustomRolePayload) => fetchApi('/custom-roles/' + id, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string, reassignments?: { userId: string; newRole: string }[]) => fetchApi('/custom-roles/' + id, { method: 'DELETE', body: reassignments ? JSON.stringify({ reassignments }) : undefined }),
+  },
+
+  // ============================================================================
   // ADMIN (dev-only configuration)
   // ============================================================================
 
@@ -583,8 +602,8 @@ export const api = {
     updateNotificationConfig: (type: string, data: any) =>
       fetchApi(`/admin/notification-config/${type}`, { method: 'PUT', body: JSON.stringify(data) }),
     getActivityLogConfig: () => fetchApi('/admin/activity-log-config'),
-    updateActivityLogConfig: (category: string, data: any) =>
-      fetchApi(`/admin/activity-log-config/${category}`, { method: 'PUT', body: JSON.stringify(data) }),
+    updateActivityLogConfig: (actionType: string, entityType: string, data: any) =>
+      fetchApi(`/admin/activity-log-config/${actionType}/${entityType}`, { method: 'PUT', body: JSON.stringify(data) }),
 
     // System Options Management
     getOptions: () => fetchApi('/admin/options'),

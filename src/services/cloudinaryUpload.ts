@@ -16,6 +16,7 @@ export async function uploadToCloudinary(file: File, memberId: string): Promise<
       formData.append('timestamp', String(signResponse.timestamp));
       formData.append('signature', signResponse.signature);
       formData.append('folder', 'member-photos');
+      formData.append('signature_version', '2');
       if (signResponse.uploadPreset) {
         formData.append('upload_preset', signResponse.uploadPreset);
       }

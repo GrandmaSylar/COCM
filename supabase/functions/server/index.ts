@@ -77,6 +77,18 @@ async function checkPermission(userId: string, permission: string): Promise<bool
     }
   }
 
+  if (!SYSTEM_ROLES.includes(profile.role as any)) {
+    const { data: customRole } = await supabase
+      .from('custom_roles')
+      .select('permissions')
+      .eq('name', profile.role)
+      .maybeSingle();
+
+    if (customRole && Array.isArray(customRole.permissions) && customRole.permissions.includes(permission)) {
+      return true;
+    }
+  }
+
   // Check for temporary permissions
   const { data: tempPermissions } = await supabase
     .from('temporary_permissions')
@@ -126,6 +138,8 @@ function toCamelCase(obj) {
   }
   return obj;
 }
+
+const SYSTEM_ROLES = ['dev', 'admin', 'pastor', 'elder'] as const;
 // ============================================================================
 // MEMBER STATUS RECALCULATION
 // ============================================================================
@@ -349,13 +363,21 @@ async function createNotification(opts: {
 
     if (config) {
       if (!config.is_enabled) return; // notification type is disabled globally
-      // Check if user matches allowed roles or specific user ids
-      const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', opts.userId).maybeSingle();
-      const userRole = profile?.role || '';
-      const roleAllowed = (config.allowed_roles || []).includes(userRole);
-      const userAllowed = (config.allowed_user_ids || []).includes(opts.userId);
-      if (!roleAllowed && !userAllowed) return; // user not in audience
+      
+      const allowedRoles: string[] = config.allowed_roles || [];
+      const allowedUsers: string[] = config.allowed_user_ids || [];
+
+      // If either list has entries, restrict by them. If both empty, allow everyone.
+      if (allowedRoles.length > 0 || allowedUsers.length > 0) {
+        const { data: profile } = await supabase
+          .from('profiles').select('role').eq('id', opts.userId).maybeSingle();
+        const userRole = profile?.role || '';
+        
+        const roleAllowed = allowedRoles.includes(userRole);
+        const userAllowed = allowedUsers.includes(opts.userId);
+        
+        if (!roleAllowed && !userAllowed) return; // user not in audience
+      }
     }
     // Config absent = allow (not yet seeded), config present = gate above
     await supabase.from('notifications').insert({
@@ -534,6 +556,251 @@ app.use("/*", cors({
   ],
   maxAge: 600
 }));
+
+// Diagnostic Middleware (logs to Supabase function logs)
+app.use('*', async (c, next) => {
+  console.log(`[${c.req.method}] ${c.req.url} - Path: ${c.req.path} - Matched: ${c.req.routePath}`);
+  await next();
+});
+
+// ============================================================================
+// CUSTOM ROLES (MOVE HIGHER)
+// ============================================================================
+
+app.get('/custom-roles', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const { data: roles, error: rolesError } = await supabase.from('custom_roles').select('*');
+    if (rolesError) return c.json({ error: 'Failed to fetch custom roles' }, 500);
+
+    const { data: profiles, error: profError } = await supabase.from('profiles').select('id, name, role');
+    if (profError) return c.json({ error: 'Failed to fetch profiles' }, 500);
+
+    const usersByRole: Record<string, any[]> = {};
+    if (profiles) {
+      profiles.forEach(p => {
+        if (!usersByRole[p.role]) usersByRole[p.role] = [];
+        usersByRole[p.role].push({ id: p.id, name: p.name });
+      });
+    }
+
+    const result = (roles || []).map(r => {
+      const users = usersByRole[r.name] || [];
+      const creator = profiles?.find(p => p.id === r.created_by);
+      return {
+        ...toCamelCase(r),
+        createdByName: creator?.name || 'System',
+        userCount: users.length,
+        users
+      };
+    });
+
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.post('/custom-roles', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role, name').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const body = await c.req.json();
+    const { name, description, permissions, tabAccess, dashboardWidgets } = body;
+
+    if (!name || name.trim() === '') {
+      return c.json({ error: 'Name is required' }, 400);
+    }
+    const trimName = name.trim();
+
+    if (SYSTEM_ROLES.some(r => r.toLowerCase() === trimName.toLowerCase())) {
+      return c.json({ error: 'Cannot create a custom role with a system role name' }, 400);
+    }
+
+    const { data: existing } = await supabase.from('custom_roles').select('id').ilike('name', trimName).maybeSingle();
+    if (existing) {
+      return c.json({ error: 'A custom role with this name already exists' }, 400);
+    }
+
+    const { data: inserted, error: insertError } = await supabase.from('custom_roles').insert({
+      name: trimName,
+      description: description || null,
+      permissions: permissions || [],
+      tab_access: tabAccess || [],
+      dashboard_widgets: dashboardWidgets || [],
+      created_by: user.id
+    }).select().single();
+
+    if (insertError) {
+      return c.json({ error: 'Failed to create custom role: ' + insertError.message }, 500);
+    }
+
+    await logActivity({
+      userId: user.id,
+      userName: prof.name || 'Unknown',
+      userRole: prof.role,
+      action: 'create',
+      entityType: 'custom_role',
+      entityId: inserted.id,
+      description: `Created custom role: ${trimName}`
+    });
+
+    return c.json(toCamelCase(inserted), 201);
+  } catch (e) {
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.put('/custom-roles/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role, name').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const { name, description, permissions, tabAccess, dashboardWidgets } = body;
+
+    if (!name || name.trim() === '') {
+      return c.json({ error: 'Name is required' }, 400);
+    }
+    const trimName = name.trim();
+
+    if (SYSTEM_ROLES.some(r => r.toLowerCase() === trimName.toLowerCase())) {
+      return c.json({ error: 'Cannot utilize a system role name' }, 400);
+    }
+
+    const { data: existing } = await supabase.from('custom_roles').select('id').ilike('name', trimName).neq('id', id).maybeSingle();
+    if (existing) {
+      return c.json({ error: 'Another custom role with this name already exists' }, 400);
+    }
+
+    const { data: updated, error: updateError } = await supabase.from('custom_roles').update({
+      name: trimName,
+      description: description !== undefined ? description : null,
+      permissions: permissions || [],
+      tab_access: tabAccess || [],
+      dashboard_widgets: dashboardWidgets || []
+    }).eq('id', id).select().single();
+
+    if (updateError) {
+      return c.json({ error: 'Failed to update custom role: ' + updateError.message }, 500);
+    }
+    
+    if (!updated) {
+      return c.json({ error: 'Custom role not found' }, 404);
+    }
+
+    await logActivity({
+      userId: user.id,
+      userName: prof.name || 'Unknown',
+      userRole: prof.role,
+      action: 'update',
+      entityType: 'custom_role',
+      entityId: id,
+      description: `Updated custom role: ${trimName}`
+    });
+
+    return c.json(toCamelCase(updated));
+  } catch (e) {
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+app.delete('/custom-roles/:id', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role, name').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+
+    const id = c.req.param('id');
+    const { data: roleToDelete } = await supabase.from('custom_roles').select('name').eq('id', id).maybeSingle();
+    if (!roleToDelete) return c.json({ error: 'Custom role not found' }, 404);
+
+    const roleName = roleToDelete.name;
+
+    let body: any = null;
+    try {
+      body = await c.req.json();
+    } catch (err) {
+      body = null;
+    }
+
+    if (!body || !body.reassignments || !Array.isArray(body.reassignments)) {
+      // Phase 1
+      const { data: usersWithRole } = await supabase.from('profiles').select('id, name').eq('role', roleName);
+      if (usersWithRole && usersWithRole.length > 0) {
+        return c.json({ users: usersWithRole }, 409);
+      }
+    } else {
+      // Phase 2
+      const reassignments = body.reassignments;
+      
+      const { data: usersWithRole } = await supabase.from('profiles').select('id, name').eq('role', roleName);
+      const assignedUserIds = (usersWithRole || []).map(u => u.id);
+      const reassignedUserIds = reassignments.map((r: any) => r.userId);
+      const missingUsers = assignedUserIds.filter(id => !reassignedUserIds.includes(id));
+      const uniqueReassignments = new Set(reassignedUserIds);
+      const unrelatedUsers = reassignedUserIds.filter(id => !assignedUserIds.includes(id));
+      
+      if (missingUsers.length > 0 || reassignedUserIds.length !== uniqueReassignments.size || unrelatedUsers.length > 0) {
+        return c.json({ error: 'Reassignments must cover exactly all currently assigned users' }, 400);
+      }
+      
+      const allCustomRolesRes = await supabase.from('custom_roles').select('name');
+      const validCustomRoles = (allCustomRolesRes.data || []).map(r => r.name);
+      
+      for (const r of reassignments) {
+        if (!SYSTEM_ROLES.includes(r.newRole as any) && !validCustomRoles.includes(r.newRole)) {
+          return c.json({ error: `Invalid role specified for reassignment: ${r.newRole}` }, 400);
+        }
+        if (r.newRole === roleName) {
+           return c.json({ error: 'Cannot reassign to the role being deleted' }, 400);
+        }
+      }
+
+      const { error: rpcError } = await supabase.rpc('delete_custom_role_txn', {
+        p_role_id: id,
+        p_reassignments: reassignments,
+        p_user_id: user.id,
+        p_user_name: prof.name || 'Unknown',
+        p_user_role: prof.role
+      });
+      
+      if (rpcError) {
+        return c.json({ error: 'Failed to delete role: ' + rpcError.message }, 500);
+      }
+      
+      return c.json({ deleted: true, reassigned: reassignments.length });
+    }
+
+    const { error: delError } = await supabase.from('custom_roles').delete().eq('id', id);
+    if (delError) return c.json({ error: 'Failed to delete role: ' + delError.message }, 500);
+
+    await logActivity({
+      userId: user.id,
+      userName: prof.name || 'Unknown',
+      userRole: prof.role,
+      action: 'delete',
+      entityType: 'custom_role',
+      entityId: id,
+      description: `Deleted custom role: ${roleName}`
+    });
+
+    return c.json({ deleted: true, reassigned: 0 });
+  } catch (e) {
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
 // ============================================================================
 // CLOUDINARY UPLOAD ROUTE
 // ============================================================================
@@ -566,10 +833,10 @@ app.post("/cloudinary/sign", async (c) => {
     }
     const stringToSign = `${sortedParams}${apiSecret}`;
 
-    // Generate SHA-1 hash for the signature
+    // Generate SHA-256 hash for the signature (Cloudinary signature version 2)
     const encoder = new TextEncoder();
     const data = encoder.encode(stringToSign);
-    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const signature = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
@@ -4533,10 +4800,20 @@ app.patch("/users/:id/role", async (c)=>{
     const body = await c.req.json();
     const { role } = body;
 
-    if (!role || !['dev', 'admin', 'pastor', 'elder'].includes(role)) {
-      return c.json({
-        error: 'Invalid role'
-      }, 400);
+    if (!role) {
+      return c.json({ error: 'Invalid role' }, 400);
+    }
+    
+    if (!SYSTEM_ROLES.includes(role as any)) {
+      const { data: customRole } = await supabase
+        .from('custom_roles')
+        .select('name')
+        .eq('name', role)
+        .maybeSingle();
+        
+      if (!customRole) {
+        return c.json({ error: 'Invalid role' }, 400);
+      }
     }
     const { data: updatedProfile, error } = await supabase.from('profiles').update({
       role,
@@ -5503,24 +5780,34 @@ app.get("/activity-log", async (c) => {
     const userId = c.req.query('userId');
     const action = c.req.query('action');
     const entityType = c.req.query('entityType');
-    const startDate = c.req.query('startDate');
     const endDate = c.req.query('endDate');
+    const startDate = c.req.query('startDate');
+    // Fetch dev config rules where is_enabled is false, or specific allowed_roles are set
+    const { data: configs } = await supabase
+      .from('activity_log_config')
+      .select('action_type, entity_type, is_enabled, allowed_roles, allowed_user_ids');
 
-    // Fetch visibility config for this role: categories where is_visible = false are excluded
-    const { data: visibilityConfigs } = await supabase
-      .from('activity_log_visibility_config')
-      .select('category, is_visible, allowed_roles')
-      .eq('is_visible', false);
-
-    // Determine which categories are hidden for this role
-    const hiddenCategories: string[] = [];
-    if (visibilityConfigs) {
-      for (const cfg of visibilityConfigs) {
+    const hiddenConfigs: { action: string, entity: string }[] = [];
+    if (configs) {
+      for (const cfg of configs) {
+        const isEnabled = cfg.is_enabled;
         const allowedRoles: string[] = cfg.allowed_roles || [];
-        // If there are no allowed_roles for an invisible category, it is hidden for everyone.
-        // If allowedRoles is set, hide only if this role is NOT in allowedRoles.
-        if (allowedRoles.length === 0 || !allowedRoles.includes(userRole)) {
-          hiddenCategories.push(cfg.category);
+        const allowedUsers: string[] = cfg.allowed_user_ids || [];
+
+        // If not globally enabled, or if role/user isn't in lists (when lists are not empty)
+        let isConfigHidden = false;
+        if (!isEnabled) {
+          isConfigHidden = true;
+        } else if (allowedRoles.length > 0 || allowedUsers.length > 0) {
+          const roleMatch = allowedRoles.includes(userRole);
+          const userMatch = allowedUsers.includes(user.id);
+          if (!roleMatch && !userMatch) {
+            isConfigHidden = true; // Hidden for THIS user
+          }
+        }
+
+        if (isConfigHidden) {
+          hiddenConfigs.push({ action: cfg.action_type, entity: cfg.entity_type });
         }
       }
     }
@@ -5538,9 +5825,12 @@ app.get("/activity-log", async (c) => {
       query = query.eq('user_id', userId);
     }
 
-    // Apply visibility filter — exclude hidden categories
-    if (hiddenCategories.length > 0) {
-      query = query.not('entity_type', 'in', `(${hiddenCategories.map(c => `"${c}"`).join(',')})`);
+    // Apply visibility filter — exclude hidden combinations using De Morgan's Laws
+    // NOT (action=A AND entity=B)  ==> (action != A OR entity != B)
+    if (hiddenConfigs.length > 0) {
+      for (const hc of hiddenConfigs) {
+        query = query.or(`action.neq.${hc.action},entity_type.neq.${hc.entity}`);
+      }
     }
 
     if (action) query = query.eq('action', action);
@@ -5581,6 +5871,35 @@ app.get("/activity-log/export", async (c) => {
     const startDate = c.req.query('startDate');
     const endDate = c.req.query('endDate');
 
+    // Fetch dev config rules where is_enabled is false, or specific allowed_roles are set
+    const { data: configs } = await supabase
+      .from('activity_log_config')
+      .select('action_type, entity_type, is_enabled, allowed_roles, allowed_user_ids');
+
+    const hiddenConfigs: { action: string, entity: string }[] = [];
+    if (configs) {
+      for (const cfg of configs) {
+        const isEnabled = cfg.is_enabled;
+        const allowedRoles: string[] = cfg.allowed_roles || [];
+        const allowedUsers: string[] = cfg.allowed_user_ids || [];
+
+        let isConfigHidden = false;
+        if (!isEnabled) {
+          isConfigHidden = true;
+        } else if (allowedRoles.length > 0 || allowedUsers.length > 0) {
+          const roleMatch = allowedRoles.includes(userRole);
+          const userMatch = allowedUsers.includes(user.id);
+          if (!roleMatch && !userMatch) {
+            isConfigHidden = true; // Hidden for THIS user
+          }
+        }
+
+        if (isConfigHidden) {
+          hiddenConfigs.push({ action: cfg.action_type, entity: cfg.entity_type });
+        }
+      }
+    }
+
     let query = supabase.from('activity_log')
       .select('*')
       .order('created_at', { ascending: false })
@@ -5592,6 +5911,13 @@ app.get("/activity-log/export", async (c) => {
       query = query.eq('user_id', user.id);
     } else if (userId) {
       query = query.eq('user_id', userId);
+    }
+
+    // Apply visibility filter — exclude hidden combinations using De Morgan's Laws
+    if (hiddenConfigs.length > 0) {
+      for (const hc of hiddenConfigs) {
+        query = query.or(`action.neq.${hc.action},entity_type.neq.${hc.entity}`);
+      }
     }
 
     if (action) query = query.eq('action', action);
@@ -7845,75 +8171,6 @@ app.get('/expenses/:id', async (c) => {
 });
 
 // ============================================================================
-// ADMIN: NOTIFICATION CONFIG (dev only)
-// ============================================================================
-
-app.get('/admin/notification-config', async (c) => {
-  try {
-    const user = await getUserFromToken(c.req.raw);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
-    const { data, error } = await supabase.from('notification_type_config').select('*').order('category');
-    if (error) return c.json({ error: 'Failed to fetch config' }, 500);
-    return c.json((data || []).map((r: any) => toCamelCase(r)));
-  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
-});
-
-app.put('/admin/notification-config/:type', async (c) => {
-  try {
-    const user = await getUserFromToken(c.req.raw);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
-    const type = c.req.param('type');
-    const body = await c.req.json();
-    const { data, error } = await supabase.from('notification_type_config').update({
-      allowed_roles: body.allowedRoles,
-      allowed_user_ids: body.allowedUserIds,
-      is_enabled: body.isEnabled,
-      updated_at: new Date().toISOString(),
-    }).eq('type', type).select().single();
-    if (error) return c.json({ error: error.message }, 500);
-    return c.json(toCamelCase(data));
-  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
-});
-
-// ============================================================================
-// ADMIN: ACTIVITY LOG CONFIG (dev only)
-// ============================================================================
-
-app.get('/admin/activity-log-config', async (c) => {
-  try {
-    const user = await getUserFromToken(c.req.raw);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
-    const { data, error } = await supabase.from('activity_log_visibility_config').select('*').order('action_category');
-    if (error) return c.json({ error: 'Failed to fetch config' }, 500);
-    return c.json((data || []).map((r: any) => toCamelCase(r)));
-  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
-});
-
-app.put('/admin/activity-log-config/:category', async (c) => {
-  try {
-    const user = await getUserFromToken(c.req.raw);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
-    const category = c.req.param('category');
-    const body = await c.req.json();
-    const { data, error } = await supabase.from('activity_log_visibility_config').update({
-      allowed_roles: body.allowedRoles,
-      allowed_user_ids: body.allowedUserIds,
-      updated_at: new Date().toISOString(),
-    }).eq('action_category', category).select().single();
-    if (error) return c.json({ error: error.message }, 500);
-    return c.json(toCamelCase(data));
-  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
-});
-
-// ============================================================================
 // SYSTEM DROPDOWN OPTIONS
 // ============================================================================
 
@@ -8022,7 +8279,89 @@ app.delete('/admin/options/:id', async (c) => {
 });
 
 // ============================================================================
+// ADMIN: NOTIFICATION SETTINGS (dev only)
+// ============================================================================
+
+app.get('/admin/notification-config', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    
+    const { data, error } = await supabase.from('notification_type_config').select('*').order('type');
+    if (error) return c.json({ error: 'Failed to fetch config' }, 500);
+    return c.json((data || []).map((r: any) => toCamelCase(r)));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.put('/admin/notification-config/:type', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    
+    const type = c.req.param('type');
+    const body = await c.req.json();
+    
+    const { data, error } = await supabase.from('notification_type_config').upsert({
+      type,
+      is_enabled: body.isEnabled !== undefined ? body.isEnabled : true,
+      allowed_roles: body.allowedRoles || [],
+      allowed_user_ids: body.allowedUserIds || []
+    }, { onConflict: 'type' }).select().single();
+    
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+// ============================================================================
+// ADMIN: ACTIVITY LOG SETTINGS (dev only)
+// ============================================================================
+
+app.get('/admin/activity-log-config', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    
+    const { data, error } = await supabase.from('activity_log_config').select('*').order('entity_type').order('action_type');
+    if (error) return c.json({ error: 'Failed to fetch config' }, 500);
+    return c.json((data || []).map((r: any) => toCamelCase(r)));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+app.put('/admin/activity-log-config/:action_type/:entity_type', async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    if (prof?.role !== 'dev') return c.json({ error: 'Forbidden' }, 403);
+    
+    const action_type = c.req.param('action_type');
+    const entity_type = c.req.param('entity_type');
+    const body = await c.req.json();
+    
+    const { data, error } = await supabase.from('activity_log_config').upsert({
+      action_type,
+      entity_type,
+      is_enabled: body.isEnabled !== undefined ? body.isEnabled : true,
+      allowed_roles: body.allowedRoles || [],
+      allowed_user_ids: body.allowedUserIds || []
+    }, { onConflict: 'action_type,entity_type' }).select().single();
+    
+    if (error) return c.json({ error: error.message }, 500);
+    return c.json(toCamelCase(data));
+  } catch (e) { return c.json({ error: 'Internal server error' }, 500); }
+});
+
+// ============================================================================
 // (Removed duplicate Cloudinary signature route)
+
+// (Moved Higher)
 
 // DEBUG: Global 404 Handler
 app.notFound((c)=>{

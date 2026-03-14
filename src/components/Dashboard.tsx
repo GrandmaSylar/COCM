@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { EmptyState } from './EmptyState';
-import { Users, Calendar, Banknote, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw } from 'lucide-react';
+import { Users, Calendar, Banknote, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw, LayoutDashboard } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useState, useEffect } from 'react';
@@ -19,6 +19,22 @@ interface DashboardProps {
 export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   const { user, canAccess, hasTabAccess } = useAuth();
   const { startTutorial, hasSeenTutorial } = useTutorial();
+
+  // Widget visibility gating for custom role users
+  const SYSTEM_ROLES = ['dev', 'admin', 'pastor', 'elder'];
+  const isCustomRoleUser = !!user && !SYSTEM_ROLES.includes(user.role);
+  
+  const visibleWidgets = isCustomRoleUser && user?.customRoleDefinition
+    ? new Set(user.customRoleDefinition.dashboard_widgets)
+    : isCustomRoleUser 
+      ? new Set<string>() // treat missing as empty widget set for non-system roles
+      : null;
+
+  const isWidgetVisible = (widgetId: string): boolean => {
+    if (!isCustomRoleUser) return true; // system role — always show all
+    return visibleWidgets!.has(widgetId);
+  };
+
 
   useEffect(() => {
     if (!user) return;
@@ -219,6 +235,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       {/* Summary Cards */}
       <div id="dashboard-stats" className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children">
         {/* Members Card */}
+        {isWidgetVisible('widget_total_members') && (
         <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-1">
             <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
                 <Users className="w-24 h-24 text-blue-600" />
@@ -239,8 +256,10 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 )}
             </div>
         </div>
+        )}
 
         {/* Attendance Card */}
+        {isWidgetVisible('widget_attendance_week') && (
         <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-1">
             <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
                 <Calendar className="w-24 h-24 text-amber-600" />
@@ -255,8 +274,10 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
             </div>
         </div>
+        )}
 
         {/* Giving Card */}
+        {isWidgetVisible('widget_giving_month') && (
         <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-1">
             <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
                 <Banknote className="w-24 h-24 text-emerald-600" />
@@ -271,9 +292,11 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
             </div>
         </div>
+        )}
       </div>
 
       {/* Quick Actions */}
+      {isWidgetVisible('widget_quick_actions') && (
       <div id="dashboard-quick-actions" className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
         <h2 className="text-xl font-semibold mb-5 flex items-center text-foreground/90">
             Quick Actions
@@ -303,6 +326,17 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
           })}
         </div>
       </div>
+      )}
+
+      {/* Empty state for custom role users with no widgets configured */}
+      {isCustomRoleUser && visibleWidgets!.size === 0 && (
+        <EmptyState
+          title="No dashboard widgets configured"
+          description="No dashboard widgets are configured for your role."
+          icon={LayoutDashboard}
+          className="border border-border/50 rounded-2xl bg-card/50 backdrop-blur-sm py-8"
+        />
+      )}
 
       {/* Recent Activity */}
       <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>

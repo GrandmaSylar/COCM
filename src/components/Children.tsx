@@ -374,7 +374,7 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden shadow-inner">
                     {child.photo && sanitizeUrl(child.photo) !== 'about:blank' ? (
-                      <img src={getCloudinaryUrl(child.photo, 'thumbnail') ?? ''} alt={child.firstName} className="w-full h-full object-cover" />
+                      <img src={sanitizeUrl(getCloudinaryUrl(child.photo, 'thumbnail') ?? '')} alt={child.firstName} className="w-full h-full object-cover" />
                     ) : (
                       `${child.firstName[0]}${child.lastName[0]}`
                     )}

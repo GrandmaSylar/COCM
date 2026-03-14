@@ -17,14 +17,23 @@ export interface TemporaryPermission {
   createdAt?: Date;
 }
 
+export interface CustomRoleDefinition {
+  id: string;
+  name: string;
+  permissions: string[];
+  tab_access: string[];
+  dashboard_widgets: string[];
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string;
   permissions?: string[]; // Computed from role
   temporaryPermissions?: TemporaryPermission[]; // Fetched from temporary_permissions table
   tabAccess?: string[]; // Tabs this user can access
+  customRoleDefinition?: CustomRoleDefinition | null;
   isActive: boolean;
   approvalStatus?: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
@@ -38,13 +47,6 @@ export interface RolePermissions {
   [key: string]: string[];
 }
 
-export interface CustomRole {
-  id: string;
-  name: string;
-  permissions: string[];
-  createdBy: string;
-  createdAt: Date;
-}
 
 export interface TwoFAData {
   requires2FA: true;
@@ -78,9 +80,6 @@ interface AuthContextType {
   revokeTemporaryPermission: (userId: string, permission: string) => void;
   getUserTemporaryPermissions: (userId: string) => TemporaryPermission[];
   assignRoleToUser: (userId: string, role: UserRole, temporary?: boolean, durationHours?: number) => void;
-  customRoles: CustomRole[];
-  addCustomRole: (name: string, permissions: string[]) => void;
-  deleteCustomRole: (roleId: string) => void;
   allUsers: User[];
 }
 
@@ -127,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(defaultPermissions);
   const [users, setUsers] = useState<User[]>(mockUsers);
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
 
   // Helper function to fetch user with temporary permissions
   const fetchUserWithPermissions = async (userId: string) => {
@@ -170,6 +168,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Failed to fetch tab access:', error);
     }
 
+    // Fetch custom role definition for non-system-role users
+    const SYSTEM_ROLES = ['dev', 'admin', 'pastor', 'elder'];
+    let customRoleDefinition: CustomRoleDefinition | null = null;
+    if (!SYSTEM_ROLES.includes(profile.role)) {
+      // Default to empty for non-system roles to prevent "failing open"
+      customRoleDefinition = {
+        id: 'unresolved',
+        name: profile.role,
+        permissions: [],
+        tab_access: [],
+        dashboard_widgets: []
+      };
+
+      try {
+        const { data: customRole, error: crError } = await supabase
+          .from('custom_roles')
+          .select('id, name, permissions, tab_access, dashboard_widgets')
+          .eq('name', profile.role)
+          .single();
+        if (!crError && customRole) {
+          customRoleDefinition = {
+            id: customRole.id,
+            name: customRole.name,
+            permissions: customRole.permissions || [],
+            tab_access: customRole.tab_access || [],
+            dashboard_widgets: customRole.dashboard_widgets || [],
+          };
+        }
+      } catch (error) {
+        console.error('Failed to fetch custom role definition:', error);
+      }
+    }
+
+
     return {
       id: profile.id,
       name: profile.name,
@@ -178,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isActive: profile.is_active,
       temporaryPermissions,
       tabAccess,
+      customRoleDefinition,
       createdAt: profile.created_at
     };
   };
@@ -499,6 +532,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Dev role can access everything
     if (user.role === 'dev') return true;
 
+    // Custom role: check permissions from custom role definition
+    if (user.customRoleDefinition) {
+      if (user.customRoleDefinition.permissions.includes(permission)) return true;
+      // Also check temporary permissions for custom role users
+      const tempPerms = user.temporaryPermissions || [];
+      const validTempPerms = tempPerms.filter(tp => new Date(tp.expiresAt) > new Date());
+      return validTempPerms.some(tp => tp.permission === permission);
+    }
+
     // Check role-based permissions
     const userPermissions = rolePermissions[user.role] || [];
     if (userPermissions.includes(permission)) return true;
@@ -517,6 +559,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Dashboard, settings, and help are always accessible
     if (['dashboard', 'settings', 'help'].includes(tab)) return true;
+
+    // Custom role: check tab_access from custom role definition
+    if (user.customRoleDefinition) {
+      return user.customRoleDefinition.tab_access.includes(tab);
+    }
 
     // Check user's tab access
     return (user.tabAccess || []).includes(tab);
@@ -602,27 +649,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  const addCustomRole = (name: string, permissions: string[]) => {
-    // Only Dev can add custom roles
-    if (!user || user.role !== 'dev') return;
-    
-    const newRole: CustomRole = {
-      id: `custom_${Date.now()}`,
-      name,
-      permissions,
-      createdBy: user.id,
-      createdAt: new Date()
-    };
-    
-    setCustomRoles(prev => [...prev, newRole]);
-  };
-
-  const deleteCustomRole = (roleId: string) => {
-    // Only Dev can delete custom roles
-    if (!user || user.role !== 'dev') return;
-    
-    setCustomRoles(prev => prev.filter(r => r.id !== roleId));
-  };
 
   const isDev = user?.role === 'dev';
   const isAdmin = user?.role === 'admin';
@@ -646,9 +672,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     revokeTemporaryPermission,
     getUserTemporaryPermissions,
     assignRoleToUser,
-    customRoles,
-    addCustomRole,
-    deleteCustomRole,
     allUsers: users,
   };
 
