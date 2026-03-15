@@ -894,15 +894,18 @@ app.post("/auth/signup", async (c)=>{
         error: 'Missing required fields'
       }, 400);
     }
-    if (![
-      'dev',
-      'admin',
-      'pastor',
-      'elder'
-    ].includes(role)) {
-      return c.json({
-        error: 'Invalid role'
-      }, 400);
+    if (!SYSTEM_ROLES.includes(role)) {
+      const { data: customRole } = await supabase
+        .from('custom_roles')
+        .select('name')
+        .eq('name', role)
+        .maybeSingle();
+        
+      if (!customRole) {
+        return c.json({
+          error: 'Invalid role'
+        }, 400);
+      }
     }
     const normalizedSignupPhone = phone ? normalizePhone(phone) : null;
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
@@ -4507,15 +4510,18 @@ app.post("/users", async (c)=>{
         error: 'Missing required fields'
       }, 400);
     }
-    if (![
-      'dev',
-      'admin',
-      'pastor',
-      'elder'
-    ].includes(role)) {
-      return c.json({
-        error: 'Invalid role'
-      }, 400);
+    if (!SYSTEM_ROLES.includes(role)) {
+      const { data: customRole } = await supabase
+        .from('custom_roles')
+        .select('name')
+        .eq('name', role)
+        .maybeSingle();
+
+      if (!customRole) {
+        return c.json({
+          error: 'Invalid role'
+        }, 400);
+      }
     }
     if (role === 'dev' && profile.role !== 'dev') {
       return c.json({
