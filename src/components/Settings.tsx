@@ -1028,7 +1028,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                         <div className="flex items-start gap-3 sm:gap-4 flex-1">
                           <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
                             <span className="text-sm font-medium text-primary">
-                              {systemUser.name.split(' ').map(n => n[0]).join('')}
+                              {systemUser.name.split(' ').map((n: string) => n[0]).join('')}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
@@ -3416,12 +3416,12 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader className="mb-6">
+      <SheetContent side="right" className="w-full sm:max-w-xl gap-0">
+        <SheetHeader>
           <SheetTitle>{editingRole ? `Edit Role — ${editingRole.name}` : 'Create Custom Role'}</SheetTitle>
         </SheetHeader>
         
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 space-y-6">
           <div className="space-y-3">
             <div className="space-y-1">
               <Label htmlFor="role-name">Role Name <span className="text-red-500">*</span></Label>
@@ -3509,7 +3509,7 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
 
           <Separator />
 
-          <div className="space-y-3 pb-8">
+          <div className="space-y-3">
             <h3 className="font-semibold text-sm">Dashboard Widgets</h3>
             <div className="flex flex-wrap gap-2">
               {WIDGET_OPTIONS.map(widget => (
@@ -3529,7 +3529,7 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
           </div>
         </div>
 
-        <SheetFooter className="absolute bottom-0 left-0 right-0 p-4 bg-background border-t">
+        <SheetFooter className="border-t">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSave} disabled={isSaving}>
             {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
