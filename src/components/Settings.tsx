@@ -1,3 +1,4 @@
+import { OfflineOverlay } from './OfflineOverlay';
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -735,6 +736,8 @@ export function Settings({ onAddUser }: SettingsProps) {
 
         {/* Users & Permissions Tab */}
         <TabsContent value="users" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+
           {/* Pending Users Section */}
           {pendingUsers.length > 0 && (
             <div>
@@ -1375,11 +1378,15 @@ export function Settings({ onAddUser }: SettingsProps) {
               })()}
             </div>
           </div>
-        </TabsContent>
+        
+        </OfflineOverlay>
+      </TabsContent>
 
         {/* Roles & Permissions Tab */}
         {isDev && (
           <TabsContent value="roles-and-permissions" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+
             {/* System Roles */}
             <div className="space-y-4">
               <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -1448,12 +1455,16 @@ export function Settings({ onAddUser }: SettingsProps) {
                 </div>
               )}
             </div>
-          </TabsContent>
+          
+        </OfflineOverlay>
+      </TabsContent>
         )}
 
         {/* Dropdown Options Tab (Dev Only) */}
         {isDev && (
           <TabsContent value="dropdown-options" className="space-y-6">
+        <OfflineOverlay>
+
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1589,18 +1600,25 @@ export function Settings({ onAddUser }: SettingsProps) {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          
+        </OfflineOverlay>
+      </TabsContent>
         )}
 
         {/* Dev Settings Tab (Dev Only) */}
         {isDev && (
           <TabsContent value="dev-settings" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+
             <DevSettings />
-          </TabsContent>
+          
+        </OfflineOverlay>
+      </TabsContent>
         )}
 
         {/* Theme Tab (Dev Only) */}
           <TabsContent value="theme" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1810,17 +1828,26 @@ export function Settings({ onAddUser }: SettingsProps) {
                 </Alert>
               </CardContent>
             </Card>
+        </OfflineOverlay>
           </TabsContent>
         {/* Backup & Restore Tab */}
         {hasAdminAccess && (
           <TabsContent value="backup" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+
             <BackupRestore />
-          </TabsContent>
+          
+        </OfflineOverlay>
+      </TabsContent>
         )}
 
         <TabsContent value="security" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+
           <SecuritySettings />
-        </TabsContent>
+        
+        </OfflineOverlay>
+      </TabsContent>
       </Tabs>
 
       {/* Reset Password Dialog */}
@@ -2008,6 +2035,14 @@ const BACKUP_TABLE_GROUPS = [
       { id: 'user_settings', label: 'User Settings', description: 'User preferences and themes' },
       { id: 'notifications', label: 'Notifications', description: 'User notifications' },
       { id: 'activity_log', label: 'Activity Logs', description: 'System activity history' },
+    ]
+  },
+  {
+    title: 'Settings & Configuration',
+    tables: [
+      { id: 'system_dropdown_options', label: 'Dropdown Options', description: 'Custom dropdown values (ministries, positions, ID types, etc.)' },
+      { id: 'notification_type_config', label: 'Notification Config', description: 'Notification type enable/disable settings' },
+      { id: 'activity_log_config', label: 'Activity Log Config', description: 'Activity log action visibility settings' },
     ]
   }
 ];

@@ -149,7 +149,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                   </Button>
                 )}
                 {canAccess('manage_members') && (
-                  <Button size="sm" className="bg-violet-600 hover:bg-violet-700 text-white" onClick={() => onPromoteToMember(child)}>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onPromoteToMember(child)}>
                     <UserCheck className="w-3.5 h-3.5 mr-1.5" />
                     Promote to Main Member
                   </Button>
@@ -319,8 +319,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <Card className="min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <BarChart3 className="w-5 h-5 text-purple-600" />
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-2xl font-bold truncate">{attendanceData?.summary.percentage || 0}%</p>

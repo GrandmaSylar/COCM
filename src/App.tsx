@@ -6,6 +6,7 @@ import { SignUp } from './components/SignUp';
 import { ForgotPassword } from './components/ForgotPassword';
 import { OtpVerification } from './components/OtpVerification';
 import { Layout } from './components/Layout';
+import { SplashScreen } from './components/SplashScreen';
 import { Toaster } from './components/ui/sonner';
 
 // Lazy load main pages
@@ -118,6 +119,7 @@ function AppContent() {
   const [restoringState, setRestoringState] = useState(true);
   const [selectedChild, setSelectedChild] = useState<ChildMember | null>(null);
   const [childrenRefreshKey, setChildrenRefreshKey] = useState(0);
+  const [showSplash, setShowSplash] = useState(true);
 
   const getInitialChildrenTab = (): any => {
     if (typeof window !== 'undefined') {
@@ -241,13 +243,13 @@ function AppContent() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Show full screen loader while auth is initializing to prevent login page flash
-  if (isInitializing) {
+  // Show splash screen while auth is initializing or splash animation is playing
+  if (isInitializing || showSplash) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-muted-foreground text-sm font-medium animate-pulse">Loading CoC.M...</p>
-      </div>
+      <SplashScreen
+        isReady={!isInitializing}
+        onComplete={() => setShowSplash(false)}
+      />
     );
   }
 

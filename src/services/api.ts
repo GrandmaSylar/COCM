@@ -466,6 +466,20 @@ export const api = {
   // BACKUP & RESTORE
   // ============================================================================
 
+  preferences: {
+    get: () => fetchApi('/preferences'),
+
+    save: (data: { defaultPaperSize: string }) =>
+      fetchApi('/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }),
+  },
+
+  // ============================================================================
+  // BACKUP & RESTORE
+  // ============================================================================
+
   backups: {
     getAll: () => fetchApi('/backups'),
 

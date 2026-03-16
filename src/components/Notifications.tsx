@@ -5,6 +5,8 @@ import { Skeleton } from './ui/skeleton';
 import { Bell, CheckCheck, Users, Calendar, Banknote, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { supabase } from '../utils/supabase/client';
+import { ConflictsPanel } from './ConflictsPanel';
+import { OfflineOverlay } from './OfflineOverlay';
 
 interface Notification {
   id: string;
@@ -140,6 +142,7 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
+    <OfflineOverlay>
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -170,6 +173,8 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
           )}
         </div>
       </div>
+
+      <ConflictsPanel onAllResolved={handleRefresh} />
 
       {loading ? (
         <div className="space-y-3">
@@ -240,5 +245,6 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
         </div>
       )}
     </div>
+    </OfflineOverlay>
   );
 }

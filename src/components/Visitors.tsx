@@ -16,6 +16,7 @@ import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
 import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
+import { OfflineOverlay } from './OfflineOverlay';
 
 export interface Visitor {
   id: string;
@@ -107,6 +108,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
 
   if (loading) {
     return (
+      <OfflineOverlay>
       <div className="space-y-6">
         <div>
           <h1>Visitors</h1>
@@ -116,10 +118,12 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       </div>
+      </OfflineOverlay>
     );
   }
 
   return (
+    <OfflineOverlay>
     <div className="space-y-6 relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -346,6 +350,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
       </div>
 
     </div>
+    </OfflineOverlay>
   );
 }
 
@@ -427,6 +432,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
   const zones = Object.keys(ZONES) as Array<keyof typeof ZONES>;
 
   return (
+    <OfflineOverlay>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -661,6 +667,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
         </CardContent>
       </Card>
     </div>
+    </OfflineOverlay>
   );
 }
 
@@ -740,6 +747,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
   const zones = Object.keys(ZONES) as Array<keyof typeof ZONES>;
 
   return (
+    <OfflineOverlay>
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onBack}>
@@ -973,6 +981,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
         </CardContent>
       </Card>
     </div>
+    </OfflineOverlay>
   );
 }
 
@@ -998,6 +1007,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
 
 
   return (
+    <OfflineOverlay>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
@@ -1128,5 +1138,6 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
         </CardContent>
       </Card>
     </div>
+    </OfflineOverlay>
   );
 }

@@ -18,6 +18,7 @@ import { useCachedData } from '../hooks/useCachedData';
 import { api } from '../services/api';
 import { sanitizeUrl } from '@braintree/sanitize-url';
 import { getCloudinaryUrl } from '../utils/cloudinary';
+import { OfflineOverlay } from './OfflineOverlay';
 import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
 
@@ -1018,6 +1019,7 @@ export function Children({
   const [givingRefreshKey, setGivingRefreshKey] = useState(0);
 
   return (
+    <OfflineOverlay>
     <div className="space-y-8 animate-fade-in max-w-[1200px] mx-auto">
       <div>
         <h1 className="text-3xl font-bold tracking-tight mb-2">Children's Ministry</h1>
@@ -1028,7 +1030,7 @@ export function Children({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-violet-100 text-violet-600' },
+          { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-blue-100 text-blue-600' },
           { id: 'visitors', title: 'Visitors', label: 'New & visiting children', icon: UserPlus, color: 'bg-amber-100 text-amber-600' },
           { id: 'attendance', title: 'Attendance', label: 'Service attendance records', icon: Calendar, color: 'bg-green-100 text-green-600' },
           { id: 'giving', title: 'Giving', label: "Children's giving records", icon: Banknote, color: 'bg-emerald-100 text-emerald-600' },
@@ -1086,5 +1088,6 @@ export function Children({
         {currentTab === 'analytics' && <ChildrenAnalytics />}
       </div>
     </div>
+    </OfflineOverlay>
   );
 }

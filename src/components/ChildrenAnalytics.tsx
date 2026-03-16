@@ -16,7 +16,7 @@ const GENDER_COLORS: Record<string, string> = {
   unknown: '#94a3b8',
 };
 
-const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
 
 const CustomTooltip = ({ active, payload, label, prefix, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
@@ -282,9 +282,9 @@ export function ChildrenAnalytics() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-white">
+        <Card className="bg-gradient-to-br from-blue-50 to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
-            <UserPlus className="w-6 h-6 text-purple-500 mb-2" />
+            <UserPlus className="w-6 h-6 text-blue-500 mb-2" />
             <div className="text-2xl font-bold">{summary.visitorCount}</div>
             <div className="text-xs text-muted-foreground font-medium">Total Visitors</div>
           </CardContent>
@@ -394,7 +394,7 @@ export function ChildrenAnalytics() {
                 <XAxis dataKey="ageGroup" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" name="Count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" name="Count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

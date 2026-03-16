@@ -208,7 +208,7 @@ function GivingChart({ sr }: { sr: ServiceDateDetail }) {
   const chartData = [{ name: 'Giving', offering, donation, thanksgiving, cash }];
   
   const chartConfig = {
-    offering: { label: 'Offering', color: '#7c3aed' },
+    offering: { label: 'Offering', color: '#2563eb' },
     donation: { label: 'Donation', color: '#10b981' },
     thanksgiving: { label: 'Thanksgiving', color: '#f59e0b' },
     cash: { label: 'Cash', color: '#3b82f6' }
@@ -227,7 +227,7 @@ function GivingChart({ sr }: { sr: ServiceDateDetail }) {
   }
 
   const categories = [
-    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-purple-600', fill: '#7c3aed' },
+    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-blue-600', fill: '#2563eb' },
     { key: 'donation', label: 'Donation', amount: donation, color: 'bg-emerald-500', fill: '#10b981' },
     { key: 'thanksgiving', label: 'Thanksgiving', amount: thanksgiving, color: 'bg-amber-500', fill: '#f59e0b' },
     { key: 'cash', label: 'Cash', amount: cash, color: 'bg-blue-500', fill: '#3b82f6' }

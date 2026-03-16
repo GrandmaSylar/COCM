@@ -6,11 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown, Droplets } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown, Droplets, WifiOff } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { useCachedData } from '../hooks/useCachedData';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { exportToCSV, exportToPDF, exportToXLSX, formatDateForExport } from '../utils/export';
 import { getCloudinaryUrl } from '../utils/cloudinary';
@@ -147,6 +148,7 @@ interface MembersProps {
 }
 
 export function Members({ onAddMember, onViewMember, onAddFromVisitor }: MembersProps) {
+  const { isOnline } = useNetworkStatus();
   const [searchTerm, setSearchTerm] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -407,7 +409,15 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1>Members</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Members</h1>
+            {!isOnline && (
+              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Cached Data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Manage your church members
           </p>
@@ -569,12 +579,12 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Inactive</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-md hover:shadow-purple-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-md hover:shadow-blue-500/50 hover:-translate-y-0.5">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-purple-600" />
+                <Users className="w-12 h-12 text-blue-600" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/40 flex items-center justify-center mb-2 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/40 flex items-center justify-center mb-2 text-blue-600 group-hover:scale-110 transition-transform duration-300">
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => ['sick', 'traveled', 'schooling'].includes(m.status)).length}</div>

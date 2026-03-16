@@ -163,3 +163,75 @@
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* ============================================
+   SPLASH SCREEN ANIMATIONS
+   ============================================ */
+
+/* Fade keyframes — always active (reduced-motion safe) */
+@keyframes splash-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes splash-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+/* Reduced-motion-safe utility classes */
+.splash-fade-in {
+  animation: splash-fade-in 200ms ease-out both;
+}
+
+.splash-fade-out {
+  animation: splash-fade-out 200ms ease-in both;
+}
+
+/* Rich animations — only when user allows motion */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes splash-logo-in {
+    from { opacity: 0; transform: scale(0.75); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  @keyframes splash-text-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes splash-exit {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(1.06); }
+  }
+
+  @keyframes splash-gradient-morph {
+    from { opacity: 0.8; }
+    to { opacity: 1.0; }
+  }
+
+  @keyframes splash-shimmer {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
+
+  .splash-logo-in {
+    animation: splash-logo-in 600ms ease-out both;
+  }
+
+  .splash-text-in {
+    animation: splash-text-in 400ms ease-out both;
+  }
+
+  .splash-exit {
+    animation: splash-exit 400ms ease-in both;
+  }
+
+  .splash-gradient-morph {
+    animation: splash-gradient-morph 7s ease-in-out infinite alternate;
+  }
+
+  .splash-shimmer {
+    animation: splash-shimmer 1.5s ease-in-out infinite;
+  }
+}

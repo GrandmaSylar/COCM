@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useCallback } from "react";
 import { Button } from "./ui/button";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
@@ -21,6 +21,8 @@ import {
   Menu,
   X,
   Play,
+  Download,
+  RefreshCw,
   Moon,
   Sun,
   Monitor,
@@ -35,9 +37,24 @@ import {
   User,
   Baby,
   Receipt,
+  WifiOff,
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { api } from "../services/api";
+import { useNetworkStatus } from "../hooks/useNetworkStatus";
+import { getPendingQueueCount, getConflicts } from "../services/offlineStore";
+import { retrySyncNow } from "../services/syncEngine";
+import { FixRetryPanel } from "./FixRetryPanel";
+import {
+  updateSW,
+  needsRefresh,
+  beforeInstallPromptEvent,
+  setBeforeInstallPromptEvent,
+  type BeforeInstallPromptEvent,
+} from "../services/pwa";
 
 interface LayoutProps {
   children: ReactNode;
@@ -50,6 +67,169 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const { theme, setTheme, isDark } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showUpdateBtn, setShowUpdateBtn] = useState(false);
+  const [sessionDismissed, setSessionDismissed] = useState(
+    () => sessionStorage.getItem("pwa-banner-dismissed") === "true"
+  );
+  const isPermanentlyInstalled = () =>
+    localStorage.getItem("pwa-installed") === "true";
+
+  const { isOnline } = useNetworkStatus();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Sync Engine State
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'conflicts' | 'fix-retry'>('idle');
+  const [syncConflictCount, setSyncConflictCount] = useState(0);
+  const [syncFailureReason, setSyncFailureReason] = useState('');
+  const [conflictBadgeCount, setConflictBadgeCount] = useState(0);
+
+  // ── Offline: listen for pending queue size ──
+  useEffect(() => {
+    const updateCount = async () => {
+      try {
+        const count = await getPendingQueueCount();
+        setPendingCount(count);
+      } catch (err) {
+        console.error("Failed to get pending queue count", err);
+      }
+    };
+    
+    updateCount();
+
+    const handleSyncUpdate = () => {
+      updateCount();
+    };
+
+    window.addEventListener("online", updateCount);
+    window.addEventListener("sync-queue-updated", handleSyncUpdate);
+    
+    return () => {
+      window.removeEventListener("online", updateCount);
+      window.removeEventListener("sync-queue-updated", handleSyncUpdate);
+    };
+  }, []);
+
+  // ── Sync Engine Events ──
+  useEffect(() => {
+    const handleSyncState = (e: Event) => {
+      const customEvent = e as CustomEvent<{ state: 'idle' | 'syncing' | 'conflicts' | 'fix-retry' | 'success', conflictCount?: number, failureReason?: string }>;
+      const { state, conflictCount, failureReason } = customEvent.detail;
+
+      if (state === 'syncing') {
+        setSyncState('syncing');
+      } else if (state === 'conflicts') {
+        setSyncState('conflicts');
+        if (conflictCount !== undefined) {
+          setSyncConflictCount(conflictCount);
+          setConflictBadgeCount(conflictCount);
+        } else {
+          // Fallback to fetch
+          getConflicts().then(c => {
+             setSyncConflictCount(c.length);
+             setConflictBadgeCount(c.length);
+          });
+        }
+      } else if (state === 'fix-retry') {
+        setSyncState('fix-retry');
+        setSyncFailureReason(failureReason || 'Unknown error');
+      } else if (state === 'success') {
+        setSyncState('idle');
+        setSyncConflictCount(0);
+        setConflictBadgeCount(0);
+      }
+    };
+
+    const handleConflictsResolved = () => {
+      setSyncState('idle');
+      setConflictBadgeCount(0);
+      toast.success('✓ All conflicts resolved.');
+    };
+
+    window.addEventListener('sync-state', handleSyncState);
+    window.addEventListener('conflicts-resolved', handleConflictsResolved);
+
+    // Initial load check for conflicts
+    getConflicts().then(c => {
+      if (c.length > 0) {
+        setSyncState('conflicts');
+        setSyncConflictCount(c.length);
+        setConflictBadgeCount(c.length);
+      }
+    });
+
+    return () => {
+      window.removeEventListener('sync-state', handleSyncState);
+      window.removeEventListener('conflicts-resolved', handleConflictsResolved);
+    };
+  }, []);
+
+  // ── PWA: listen for beforeinstallprompt & appinstalled ──
+  useEffect(() => {
+    if (isPermanentlyInstalled() || sessionDismissed) return;
+
+    if (beforeInstallPromptEvent) {
+      setShowInstallBanner(true);
+    }
+
+    const handleBIP = (e: Event) => {
+      e.preventDefault();
+      setBeforeInstallPromptEvent(e as BeforeInstallPromptEvent);
+      setShowInstallBanner(true);
+    };
+
+    const handleInstalled = () => {
+      localStorage.setItem("pwa-installed", "true");
+      setShowInstallBanner(false);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBIP);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBIP);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, [sessionDismissed]);
+
+  // ── PWA: listen for service-worker update ──
+  useEffect(() => {
+    const handleUpdate = () => {
+      setShowUpdateBtn(true);
+      toast("A new version is available", {
+        duration: 10000,
+        action: {
+          label: "Refresh to update",
+          onClick: () => updateSW?.(true),
+        },
+        icon: <RefreshCw className="w-4 h-4" />,
+      });
+    };
+
+    if (needsRefresh) {
+      handleUpdate();
+    }
+
+    window.addEventListener("sw-update-available", handleUpdate);
+    return () => window.removeEventListener("sw-update-available", handleUpdate);
+  }, []);
+
+  const handleInstallClick = useCallback(async () => {
+    const prompt = beforeInstallPromptEvent;
+    if (!prompt) return;
+    await prompt.prompt();
+    const { outcome } = await prompt.userChoice;
+    if (outcome === "accepted") {
+      localStorage.setItem("pwa-installed", "true");
+      setShowInstallBanner(false);
+    }
+    setBeforeInstallPromptEvent(null);
+  }, []);
+
+  const handleDismissBanner = useCallback(() => {
+    sessionStorage.setItem("pwa-banner-dismissed", "true");
+    setSessionDismissed(true);
+    setShowInstallBanner(false);
+  }, []);
 
   // Fetch unread notification count
   useEffect(() => {
@@ -93,6 +273,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     <>
       <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
         {/* Mobile Header */}
+        {/* eslint-disable-next-line -- PWA install banner for mobile (rendered after header) */}
         <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <img src="/newlogo.png" alt="logo" className="w-8 h-8 object-contain" />
@@ -108,9 +289,12 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center animate-soft-pulse">
+                <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center animate-soft-pulse">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
+              )}
+              {conflictBadgeCount > 0 && (
+                <span className="absolute -top-0.5 -left-0.5 bg-red-500 rounded-full w-2.5 h-2.5 animate-pulse border border-card" />
               )}
             </Button>
             {/* Theme Toggle for Mobile */}
@@ -164,6 +348,68 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             </Button>
           </div>
         </div>
+
+        {/* PWA Install Banner — Mobile (between header and flex row) */}
+        {showInstallBanner && !sessionDismissed && (
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Install CoC.M for a faster, offline-capable experience</span>
+            </p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button size="sm" variant="default" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleInstallClick}>
+                Install
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissBanner}>
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Banner Block — Mobile (between install banner and flex row) */}
+        {!isOnline ? (
+          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700">
+            <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-amber-800 dark:text-amber-200">
+              <span className="font-semibold">⚠ You are offline</span>
+              <span>—</span>
+              {pendingCount === 0 ? (
+                <span>changes will sync automatically when reconnected.</span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-amber-500 text-white rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm whitespace-nowrap">{pendingCount} pending</span>
+                  <span>will sync when reconnected.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : syncState === 'syncing' ? (
+          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700">
+            <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
+            <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
+          </div>
+        ) : syncState === 'conflicts' ? (
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 flex-wrap">
+            <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
+              <span>Sync complete — {syncConflictCount} conflicts</span>
+            </div>
+            <Button size="sm" variant="outline" className="h-7 text-xs border-orange-400 text-orange-700 hover:bg-orange-100" onClick={() => onNavigate('notifications')}>
+              Review Conflicts
+            </Button>
+          </div>
+        ) : syncState === 'fix-retry' ? (
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 flex-wrap">
+            <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
+              <span className="truncate max-w-[200px]">Sync failed: {syncFailureReason}</span>
+            </div>
+            <Button size="sm" variant="default" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white" onClick={retrySyncNow}>
+              Retry Now
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex">
           {/* Desktop Sidebar */}
@@ -219,6 +465,9 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                           {unreadCount > 9 ? "9+" : unreadCount}
                         </span>
                       )}
+                      {conflictBadgeCount > 0 && (
+                        <span className="absolute -bottom-1 -left-1 bg-red-500 rounded-full w-3 h-3 animate-pulse border-2 border-sidebar" />
+                      )}
                     </div>
                     <span className="font-medium">Notifications</span>
                     {unreadCount > 0 && (
@@ -254,7 +503,31 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                   })}
                 </nav>
 
-                <div className="px-4 pt-4 mt-auto">
+                <div className="px-4 pt-4 mt-auto space-y-3">
+                    {/* PWA Install / Update button */}
+                    {showInstallBanner && !isPermanentlyInstalled() && (
+                      <Button
+                        onClick={handleInstallClick}
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start gap-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Install App
+                      </Button>
+                    )}
+                    {showUpdateBtn && (
+                      <Button
+                        onClick={() => updateSW?.(true)}
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start gap-2 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors animate-pulse"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Update Available
+                      </Button>
+                    )}
+
                     <div className="p-4 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/50">
                         <div className="flex items-center gap-3 mb-3">
                             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ring-2 ring-background" style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>
@@ -333,7 +606,29 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                     </nav>
                   </div>
 
-                  <div className="p-4 border-t border-border/50 bg-sidebar/30">
+                  <div className="p-4 border-t border-border/50 bg-sidebar/30 space-y-3">
+                    {/* PWA Install / Update button — Mobile */}
+                    {showInstallBanner && !isPermanentlyInstalled() && (
+                      <Button
+                        onClick={() => { handleInstallClick(); setMobileMenuOpen(false); }}
+                        variant="outline"
+                        className="w-full justify-center gap-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                      >
+                        <Download className="w-4 h-4" />
+                        Install App
+                      </Button>
+                    )}
+                    {showUpdateBtn && (
+                      <Button
+                        onClick={() => updateSW?.(true)}
+                        variant="outline"
+                        className="w-full justify-center gap-2 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 animate-pulse"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Update Available
+                      </Button>
+                    )}
+
                     <div className="flex items-center gap-3 mb-4 px-2">
                         <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
                             {user?.name?.charAt(0)}
@@ -390,7 +685,73 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+
+            {/* PWA Install Banner — Desktop (between top bar and main) */}
+            {showInstallBanner && !sessionDismissed && (
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                  <Download className="w-4 h-4 shrink-0" />
+                  <span>📲 Install CoC.M — Get a faster, offline-capable experience</span>
+                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button size="sm" variant="default" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleInstallClick}>
+                    Install
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissBanner}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Banner Block — Desktop (between install banner and main) */}
+            {!isOnline ? (
+              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700">
+                <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+                  <span className="font-semibold">⚠ You are offline</span>
+                  <span>—</span>
+                  {pendingCount === 0 ? (
+                    <span>changes will sync automatically when reconnected.</span>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                       <span className="bg-amber-500 text-white rounded-full px-2 py-0.5 text-xs font-bold shadow-sm">{pendingCount} pending changes</span>
+                       <span>will sync when reconnected.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : syncState === 'syncing' ? (
+              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700">
+                <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
+                <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
+              </div>
+            ) : syncState === 'conflicts' ? (
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700">
+                <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
+                  <span>⚠ Sync complete — {syncConflictCount} conflicts need your attention</span>
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-xs border-orange-400 text-orange-700 hover:bg-orange-100" onClick={() => onNavigate('notifications')}>
+                  Review Conflicts
+                </Button>
+              </div>
+            ) : syncState === 'fix-retry' ? (
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700">
+                <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
+                  <span>Sync failed — {syncFailureReason}</span>
+                </div>
+                <Button size="sm" variant="default" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white" onClick={retrySyncNow}>
+                  Retry Now
+                </Button>
+              </div>
+            ) : null}
+
             <main className="p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-x-hidden max-w-[1600px] mx-auto">
+              {syncState === 'fix-retry' && (
+                <FixRetryPanel reason={syncFailureReason} onRetry={retrySyncNow} />
+              )}
               <div
                 key={currentPage}
                 className="page-transition min-h-[calc(100vh-4rem)]" // Ensure min height for transition

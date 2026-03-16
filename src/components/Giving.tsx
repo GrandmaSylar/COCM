@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Banknote, Plus, TrendingUp, TrendingDown, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw } from 'lucide-react';
+import { Banknote, Plus, TrendingUp, TrendingDown, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw, WifiOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis, getExpenseKey } from './ui/utils';
 import { api } from '../services/api';
@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface GivingRecord {
   id: string;
@@ -110,6 +111,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   const [showCustomTypeManager, setShowCustomTypeManager] = useState(initialShowTypeManager);
   const [refreshing, setRefreshing] = useState(false);
   const { user, canAccess } = useAuth();
+  const { isOnline } = useNetworkStatus();
 
   const { data: cachedGiving, loading: loadingGiving, refresh: refreshGiving } = useCachedData<any[]>(
     'giving-records',
@@ -140,6 +142,16 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   useEffect(() => {
     if (cachedExpenses) setExpenseRecords(cachedExpenses);
   }, [cachedExpenses]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      refreshGiving();
+      refreshTypes();
+      refreshExpenses();
+    };
+    window.addEventListener('sync-queue-updated', handleSync);
+    return () => window.removeEventListener('sync-queue-updated', handleSync);
+  }, [refreshGiving, refreshTypes, refreshExpenses]);
 
   const canRecordGiving = canAccess('record_giving');
   const canManageCustomTypes = canAccess('manage_giving_types');
@@ -225,6 +237,10 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   };
 
   const handleDeleteCustomType = async (typeId: string) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to delete records.');
+      return;
+    }
     if (confirm('Are you sure you want to delete this custom giving type?')) {
       try {
         await api.giving.types.delete(typeId);
@@ -239,6 +255,10 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   };
 
   const handleToggleCustomType = async (typeId: string) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to update giving types.');
+      return;
+    }
     try {
       await api.giving.types.toggle(typeId);
       clearCacheByPattern('giving-types');
@@ -346,7 +366,15 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1>Giving</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Giving</h1>
+            {!isOnline && (
+              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Cached Data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Track offerings, donations, and thanksgiving per service
           </p>
@@ -424,12 +452,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-purple-600" />
+            <TrendingUp className="w-20 h-20 text-blue-600" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-purple-500/40 flex items-center justify-center mb-4 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisWeekGiving)}</div>
@@ -678,9 +706,14 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
   const [refreshing, setRefreshing] = useState(false);
   const [newTypeName, setNewTypeName] = useState('');
   const [newTypeDescription, setNewTypeDescription] = useState('');
+  const { isOnline } = useNetworkStatus();
 
   const handleAddType = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      toast.warning('Reconnect to add custom giving types.');
+      return;
+    }
     if (!newTypeName.trim()) return;
 
     onAdd({
@@ -792,6 +825,7 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
                     <Button
                       variant="outline"
                       size="sm"
+                      disabled={!isOnline}
                       onClick={() => onToggle(type.id)}
                     >
                       {type.isActive ? 'Deactivate' : 'Activate'}
@@ -801,6 +835,8 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
                       size="sm"
                       onClick={() => onDelete(type.id)}
                       className="text-destructive hover:text-destructive"
+                      disabled={!isOnline}
+                      title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

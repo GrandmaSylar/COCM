@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -7,7 +7,7 @@ import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Alert, AlertDescription } from './ui/alert';
 import { Label } from './ui/label';
-import { Banknote, Plus, Calendar, Search, Settings, Receipt, Download, RefreshCw, Eye, Edit, Trash2, ArrowLeft, X, CheckCircle } from 'lucide-react';
+import { Banknote, Plus, Calendar, Search, Settings, Receipt, Download, RefreshCw, Eye, Edit, Trash2, ArrowLeft, X, CheckCircle, WifiOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { getFriendlyMessage } from '../utils/error-handler';
 import { formatCurrencyForExport, exportToCSV, exportToPDF, exportToXLSX, exportGroupedToCSV, exportGroupedToPDF, exportGroupedToXLSX } from '../utils/export';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { useCachedData } from '../hooks/useCachedData';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface ExpensesProps {
   onAddExpense: () => void;
@@ -29,6 +30,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
   const [searchTerm, setSearchTerm] = useState('');
   const [showTypeManager, setShowTypeManager] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const { isOnline } = useNetworkStatus();
 
   const { data: expensesData, loading: loading1, refresh: refresh1 } = useCachedData(`expenses-list-${refreshKey}`, () => api.expenses.getAll());
   const { data: pmData, loading: loading2, refresh: refresh2 } = useCachedData(`expenses-payment-methods-${refreshKey}`, () => api.expenses.paymentMethods.getAll());
@@ -43,6 +45,16 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
   const handleRefresh = async () => {
     await Promise.all([refresh1(), refresh2(), refresh3()]);
   };
+
+  useEffect(() => {
+    const handleSync = () => {
+      refresh1();
+      refresh2();
+      refresh3();
+    };
+    window.addEventListener('sync-queue-updated', handleSync);
+    return () => window.removeEventListener('sync-queue-updated', handleSync);
+  }, [refresh1, refresh2, refresh3]);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter((e: any) => {
@@ -103,6 +115,10 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
   }, [expenses]);
 
   const handleDelete = async (id: string, formId: string) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to delete records.');
+      return;
+    }
     if (confirm(`Are you sure you want to permanently delete Expense Requisition ${formId}?`)) {
       setIsDeleting(id);
       try {
@@ -153,7 +169,15 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1>Finance &amp; Expenses</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Finance &amp; Expenses</h1>
+            {!isOnline && (
+              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Cached Data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">Manage expenditure and payment authorisations</p>
         </div>
         <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -274,7 +298,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                             </Button>
                           )}
                           {isDevOrAdmin && (
-                            <Button variant="ghost" size="icon" disabled={isDeleting === exp.id} onClick={() => handleDelete(exp.id, exp.formId)} title="Delete">
+                            <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>
                           )}
@@ -325,7 +349,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                                 </Button>
                               )}
                               {isDevOrAdmin && (
-                                <Button variant="ghost" size="icon" disabled={isDeleting === exp.id} onClick={() => handleDelete(exp.id, exp.formId)} title="Delete">
+                                <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
                                   <Trash2 className="w-4 h-4 text-red-500" />
                                 </Button>
                               )}
@@ -381,7 +405,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                                 </Button>
                               )}
                               {isDevOrAdmin && (
-                                <Button variant="ghost" size="icon" disabled={isDeleting === exp.id} onClick={() => handleDelete(exp.id, exp.formId)} title="Delete">
+                                <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
                                   <Trash2 className="w-4 h-4 text-red-500" />
                                 </Button>
                               )}
@@ -407,9 +431,14 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
   const [newTypeName, setNewTypeName] = useState('');
   const [saving, setSaving] = useState(false);
   const [inlineError, setInlineError] = useState('');
+  const { isOnline } = useNetworkStatus();
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      toast.warning('Reconnect to add payment methods.');
+      return;
+    }
     if (!newTypeName.trim()) return;
     setSaving(true);
     try {
@@ -426,6 +455,10 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
   };
 
   const handleToggle = async (id: string, currentStatus: boolean) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to update payment methods.');
+      return;
+    }
     try {
       await api.expenses.paymentMethods.update(id, { is_active: !currentStatus });
       await onRefresh();
@@ -436,6 +469,10 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
   };
 
   const handleDeleteMethod = async (id: string) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to delete records.');
+      return;
+    }
     if (confirm('Are you sure you want to delete this payment method?')) {
       try {
         await api.expenses.paymentMethods.delete(id);
@@ -496,10 +533,17 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
                   <Badge variant={m.is_active ? 'default' : 'secondary'}>{m.is_active ? 'Active' : 'Inactive'}</Badge>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleToggle(m.id, m.is_active)}>
+                  <Button variant="outline" size="sm" disabled={!isOnline} onClick={() => handleToggle(m.id, m.is_active)}>
                      {m.is_active ? 'Deactivate' : 'Activate'}
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleDeleteMethod(m.id)} className="text-red-500">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteMethod(m.id)}
+                    className="text-red-500"
+                    disabled={!isOnline}
+                    title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>

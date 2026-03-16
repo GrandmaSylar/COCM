@@ -3,6 +3,18 @@ import { Button } from './ui/button';
 import { ArrowLeft, Printer, Download, Edit, Save } from 'lucide-react';
 import { api } from '../services/api';
 import { formatGhanaCedis as formatCurrency } from './ui/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { toast } from 'sonner';
+
+export const PAPER_SIZES = [
+  { value: 'a4', label: 'A4', format: 'a4', css: 'A4' },
+  { value: 'letter', label: 'Letter', format: 'letter', css: 'Letter' },
+  { value: 'legal', label: 'Legal', format: 'legal', css: 'Legal' },
+  { value: 'tabloid', label: 'Tabloid', format: [279.4, 431.8], css: 'Tabloid' },
+  { value: 'executive', label: 'Executive', format: [184.2, 266.7], css: 'Executive' },
+  { value: 'a5', label: 'A5', format: 'a5', css: 'A5' }
+];
 
 interface ExpenseReceiptProps {
   expenseId?: string;
@@ -18,6 +30,10 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
   const [loading, setLoading] = useState(!expenseData && !!expenseId);
   const [isDownloading, setIsDownloading] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
+
+  const [paperSize, setPaperSize] = useState<string>('a4');
+  const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
+  const [pendingSize, setPendingSize] = useState<string | null>(null);
 
   useEffect(() => {
     if (expenseData) {
@@ -44,6 +60,12 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
     fetchExpense();
   }, [expenseId, expenseData]);
 
+  useEffect(() => {
+    api.preferences.get()
+      .then(res => setPaperSize(res.defaultPaperSize || 'a4'))
+      .catch(console.error);
+  }, []);
+
   const handleDownloadPDF = async () => {
     if (!receiptRef.current || !expense) return;
     try {
@@ -62,10 +84,11 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
       });
 
       const imgData = canvas.toDataURL('image/png');
+      const selectedPaper = PAPER_SIZES.find(s => s.value === paperSize) || PAPER_SIZES[0];
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4',
+        format: selectedPaper.format as any,
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -106,6 +129,26 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
           Back
         </Button>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 mr-2">
+            <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Paper:</span>
+            <Select 
+              value={paperSize} 
+              onValueChange={(val) => {
+                setPendingSize(val);
+                setPaperSize(val);
+                setShowDefaultPrompt(true);
+              }}
+            >
+              <SelectTrigger className="w-[120px] h-9">
+                <SelectValue placeholder="Size" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAPER_SIZES.map(s => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {onEdit && (
             <Button variant="outline" onClick={onEdit} disabled={isSubmitting}>
               <Edit className="w-4 h-4" />
@@ -251,10 +294,55 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
           .content-watermark { background: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
           main { padding: 0 !important; margin: 0 !important; overflow: visible !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          @page { size: portrait; margin: 10mm; }
+          @page { size: ${PAPER_SIZES.find(s => s.value === paperSize)?.css || 'A4'} portrait; margin: 10mm; }
           #root { width: 800px !important; overflow: visible !important; }
         }
       `}</style>
+      
+      {/* Default Paper Size Prompt */}
+      <Dialog open={showDefaultPrompt} onOpenChange={setShowDefaultPrompt}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Update Default Paper Size?</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-500">
+              Use this as your new default paper size across devices?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowDefaultPrompt(false);
+                setPendingSize(null);
+              }}
+            >
+              No
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (pendingSize) {
+                  try {
+                    await api.preferences.save({ defaultPaperSize: pendingSize });
+                    toast.success('Default paper size saved');
+                    setShowDefaultPrompt(false);
+                    setPendingSize(null);
+                  } catch (error: any) {
+                    console.error('Failed to save default paper size:', error);
+                    toast.error(error?.message || 'Failed to save default paper size');
+                  }
+                } else {
+                  setShowDefaultPrompt(false);
+                  setPendingSize(null);
+                }
+              }}
+            >
+              Yes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

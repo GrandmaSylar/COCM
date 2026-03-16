@@ -6259,6 +6259,70 @@ app.put("/theme", async (c) => {
 });
 
 // ============================================================================
+// GENERAL PREFERENCES
+// ============================================================================
+
+// Get user's general preferences
+app.get("/preferences", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { data, error } = await supabase.from('user_settings')
+      .select('default_paper_size')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
+      console.error('Error fetching preferences:', error);
+      return c.json({ error: 'Failed to fetch preferences' }, 500);
+    }
+
+    return c.json({
+      defaultPaperSize: data?.default_paper_size || 'a4'
+    });
+  } catch (error) {
+    console.error('Preferences fetch error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Save user's general preferences
+app.put("/preferences", async (c) => {
+  try {
+    const user = await getUserFromToken(c.req.raw);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { defaultPaperSize } = await c.req.json();
+
+    const allowedSizes = ['a4', 'letter', 'legal', 'tabloid', 'executive', 'a5'];
+    if (!allowedSizes.includes(defaultPaperSize)) {
+      return c.json({ error: 'Invalid paper size' }, 400);
+    }
+
+    // Upsert the user settings
+    const { error } = await supabase.from('user_settings')
+      .upsert({
+        user_id: user.id,
+        default_paper_size: defaultPaperSize,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) {
+      console.error('Error saving preferences:', error);
+      return c.json({ error: 'Failed to save preferences' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error) {
+    console.error('Preferences save error:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================================
 // BACKUP & RESTORE
 // ============================================================================
 
@@ -6377,7 +6441,10 @@ app.post("/backups", async (c) => {
       'children_attendance_records',
       'children_giving_records',
       'expense_payment_methods',
-      'expense_records'
+      'expense_records',
+      'system_dropdown_options',
+      'notification_type_config',
+      'activity_log_config'
     ];
 
     // Determine which tables to backup
@@ -6479,7 +6546,10 @@ app.post("/backups", async (c) => {
         'children_attendance_records': '*',
         'children_giving_records': '*',
         'expense_payment_methods': '*',
-        'expense_records': '*'
+        'expense_records': '*',
+        'system_dropdown_options': '*',
+        'notification_type_config': '*',
+        'activity_log_config': '*'
       };
 
       // Helper function to fetch all records with pagination (Supabase default limit is 1000)
@@ -6669,13 +6739,37 @@ app.post("/backups/restore", async (c) => {
       'children_attendance_records',
       'children_giving_records',
       'expense_payment_methods',
-      'expense_records'
+      'expense_records',
+      'system_dropdown_options',
+      'notification_type_config',
+      'activity_log_config'
     ];
 
     // Filter to only selected tables if specified
     const tablesToRestore = selectedTables && selectedTables.length > 0
       ? restoreOrder.filter(t => selectedTables.includes(t))
       : restoreOrder;
+
+    // Conflict keys for upsert per table (tables without 'id' column need their natural PK)
+    const conflictKeys: Record<string, string> = {
+      'notification_type_config': 'type',
+      'activity_log_config': 'action_type,entity_type'
+    };
+
+    // Merge-mode key fields per table (for existence checks)
+    const mergeKeyFields: Record<string, string[]> = {
+      'notification_type_config': ['type'],
+      'activity_log_config': ['action_type', 'entity_type']
+    };
+
+    // Per-table delete filter keys for tables whose natural key isn't the
+    // UUID 'id' column.  Each entry maps a table name to the NOT-NULL column
+    // used as an always-true filter (`.not(col, 'is', null)`) so that every
+    // row is removed deterministically during replace-mode restores.
+    const deleteFilterKeys: Record<string, string> = {
+      'notification_type_config': 'type',
+      'activity_log_config': 'action_type'
+    };
 
     for (const tableName of tablesToRestore) {
       const tableData = backupData.data[tableName];
@@ -6688,10 +6782,22 @@ app.post("/backups/restore", async (c) => {
         if (mode === 'replace') {
           // Delete all existing data first (careful with foreign keys!)
           if (tableName !== 'profiles' && tableName !== 'activity_log') { // Don't delete profiles or activity logs
-            const { error: deleteError } = await supabase
-              .from(tableName)
-              .delete()
-              .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+            let deleteError: any = null;
+
+            if (deleteFilterKeys[tableName]) {
+              // Tables with a natural key — delete all rows via always-true NOT NULL filter
+              const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .not(deleteFilterKeys[tableName], 'is', null);
+              deleteError = error;
+            } else {
+              const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+              deleteError = error;
+            }
 
             if (deleteError) {
               console.error(`Error clearing ${tableName}:`, deleteError);
@@ -6710,7 +6816,7 @@ app.post("/backups/restore", async (c) => {
           // Upsert - insert or update on conflict
           const { data, error } = await supabase
             .from(tableName)
-            .upsert(tableData, { onConflict: 'id' })
+            .upsert(tableData, { onConflict: conflictKeys[tableName] ?? 'id' })
             .select();
 
           if (error) {
@@ -6730,12 +6836,17 @@ app.post("/backups/restore", async (c) => {
           let hasError = false;
           let lastErrorMessage = '';
 
+          const keyFields = mergeKeyFields[tableName] ?? ['id'];
+
           for (const record of tableData) {
-            const { data: existing } = await supabase
+            // Build dynamic existence check using the table's key fields
+            let existQuery = supabase
               .from(tableName)
-              .select('id')
-              .eq('id', record.id)
-              .single();
+              .select(keyFields.join(', '));
+            for (const field of keyFields) {
+              existQuery = existQuery.eq(field, record[field]);
+            }
+            const { data: existing } = await existQuery.single();
 
             if (!existing) {
               const { error } = await supabase
@@ -6870,7 +6981,8 @@ app.post("/backups/preview", async (c) => {
       'custom_roles', 'profiles', 'temporary_permissions', 'user_tab_access', 'user_settings',
       'service_records', 'notifications', 'activity_log', 'children_members', 'children_member_parents',
       'children_visitors', 'children_visitor_guardians', 'children_attendance_records', 'children_giving_records',
-      'expense_payment_methods', 'expense_records'
+      'expense_payment_methods', 'expense_records',
+      'system_dropdown_options', 'notification_type_config', 'activity_log_config'
     ];
 
     const tables = selectedTables && selectedTables.length > 0

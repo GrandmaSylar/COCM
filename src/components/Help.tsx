@@ -706,7 +706,7 @@ export function Help() {
                 <div className="flex flex-wrap gap-3 mt-1">
                   <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-green-600" /> Green badge = editable, shows countdown</span>
                   <span className="flex items-center gap-1 text-xs"><Lock className="w-3 h-3 text-gray-500" /> Gray badge = locked, view-only</span>
-                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-purple-600" /> "Dev" badge = Dev override access</span>
+                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-blue-600" /> "Dev" badge = Dev override access</span>
                 </div>
               </div>
             </AlertDescription>
@@ -778,12 +778,12 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2 mb-2">
                 <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
                   Developer
                 </Badge>
-                <Shield className="w-4 h-4 text-purple-600" />
+                <Shield className="w-4 h-4 text-blue-600" />
               </div>
               <p className="text-sm">
                 Supreme access to all features. Can create custom roles, modify base permissions,

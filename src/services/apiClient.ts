@@ -1,4 +1,6 @@
 import { supabase } from '../utils/supabase/client';
+import { isCoreEndpoint, isAllowlistedOfflineEndpoint, readCacheSnapshot, writeCacheSnapshot, invalidateModuleCache, addToSyncQueue, applyOptimisticWrite } from './offlineStore';
+import { toast } from 'sonner';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -13,6 +15,13 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) {
     super(message);
     this.name = 'ApiError';
+  }
+}
+
+export class OfflineDeleteError extends Error {
+  constructor() {
+    super('Reconnect to delete records.');
+    this.name = 'OfflineDeleteError';
   }
 }
 
@@ -64,6 +73,53 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   }
 
   const requestPromise = (async () => {
+    // ── Offline fallback for GET requests ──────────────────────────────
+    if (!navigator.onLine && isGet) {
+      if (isCoreEndpoint(endpoint)) {
+        const cached = await readCacheSnapshot(endpoint);
+        if (cached !== undefined) {
+          return cached as T;
+        }
+      }
+      throw new ApiError(503, 'Offline — data not available');
+    }
+
+    if (!navigator.onLine && !isGet) {
+      if (method === 'DELETE') {
+        throw new OfflineDeleteError();
+      }
+      if ((method === 'POST' || method === 'PUT') && isAllowlistedOfflineEndpoint(endpoint)) {
+        const modulePrefix = endpoint.split('/')[1];
+        const payload = options.body ? JSON.parse(options.body as string) : {};
+        
+        // 1. Queue the operation
+        await addToSyncQueue({ 
+            module: modulePrefix, 
+            method, 
+            endpoint, 
+            payload, 
+            timestamp: Date.now(), 
+            status: 'pending' 
+        });
+        
+        // 2. Optimistically update the local cache snapshot
+        await applyOptimisticWrite(endpoint, method as 'POST' | 'PUT', payload);
+        
+        // 3. Fire toast
+        toast('Saved locally — will sync when reconnected', { duration: 2000 });
+        
+        // 4. Dispatch event so Layout can refresh count and Modules can refresh lists
+        window.dispatchEvent(new Event('sync-queue-updated'));
+        
+        // 5. Update in-memory cache manually to let useCachedData update immediately
+        const fullPrefix = '/' + modulePrefix;
+        invalidateApiCache(fullPrefix);
+        
+        return payload as T;
+      }
+      throw new ApiError(503, 'Offline — action not available');
+    }
+
     const token = await getAccessToken();
 
     const response = await fetch(`${BASE_URL}${endpoint}`, {
@@ -116,6 +172,22 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
 
     // Handle empty responses
     const text = await response.text();
+
+    // Mutating requests invalidate related cache entries upon success
+    if (!isGet) {
+      // Extract the resource path (e.g., /members from /members/123)
+      const resourcePath = endpoint.split('/').slice(0, 2).join('/');
+      for (const key of getCache.keys()) {
+        if (key.startsWith(resourcePath)) {
+          getCache.delete(key);
+        }
+      }
+      // Also invalidate IndexedDB cache for the affected module
+      if (isCoreEndpoint(endpoint)) {
+        invalidateModuleCache(endpoint).catch(() => {/* swallow */});
+      }
+    }
+
     if (!text) {
       return {} as T;
     }
@@ -125,6 +197,11 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
       // Cache successful GET responses
       if (isGet) {
         getCache.set(cacheKey, { data: parsed, timestamp: Date.now() });
+
+        // Persist to IndexedDB for offline fallback (fire-and-forget)
+        if (isCoreEndpoint(endpoint)) {
+          writeCacheSnapshot(endpoint, parsed).catch(() => {/* swallow */});
+        }
       }
       return parsed;
     } catch {
@@ -136,17 +213,6 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   if (isGet && !isRetry) {
     inflightRequests.set(cacheKey, requestPromise);
     requestPromise.finally(() => inflightRequests.delete(cacheKey));
-  }
-
-  // Mutating requests invalidate related cache entries
-  if (!isGet && !isRetry) {
-    // Extract the resource path (e.g., /members from /members/123)
-    const resourcePath = endpoint.split('/').slice(0, 2).join('/');
-    for (const key of getCache.keys()) {
-      if (key.startsWith(resourcePath)) {
-        getCache.delete(key);
-      }
-    }
   }
 
   return requestPromise;

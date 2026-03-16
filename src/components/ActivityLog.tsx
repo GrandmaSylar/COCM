@@ -43,7 +43,7 @@ const actionColors: Record<string, string> = {
   logout: 'text-gray-500',
   approve: 'text-green-600',
   reject: 'text-red-600',
-  grant: 'text-purple-500',
+  grant: 'text-blue-500',
   revoke: 'text-orange-500',
 };
 

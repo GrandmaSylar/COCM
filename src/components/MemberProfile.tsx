@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from './ui/dialog';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { getCloudinaryUrl } from '../utils/cloudinary';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface MemberProfileProps {
   member: Member;
@@ -26,6 +27,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
   const { canAccess } = useAuth();
   const canEdit = canAccess('edit_members');
   const canDelete = canAccess('delete_members');
+  const { isOnline } = useNetworkStatus();
 
   // State for complete member data (including family members)
   const [member, setMember] = useState<Member>(initialMember);
@@ -63,6 +65,12 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     };
 
     fetchMemberData();
+
+    const handleSync = () => {
+      fetchMemberData();
+    };
+    window.addEventListener('sync-queue-updated', handleSync);
+    return () => window.removeEventListener('sync-queue-updated', handleSync);
   }, [initialMember.id]);
 
   // Calculate age
@@ -258,6 +266,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   <Button
                     variant="destructive"
                     size="sm"
+                    disabled={!isOnline}
+                    title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
                     onClick={() => {
                       if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
                         onDelete(member);

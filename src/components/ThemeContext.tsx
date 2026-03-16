@@ -37,7 +37,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const defaultColors: ThemeColors = {
   primary: '#dc2626',    // Red
   secondary: '#3b82f6',  // Blue
-  accent: '#8b5cf6',     // Purple
+  accent: '#3b82f6',     // Blue
   success: '#22c55e',    // Green
   warning: '#f59e0b',    // Amber
   error: '#ef4444',      // Red
@@ -48,7 +48,7 @@ export const defaultColors: ThemeColors = {
   chart2: '#3b82f6',     // Blue
   chart3: '#22c55e',     // Green
   chart4: '#f59e0b',     // Amber
-  chart5: '#8b5cf6',     // Purple
+  chart5: '#3b82f6',     // Blue
 };
 
 export function ThemeProvider({ children }: { children: ReactNode }) {

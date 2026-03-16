@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock, RefreshCw } from 'lucide-react';
+import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock, RefreshCw, WifiOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { useCachedData, clearCacheByPattern } from '../hooks/useCachedData';
 import { AbsenteeReview } from './AbsenteeReview';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 interface AttendanceRecord {
   id: string;
@@ -76,6 +77,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   const [showServiceManager, setShowServiceManager] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const { user, canAccess } = useAuth();
+  const { isOnline } = useNetworkStatus();
 
   const { data: cachedAttendance, loading: loadingAttendance, refresh: refreshAttendance } = useCachedData<any[]>(
     'attendance-records',
@@ -97,6 +99,15 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   useEffect(() => {
     if (cachedServices) setCustomServices(cachedServices);
   }, [cachedServices]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      refreshAttendance();
+      refreshServices();
+    };
+    window.addEventListener('sync-queue-updated', handleSync);
+    return () => window.removeEventListener('sync-queue-updated', handleSync);
+  }, [refreshAttendance, refreshServices]);
 
   const canRecordAttendance = canAccess('record_attendance');
   const canManageServices = canAccess('manage_services');
@@ -175,6 +186,10 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   };
 
   const handleDeleteService = async (serviceId: string) => {
+    if (!isOnline) {
+      toast.warning('Reconnect to delete records.');
+      return;
+    }
     if (confirm('Are you sure you want to delete this custom service? This action cannot be undone.')) {
       try {
         await api.services.delete(serviceId);
@@ -269,7 +284,15 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1>Attendance</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Attendance</h1>
+            {!isOnline && (
+              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+                <WifiOff className="w-3 h-3 mr-1" />
+                Cached Data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Track and manage service attendance
           </p>
@@ -344,12 +367,12 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-purple-600" />
+            <TrendingUp className="w-20 h-20 text-blue-600" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-purple-500/40 flex items-center justify-center mb-4 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{thisWeekAttendance}</div>
@@ -538,6 +561,7 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
     endTime: '',
     daysOfWeek: [] as number[]
   });
+  const { isOnline } = useNetworkStatus();
 
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -773,6 +797,8 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
                       size="sm"
                       onClick={() => onDelete(service.id)}
                       className="text-destructive hover:text-destructive"
+                      disabled={!isOnline}
+                      title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

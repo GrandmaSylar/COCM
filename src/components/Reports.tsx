@@ -13,6 +13,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { api, invalidateApiCache } from '../services/api';
 import { exportToCSV, exportToPDF, exportToXLSX } from '../utils/export';
+import { OfflineOverlay } from './OfflineOverlay';
 
 const STATUS_COLORS: Record<string, string> = {
   active: '#22c55e',
@@ -289,8 +290,9 @@ export function Reports() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <OfflineOverlay>
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <Skeleton className="h-8 w-48 mb-2" />
             <Skeleton className="h-4 w-64" />
@@ -318,6 +320,7 @@ export function Reports() {
           ))}
         </div>
       </div>
+      </OfflineOverlay>
     );
   }
 
@@ -383,8 +386,9 @@ export function Reports() {
     .sort((a, b) => b.amount - a.amount);
 
   return (
-    <div className="space-y-6 relative">
-      {/* Header */}
+    <OfflineOverlay>
+      <div className="space-y-6 relative">
+        {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Reports & Analytics</h1>
@@ -392,7 +396,7 @@ export function Reports() {
             Church statistics and trends — {periodLabel}
           </p>
           {selectedScope !== 'main' && (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-purple-100 text-purple-700">
+            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
               Viewing: {selectedScope === 'all' ? 'Merged (All)' : "Children's Data"}
             </span>
           )}
@@ -481,12 +485,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-purple-500/50 via-purple-500/40 to-transparent border border-purple-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Banknote className="w-16 h-16 text-purple-600" />
+            <Banknote className="w-16 h-16 text-blue-600" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/40 flex items-center justify-center mb-3 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
               <Banknote className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving)}</div>
@@ -1168,6 +1172,7 @@ export function Reports() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </div></OfflineOverlay>
   );
 }
+
