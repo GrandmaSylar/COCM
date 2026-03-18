@@ -271,6 +271,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
 
     const sendHeartbeat = async () => {
+      if (!navigator.onLine) return;
       try {
         const { api } = await import('../services/api');
         await api.auth.heartbeat();
@@ -294,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // This allows users to get newly granted permissions without re-logging
   useEffect(() => {
     const refreshUserPermissions = async () => {
+      if (!navigator.onLine) return;
       if (!user) return;
 
       try {

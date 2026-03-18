@@ -55,6 +55,7 @@ import type { Visitor } from './components/Visitors';
 import type { ChildMember } from './components/Children';
 import { toast } from 'sonner';
 import { api } from './services/api';
+import { getFriendlyMessage } from './utils/error-handler';
 import * as Sentry from '@sentry/react';
 
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
@@ -399,7 +400,7 @@ function AppContent() {
       navigateTo('members');
     } catch (error) {
       console.error('Failed to add member:', error);
-      toast.error('Failed to add member. Please try again.');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -433,8 +434,7 @@ function AppContent() {
       navigateTo('member-profile');
     } catch (error: any) {
       console.error('Failed to update member:', error);
-      const message = error?.message || 'Failed to update member. Please try again.';
-      toast.error(message);
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -611,7 +611,7 @@ function AppContent() {
       setChildrenRefreshKey(prev => prev + 1);
       navigateTo('children');
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to add child member. Please try again.');
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -638,7 +638,7 @@ function AppContent() {
       setChildrenRefreshKey(prev => prev + 1);
       navigateTo('children-profile');
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to update child member. Please try again.');
+      toast.error(getFriendlyMessage(error));
     }
   };
 

@@ -781,8 +781,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       id="zoneNumber"
                       value={formData.zoneNumber}
                       onChange={(e) => handleInputChange('zoneNumber', e.target.value)}
-                      placeholder="Auto-generated"
-                      disabled
+                      placeholder="Auto-generated — editable"
                     />
                   </div>
                 </div>

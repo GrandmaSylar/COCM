@@ -123,12 +123,48 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0) || a.label.localeCompare(b.label))
     .map(o => o.label);
 
-  // Auto-generate zone number when zone is selected
+  // Auto-generate zone number when zone is selected (sequential)
   const generateZoneNumber = (zone: Zone) => {
-    // In real app, this would check existing numbers and generate the next available
-    const randomNum = Math.floor(Math.random() * 99) + 1;
-    return `${zone}${randomNum.toString().padStart(2, '0')}`;
+    const existingNums = existingZoneNumbers[zone] || [];
+    const maxNum = existingNums.length > 0 ? Math.max(...existingNums) : 0;
+    const nextNum = maxNum + 1;
+    return `${zone}${nextNum.toString().padStart(2, '0')}`;
   };
+
+  // State for existing zone numbers (for sequential numbering)
+  const [existingZoneNumbers, setExistingZoneNumbers] = useState<Record<Zone, number[]>>({
+    A: [], B: [], F: [], K: [], M: [], R: []
+  });
+  const [existingMembers, setExistingMembers] = useState<Member[]>([]);
+  const [zoneNumbersLoading, setZoneNumbersLoading] = useState(true);
+
+  // Fetch existing members to get zone numbers on mount
+  useEffect(() => {
+    const fetchMembers = async () => {
+      try {
+        const members = await api.members.getAll();
+        const zoneNums: Record<Zone, number[]> = { A: [], B: [], F: [], K: [], M: [], R: [] };
+
+        members.forEach((m: Member) => {
+          if (m.zone && m.zoneNumber) {
+            const numPart = parseInt(m.zoneNumber.replace(/[^0-9]/g, ''), 10);
+            if (!isNaN(numPart) && zoneNums[m.zone as Zone]) {
+              zoneNums[m.zone as Zone].push(numPart);
+            }
+          }
+        });
+
+        setExistingZoneNumbers(zoneNums);
+        setExistingMembers(members);
+      } catch (error) {
+        console.error('Failed to fetch zone numbers:', error);
+      } finally {
+        setZoneNumbersLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, []);
 
   const [isLoading, setIsLoading] = useState(false);
 
@@ -305,6 +341,11 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   const isValid = formData.firstName && formData.lastName && formData.phone &&
                   formData.gender && formData.dateOfBirth && formData.residenceLocation &&
                   formData.zone && formData.zoneNumber?.trim();
+
+  // Derived: check if the current zone number conflicts with another member
+  const zoneNumberConflict = existingMembers
+    .filter(m => m.id !== member.id && formData.zoneNumber?.trim() && m.zoneNumber === formData.zoneNumber.trim())
+    .length > 0;
 
   return (
     <div className="space-y-6">
@@ -578,7 +619,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="zone">Zone *</Label>
-                  <Select value={formData.zone} onValueChange={(value: string) => handleInputChange('zone', value)}>
+                  <Select value={formData.zone} onValueChange={(value: string) => handleInputChange('zone', value)} disabled={zoneNumbersLoading}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select zone" />
                     </SelectTrigger>
@@ -602,6 +643,12 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <p className="text-xs text-muted-foreground">
                     Editable. Change Zone and leave this empty to auto-generate a number.
                   </p>
+                  {zoneNumberConflict && (
+                    <div className="flex items-center gap-1.5 mt-1 text-amber-600 dark:text-amber-400">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span className="text-xs font-medium">This zone number is already assigned to another member.</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

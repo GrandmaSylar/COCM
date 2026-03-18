@@ -234,6 +234,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   // Fetch unread notification count
   useEffect(() => {
     const fetchUnread = async () => {
+      if (!isOnline) return;
       try {
         const data = await api.notifications.getUnreadCount();
         setUnreadCount(data?.count || 0);
@@ -244,7 +245,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     fetchUnread();
     const interval = setInterval(fetchUnread, 30000); // refresh every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [isOnline]);
 
   const navigationItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
