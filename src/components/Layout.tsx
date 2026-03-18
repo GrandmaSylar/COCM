@@ -39,7 +39,8 @@ import {
   Receipt,
   WifiOff,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Share
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -69,6 +70,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [showUpdateBtn, setShowUpdateBtn] = useState(false);
+  const [showIosBanner, setShowIosBanner] = useState(false);
   const [sessionDismissed, setSessionDismissed] = useState(
     () => sessionStorage.getItem("pwa-banner-dismissed") === "true"
   );
@@ -191,6 +193,24 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     };
   }, [sessionDismissed]);
 
+  // ── PWA: iOS install banner detection ──
+  useEffect(() => {
+    if (sessionStorage.getItem("pwa-ios-banner-dismissed") === "true") return;
+    if (isPermanentlyInstalled()) return;
+
+    const ua = navigator.userAgent;
+    const isIos = /iphone|ipad|ipod/i.test(ua);
+    const isIpadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    const isSafari = /safari/i.test(ua);
+    const isNotChrome = !/CriOS/i.test(ua);
+    const isNotFirefox = !/FxiOS/i.test(ua);
+    const isStandalone = (window.navigator as any).standalone === false;
+
+    if ((isIos || isIpadOS) && isSafari && isNotChrome && isNotFirefox && isStandalone) {
+      setShowIosBanner(true);
+    }
+  }, []);
+
   // ── PWA: listen for service-worker update ──
   useEffect(() => {
     const handleUpdate = () => {
@@ -229,6 +249,11 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     sessionStorage.setItem("pwa-banner-dismissed", "true");
     setSessionDismissed(true);
     setShowInstallBanner(false);
+  }, []);
+
+  const handleDismissIosBanner = useCallback(() => {
+    sessionStorage.setItem("pwa-ios-banner-dismissed", "true");
+    setShowIosBanner(false);
   }, []);
 
   // Fetch unread notification count
@@ -365,6 +390,19 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 <X className="w-3.5 h-3.5" />
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* iOS Install Banner — Mobile */}
+        {showIosBanner && !showInstallBanner && (
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
+              <Share className="w-4 h-4 shrink-0" />
+              <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
+            </p>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissIosBanner}>
+              <X className="w-3.5 h-3.5" />
+            </Button>
           </div>
         )}
 
@@ -702,6 +740,19 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                     <X className="w-3.5 h-3.5" />
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {/* iOS Install Banner — Desktop */}
+            {showIosBanner && !showInstallBanner && (
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                  <Share className="w-4 h-4 shrink-0" />
+                  <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
+                </p>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissIosBanner}>
+                  <X className="w-3.5 h-3.5" />
+                </Button>
               </div>
             )}
 

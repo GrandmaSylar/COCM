@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
+import { exportToPDF } from '../utils/export';
 import { Skeleton } from './ui/skeleton';
 import { Member, ZONES } from './Members';
 import { useAuth } from './AuthContext';
@@ -24,7 +25,7 @@ interface MemberProfileProps {
 }
 
 export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember, onViewAttendanceHistory }: MemberProfileProps) {
-  const { canAccess } = useAuth();
+  const { canAccess, isDev } = useAuth();
   const canEdit = canAccess('edit_members');
   const canDelete = canAccess('delete_members');
   const { isOnline } = useNetworkStatus();
@@ -201,6 +202,21 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     blacklisted: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
   };
 
+  const memberPdfColumns = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'age', label: 'Age' },
+    { key: 'dateOfBirth', label: 'DOB' },
+    { key: 'zone', label: 'Zone' },
+    { key: 'status', label: 'Status' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'occupation', label: 'Occupation' },
+    { key: 'residenceLocation', label: 'Residence' },
+    { key: 'joinDate', label: 'Join Date' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Hero Header */}
@@ -260,6 +276,12 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   <Button size="sm" onClick={() => onEdit(member)}>
                     <Edit className="w-3.5 h-3.5 mr-1.5" />
                     Edit
+                  </Button>
+                )}
+                {isDev && (
+                  <Button size="sm" variant="outline" onClick={() => exportToPDF([{ ...member, age: calculateAge(member.dateOfBirth) }], `member-${member.id}`, `${member.firstName} ${member.lastName} — Profile`, memberPdfColumns)}>
+                    <FileText className="w-3.5 h-3.5 mr-1.5" />
+                    Export PDF
                   </Button>
                 )}
                 {canDelete && onDelete && (

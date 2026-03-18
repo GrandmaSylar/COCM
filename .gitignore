@@ -6,3 +6,7 @@ build/
 .vercel
 .claude/
 dev-dist/
+
+supabase/migrations/
+
+src/database-setup/

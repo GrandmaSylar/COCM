@@ -9,8 +9,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Trash2, UserCheck, Phone, MapPin, Calendar, User, Users, CheckCircle2, XCircle, BarChart3, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, UserCheck, Phone, MapPin, Calendar, User, Users, CheckCircle2, XCircle, BarChart3, ExternalLink, FileText } from 'lucide-react';
 import { getCloudinaryUrl } from '../utils/cloudinary';
+import { exportToPDF } from '../utils/export';
 
 interface ChildProfileProps {
   child: ChildMember;
@@ -22,7 +23,7 @@ interface ChildProfileProps {
 }
 
 export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, onPromoteToMember, onViewMember }: ChildProfileProps) {
-  const { canAccess } = useAuth();
+  const { canAccess, isDev } = useAuth();
   const [child, setChild] = useState<ChildMember>(initialChild);
   const [attendanceData, setAttendanceData] = useState<{
     summary: { totalServices: number; totalPresent: number; totalAbsent: number; percentage: number };
@@ -100,6 +101,25 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
     other: 'bg-gray-100 text-gray-800'
   };
 
+  const childPdfColumns = [
+    { key: 'firstName', label: 'First Name' },
+    { key: 'lastName', label: 'Last Name' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'age', label: 'Age' },
+    { key: 'dateOfBirth', label: 'DOB' },
+    { key: 'status', label: 'Status' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'residenceLocation', label: 'Residence' },
+    { key: 'joinDate', label: 'Join Date' },
+    { key: 'parentsDisplay', label: 'Parents' },
+  ];
+
+  const childExportRow = {
+    ...child,
+    age: calculateAge(child.dateOfBirth),
+    parentsDisplay: child.parents?.map(p => `${p.firstName} ${p.lastName}`).join(', ') || '',
+  };
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden shadow-sm">
@@ -146,6 +166,12 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                   <Button size="sm" onClick={() => onEdit(child)}>
                     <Edit className="w-3.5 h-3.5 mr-1.5" />
                     Edit
+                  </Button>
+                )}
+                {isDev && (
+                  <Button size="sm" variant="outline" onClick={() => exportToPDF([childExportRow], `child-${child.id}`, `${child.firstName} ${child.lastName} — Profile`, childPdfColumns)}>
+                    <FileText className="w-3.5 h-3.5 mr-1.5" />
+                    Export PDF
                   </Button>
                 )}
                 {canAccess('manage_members') && (
