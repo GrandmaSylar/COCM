@@ -1204,6 +1204,15 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                     ))}
                   </div>
                 )}
+
+                {familyMembers.length > 0 && (
+                  <div className="flex justify-center pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={addFamilyMember} className="border-dashed">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Family Member
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </CollapsibleContent>
           </Collapsible>
