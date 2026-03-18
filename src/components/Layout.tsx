@@ -300,7 +300,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
       <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
         {/* Mobile Header */}
         {/* eslint-disable-next-line -- PWA install banner for mobile (rendered after header) */}
-        <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between">
+        <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between no-print">
           <div className="flex items-center gap-2">
             <img src="/newlogo.png" alt="logo" className="w-8 h-8 object-contain" />
             <h1 className="text-lg font-medium">CoC.M</h1>
@@ -377,7 +377,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* PWA Install Banner — Mobile (between header and flex row) */}
         {showInstallBanner && !sessionDismissed && (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
             <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
               <Download className="w-4 h-4 shrink-0" />
               <span>Install CoC.M for a faster, offline-capable experience</span>
@@ -395,7 +395,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* iOS Install Banner — Mobile */}
         {showIosBanner && !showInstallBanner && (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
             <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
               <Share className="w-4 h-4 shrink-0" />
               <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
@@ -408,7 +408,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
         {/* Banner Block — Mobile (between install banner and flex row) */}
         {!isOnline ? (
-          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700">
+          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700 no-print">
             <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-amber-800 dark:text-amber-200">
               <span className="font-semibold">⚠ You are offline</span>
@@ -424,12 +424,12 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             </div>
           </div>
         ) : syncState === 'syncing' ? (
-          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700">
+          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700 no-print">
             <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
             <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
           </div>
         ) : syncState === 'conflicts' ? (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 flex-wrap">
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 flex-wrap no-print">
             <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
               <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
               <span>Sync complete — {syncConflictCount} conflicts</span>
@@ -439,7 +439,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
             </Button>
           </div>
         ) : syncState === 'fix-retry' ? (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 flex-wrap">
+          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 flex-wrap no-print">
             <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
               <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
               <span className="truncate max-w-[200px]">Sync failed: {syncFailureReason}</span>
@@ -693,7 +693,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
           {/* Main Content */}
           <div className="flex-1 lg:ml-64 overflow-x-hidden content-watermark min-h-screen bg-muted/40 dark:bg-background">
             {/* Desktop Top Bar */}
-            <div className="hidden lg:flex items-center justify-end px-8 py-3 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20">
+            <div className="hidden lg:flex items-center justify-end px-8 py-3 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20 no-print">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-accent transition-colors focus:outline-none group">
@@ -727,7 +727,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
             {/* PWA Install Banner — Desktop (between top bar and main) */}
             {showInstallBanner && !sessionDismissed && (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
                 <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
                   <Download className="w-4 h-4 shrink-0" />
                   <span>📲 Install CoC.M — Get a faster, offline-capable experience</span>
@@ -745,7 +745,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
             {/* iOS Install Banner — Desktop */}
             {showIosBanner && !showInstallBanner && (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800">
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
                 <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
                   <Share className="w-4 h-4 shrink-0" />
                   <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
@@ -758,7 +758,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
             {/* Banner Block — Desktop (between install banner and main) */}
             {!isOnline ? (
-              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700">
+              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700 no-print">
                 <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
                   <span className="font-semibold">⚠ You are offline</span>
@@ -774,12 +774,12 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 </div>
               </div>
             ) : syncState === 'syncing' ? (
-              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700">
+              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700 no-print">
                 <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
                 <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
               </div>
             ) : syncState === 'conflicts' ? (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700">
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 no-print">
                 <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
                   <span>⚠ Sync complete — {syncConflictCount} conflicts need your attention</span>
@@ -789,7 +789,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                 </Button>
               </div>
             ) : syncState === 'fix-retry' ? (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700">
+              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 no-print">
                 <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
                   <span>Sync failed — {syncFailureReason}</span>

@@ -91,10 +91,20 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         format: selectedPaper.format as any,
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      let pdfWidth = pdf.internal.pageSize.getWidth();
+      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      let xOffset = 0;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      if (pdfHeight > pageHeight) {
+        const scaleFactor = pageHeight / pdfHeight;
+        const originalPageWidth = pdfWidth;
+        pdfWidth = pdfWidth * scaleFactor;
+        pdfHeight = pdfHeight * scaleFactor;
+        xOffset = (originalPageWidth - pdfWidth) / 2;
+      }
+
+      pdf.addImage(imgData, 'PNG', xOffset, 0, pdfWidth, pdfHeight);
       pdf.save(`${expense.formId || 'receipt'}.pdf`);
     } catch (error) {
       console.error('Failed to generate PDF:', error);
@@ -175,11 +185,12 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
       {/* Receipt Content */}
       <div 
         ref={receiptRef}
-        className="bg-white text-black p-12 border rounded-xl shadow-sm mx-auto print:border-none print:shadow-none"
-        style={{ width: '800px', maxWidth: 'none', minHeight: '1000px', margin: '0 auto' }}
+        id="receipt-container"
+        className="bg-white text-black p-8 border rounded-xl shadow-sm mx-auto print:border-none print:shadow-none"
+        style={{ width: '800px', maxWidth: 'none', margin: '0 auto' }}
       >
         {/* Header */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start mb-4">
           {/* Logo & Church Name */}
           <div className="flex flex-row items-center gap-5">
             <img src="/newlogo.png" alt="Church Logo" className="w-[100px] h-[100px] object-contain" crossOrigin="anonymous" />
@@ -199,12 +210,12 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         </div>
 
         {/* Title Banner */}
-        <div className="bg-[#18182b] text-white text-center py-2.5 rounded mb-10">
+        <div className="bg-[#18182b] text-white text-center py-2.5 rounded mb-6">
           <h3 className="text-xl font-bold uppercase tracking-wide m-0">Expense Requisition Form</h3>
         </div>
 
         {/* Details of Expenditure */}
-        <div className="mb-14">
+        <div className="mb-6">
           <h4 className="font-bold text-[14px] mb-5 text-black tracking-wide uppercase">Details of Expenditure</h4>
           
           <div className="relative w-full">
@@ -218,7 +229,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
             
             {/* Content text */}
             <div 
-              className="relative z-10 w-full font-normal text-base leading-[40px] pt-1 px-1 whitespace-pre-wrap break-words min-h-[160px]" 
+              className="relative z-10 w-full font-normal text-base leading-[40px] pt-1 px-1 whitespace-pre-wrap break-words min-h-[120px]" 
             >
               {expense.details}
             </div>
@@ -226,7 +237,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         </div>
 
         {/* Amount and Date row */}
-        <div className="flex flex-row justify-between mb-16 gap-8 px-1">
+        <div className="flex flex-row justify-between mb-8 gap-8 px-1">
           <div className="flex font-bold text-sm flex-1 items-end">
             <span className="whitespace-nowrap mr-6 tracking-wide">AMOUNT GHS</span>
             <div className="border-b border-gray-400 flex-1 text-center font-normal pb-0.5 text-lg">
@@ -242,7 +253,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         </div>
 
         {/* Signatures stack */}
-        <div className="space-y-10 mb-20 px-1">
+        <div className="space-y-6 mb-8 px-1">
           <div className="flex font-bold text-[13px] items-end">
             <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Requested By</span>
             <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
@@ -266,7 +277,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         </div>
 
         {/* Bottom Signature Row */}
-        <div className="flex flex-row justify-between mb-20 gap-8 px-1">
+        <div className="flex flex-row justify-between mb-6 gap-8 px-1">
           <div className="flex font-bold text-[13px] w-[35%] items-end">
             <span className="whitespace-nowrap mr-6 tracking-wide">DATE</span>
             <div className="border-b border-gray-400 flex-1 pb-2"></div>
@@ -278,7 +289,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         </div>
         
         {/* Bottom thick lines */}
-        <div className="flex justify-between mt-auto gap-4 pt-4 px-1 pb-8">
+        <div className="flex justify-between mt-auto gap-4 pt-4 px-1 pb-4">
            <div className="border-b-[4px] border-black flex-1"></div>
            <div className="border-b-[4px] border-black flex-1"></div>
            <div className="border-b-[4px] border-black flex-1"></div>
@@ -290,12 +301,13 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
       <style>{`
         @media print {
           body { background-color: white !important; }
-          #sidebar-nav, #mobile-fab-nav, header, .no-print { display: none !important; }
+          #sidebar-nav, #mobile-fab-nav, .no-print { display: none !important; }
           .content-watermark { background: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
           main { padding: 0 !important; margin: 0 !important; overflow: visible !important; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
           @page { size: ${PAPER_SIZES.find(s => s.value === paperSize)?.css || 'A4'} portrait; margin: 10mm; }
           #root { width: 800px !important; overflow: visible !important; }
+          #receipt-container { width: 100% !important; min-height: unset !important; page-break-inside: avoid; }
         }
       `}</style>
       
