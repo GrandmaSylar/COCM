@@ -1,8 +1,8 @@
 // Export utilities for CSV, PDF, and XLSX
 
 // CSV Export
-export function exportToCSV(data: any[], filename: string, columns: { key: string; label: string }[]) {
-  if (data.length === 0) {
+export function exportToCSV(data: any[], filename: string, columns: { key: string; label: string }[], allowEmpty = false) {
+  if (data.length === 0 && !allowEmpty) {
     console.warn('No data to export');
     return;
   }
@@ -438,4 +438,123 @@ export function exportGroupedToXLSX(groups: { label: string; subtotal: number; r
 </Workbook>`;
 
   downloadFile(xml, `${filename}.xls`, 'application/vnd.ms-excel');
+}
+
+export const MEMBER_IMPORT_COLUMNS = [
+  { key: 'firstName', label: 'First Name', required: true },
+  { key: 'lastName', label: 'Last Name', required: true },
+  { key: 'otherNames', label: 'Other Names', required: false },
+  { key: 'gender', label: 'Gender (male/female)', required: true },
+  { key: 'dateOfBirth', label: 'Date of Birth (YYYY-MM-DD)', required: true },
+  { key: 'phone', label: 'Phone', required: true },
+  { key: 'secondPhone', label: 'Second Phone', required: false },
+  { key: 'email', label: 'Email', required: false },
+  { key: 'residenceLocation', label: 'Residence Location', required: true },
+  { key: 'zone', label: 'Zone (A/B/F/K/M/R)', required: true },
+  { key: 'zoneNumber', label: 'Zone Number (e.g. A01)', required: false },
+  { key: 'occupation', label: 'Occupation', required: false },
+  { key: 'hometown', label: 'Hometown', required: false },
+  { key: 'digitalAddress', label: 'Digital Address', required: false },
+  { key: 'maritalStatus', label: 'Marital Status', required: false },
+  { key: 'notes', label: 'Notes', required: false },
+  { key: 'baptismDateType', label: 'Baptism Date Type (full/monthYear/yearOnly/not_baptised)', required: true },
+  { key: 'baptismFullDate', label: 'Baptism Full Date (YYYY-MM-DD)', required: false },
+  { key: 'baptismMonth', label: 'Baptism Month', required: false },
+  { key: 'baptismYear', label: 'Baptism Year', required: false },
+  { key: 'previousCongregation', label: 'Previous Congregation', required: false },
+  { key: 'ministries', label: 'Ministries (semicolon-separated)', required: false },
+  { key: 'positionHeld', label: 'Position Held (semicolon-separated)', required: false }
+];
+
+export function downloadMemberImportTemplate() {
+  exportToCSV([], 'members_import_template', MEMBER_IMPORT_COLUMNS, true);
+}
+
+export function parseMemberImportRow(row: Record<string, string>) {
+  const errors: string[] = [];
+  const data: any = {};
+
+  const getVal = (colKey: string) => {
+    const colDef = MEMBER_IMPORT_COLUMNS.find(c => c.key === colKey);
+    if (!colDef) return '';
+    if (row[colDef.label] !== undefined) return row[colDef.label].trim();
+    if (row[colKey] !== undefined) return row[colKey].trim();
+    return '';
+  };
+
+  MEMBER_IMPORT_COLUMNS.forEach(col => {
+    if (col.required) {
+      if (!getVal(col.key)) {
+        errors.push(`Missing required field: ${col.label.split(' (')[0]}`);
+      }
+    }
+  });
+
+  data.firstName = getVal('firstName');
+  data.lastName = getVal('lastName');
+  data.otherNames = getVal('otherNames') || undefined;
+  
+  const rawGender = getVal('gender').toLowerCase();
+  if (getVal('gender') && !['male', 'female'].includes(rawGender)) {
+    errors.push(`Invalid gender: ${getVal('gender')}. Must be male or female.`);
+  } else {
+    data.gender = rawGender;
+  }
+
+  data.dateOfBirth = getVal('dateOfBirth') || undefined;
+  data.phone = getVal('phone');
+  data.secondPhone = getVal('secondPhone') || undefined;
+  data.email = getVal('email') || undefined;
+  data.residenceLocation = getVal('residenceLocation');
+  
+  const rawZone = getVal('zone').toUpperCase();
+  if (getVal('zone') && !['A', 'B', 'F', 'K', 'M', 'R'].includes(rawZone)) {
+    errors.push(`Invalid zone: ${getVal('zone')}. Must be A, B, F, K, M, or R.`);
+  } else {
+    data.zone = rawZone;
+  }
+
+  data.zoneNumber = getVal('zoneNumber') || undefined;
+  data.occupation = getVal('occupation') || undefined;
+  data.hometown = getVal('hometown') || undefined;
+  data.digitalAddress = getVal('digitalAddress') || undefined;
+  
+  const rawMaritalStatus = getVal('maritalStatus').toLowerCase();
+  const validMaritalStats = ['single', 'married', 'widowed', 'divorced'];
+  if (getVal('maritalStatus') && !validMaritalStats.includes(rawMaritalStatus)) {
+      errors.push(`Invalid marital status: ${getVal('maritalStatus')}`);
+  } else if (getVal('maritalStatus')) {
+      data.maritalStatus = rawMaritalStatus;
+  }
+
+  data.notes = getVal('notes') || undefined;
+
+  const bType = getVal('baptismDateType');
+  const validBTypes = ['full', 'monthYear', 'yearOnly', 'not_baptised'];
+  if (bType && !validBTypes.includes(bType)) {
+    errors.push(`Invalid baptism date type: ${bType}`);
+  }
+
+  // Set status based on baptism input as requested
+  if (bType === 'not_baptised') {
+    data.status = 'not baptised';
+  } else {
+    data.status = 'new';
+  }
+
+  data.baptismInfo = {
+    dateType: validBTypes.includes(bType) ? bType : 'not_baptised',
+    fullDate: getVal('baptismFullDate') || undefined,
+    month: getVal('baptismMonth') || undefined,
+    year: getVal('baptismYear') ? parseInt(getVal('baptismYear'), 10) : undefined,
+    previousCongregation: getVal('previousCongregation') || undefined
+  };
+
+  const minsVal = getVal('ministries');
+  data.ministries = minsVal ? minsVal.split(';').map(m => m.trim()).filter(Boolean) : [];
+
+  const posVal = getVal('positionHeld');
+  data.positionHeld = posVal ? posVal.split(';').map(p => p.trim()).filter(Boolean) : [];
+
+  return { data, errors };
 }

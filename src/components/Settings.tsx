@@ -24,6 +24,7 @@ import { api, invalidateApiCache } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { THEME_PRESETS } from '../utils/themePresets';
 import { DevSettings } from './DevSettings';
+import { ImportMembers } from './ImportMembers';
 
 interface SystemUser {
   id: string;
@@ -731,6 +732,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             {isDev && <TabsTrigger value="dev-settings">Dev Settings</TabsTrigger>}
             <TabsTrigger value="theme">Theme</TabsTrigger>
             {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
+            {hasAdminAccess && <TabsTrigger value="import">Import Members</TabsTrigger>}
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
@@ -1837,6 +1839,15 @@ export function Settings({ onAddUser }: SettingsProps) {
 
             <BackupRestore />
           
+        </OfflineOverlay>
+      </TabsContent>
+        )}
+
+        {/* Import Members Tab */}
+        {hasAdminAccess && (
+          <TabsContent value="import" className="space-y-6 w-full overflow-hidden">
+        <OfflineOverlay>
+            <ImportMembers />
         </OfflineOverlay>
       </TabsContent>
         )}
