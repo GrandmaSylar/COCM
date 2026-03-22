@@ -38,15 +38,38 @@ export const MEMBER_STATUS_DEFINITIONS = {
   blacklisted: 'Sacked or removed'
 } as const;
 
-export type BaptismDateType = 'full' | 'monthYear' | 'yearOnly' | 'not_baptised';
+export type BaptismDateType = 'full' | 'monthYear' | 'yearOnly' | 'forgotten';
+export type BaptismStatus = 'baptised' | 'not_baptised';
 
 export interface BaptismInfo {
-  dateType: BaptismDateType;
+  baptismStatus: BaptismStatus;
+  dateType?: BaptismDateType;
   fullDate?: string;
   month?: string;
   year?: string;
   previousCongregation?: string;
   roleInPreviousCongregation?: string;
+}
+
+export function normaliseBaptismInfo(raw: any): BaptismInfo | undefined {
+  if (raw == null) {
+    return undefined;
+  }
+
+  if (typeof raw !== 'object') {
+    return undefined;
+  }
+
+  if (raw.dateType === 'not_baptised') {
+    const { dateType, fullDate, month, year, ...rest } = raw;
+    return { baptismStatus: 'not_baptised', ...rest } as BaptismInfo;
+  }
+
+  if ('baptismStatus' in raw) {
+    return { ...raw } as BaptismInfo;
+  }
+
+  return { baptismStatus: 'baptised', ...raw } as BaptismInfo;
 }
 
 export interface FamilyMember {
