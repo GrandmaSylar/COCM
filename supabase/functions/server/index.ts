@@ -1077,7 +1077,8 @@ app.post("/auth/signin", async (c)=>{
     const requiresDeviceOtp = !profile.active_device_id || profile.active_device_id !== deviceId;
 
     // Check if 2FA is strictly enabled, or if it's a new device
-    if (requiresDeviceOtp || (profile.two_fa_method && profile.two_fa_method !== 'none')) {
+    // DISABLED 2FA check as requested:
+    if (false /* requiresDeviceOtp || (profile.two_fa_method && profile.two_fa_method !== 'none') */) {
       const tempToken = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
