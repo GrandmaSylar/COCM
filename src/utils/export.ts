@@ -457,7 +457,8 @@ export const MEMBER_IMPORT_COLUMNS = [
   { key: 'digitalAddress', label: 'Digital Address', required: false },
   { key: 'maritalStatus', label: 'Marital Status', required: false },
   { key: 'notes', label: 'Notes', required: false },
-  { key: 'baptismDateType', label: 'Baptism Date Type (full/monthYear/yearOnly/not_baptised)', required: true },
+  { key: 'baptismDateType', label: 'Baptism Date Type (baptised/not_baptised/full/monthYear/yearOnly/forgotten)', aliases: ['Baptism Date Type (full/monthYear/yearOnly/not_baptised)'], required: true },
+  { key: 'baptismDatePrecision', label: 'Baptism Date Precision (full/monthYear/yearOnly/forgotten)', required: false },
   { key: 'baptismFullDate', label: 'Baptism Full Date (YYYY-MM-DD)', required: false },
   { key: 'baptismMonth', label: 'Baptism Month', required: false },
   { key: 'baptismYear', label: 'Baptism Year', required: false },
@@ -478,6 +479,11 @@ export function parseMemberImportRow(row: Record<string, string>) {
     const colDef = MEMBER_IMPORT_COLUMNS.find(c => c.key === colKey);
     if (!colDef) return '';
     if (row[colDef.label] !== undefined) return row[colDef.label].trim();
+    if ('aliases' in colDef && Array.isArray((colDef as any).aliases)) {
+      for (const alias of (colDef as any).aliases) {
+        if (row[alias] !== undefined) return row[alias].trim();
+      }
+    }
     if (row[colKey] !== undefined) return row[colKey].trim();
     return '';
   };
@@ -530,7 +536,7 @@ export function parseMemberImportRow(row: Record<string, string>) {
   data.notes = getVal('notes') || undefined;
 
   const bType = getVal('baptismDateType');
-  const validBTypes = ['full', 'monthYear', 'yearOnly', 'not_baptised'];
+  const validBTypes = ['full', 'monthYear', 'yearOnly', 'not_baptised', 'forgotten', 'baptised'];
   if (bType && !validBTypes.includes(bType)) {
     errors.push(`Invalid baptism date type: ${bType}`);
   }
@@ -538,17 +544,46 @@ export function parseMemberImportRow(row: Record<string, string>) {
   // Set status based on baptism input as requested
   if (bType === 'not_baptised') {
     data.status = 'not baptised';
+    data.baptismInfo = {
+      baptismStatus: 'not_baptised',
+      previousCongregation: getVal('previousCongregation') || undefined
+    };
+  } else if (bType === 'baptised') {
+    data.status = 'new';
+    const precisionStr = getVal('baptismDatePrecision');
+    const validPrecisions = ['full', 'monthYear', 'yearOnly', 'forgotten'];
+    const dateType = validPrecisions.includes(precisionStr) ? precisionStr : 'forgotten';
+    
+    data.baptismInfo = {
+      baptismStatus: 'baptised',
+      dateType,
+      ...(dateType !== 'forgotten' && {
+        fullDate: getVal('baptismFullDate') || undefined,
+        month: getVal('baptismMonth') || undefined,
+        year: getVal('baptismYear') ? parseInt(getVal('baptismYear'), 10) : undefined,
+      }),
+      previousCongregation: getVal('previousCongregation') || undefined
+    };
+  } else if (bType && ['full', 'monthYear', 'yearOnly', 'forgotten'].includes(bType)) {
+    data.status = 'new';
+    data.baptismInfo = {
+      baptismStatus: 'baptised',
+      dateType: bType,
+      ...(bType !== 'forgotten' && {
+        fullDate: getVal('baptismFullDate') || undefined,
+        month: getVal('baptismMonth') || undefined,
+        year: getVal('baptismYear') ? parseInt(getVal('baptismYear'), 10) : undefined,
+      }),
+      previousCongregation: getVal('previousCongregation') || undefined
+    };
   } else {
     data.status = 'new';
+    data.baptismInfo = {
+      baptismStatus: 'baptised',
+      dateType: 'forgotten',
+      previousCongregation: getVal('previousCongregation') || undefined
+    };
   }
-
-  data.baptismInfo = {
-    dateType: validBTypes.includes(bType) ? bType : 'not_baptised',
-    fullDate: getVal('baptismFullDate') || undefined,
-    month: getVal('baptismMonth') || undefined,
-    year: getVal('baptismYear') ? parseInt(getVal('baptismYear'), 10) : undefined,
-    previousCongregation: getVal('previousCongregation') || undefined
-  };
 
   const minsVal = getVal('ministries');
   data.ministries = minsVal ? minsVal.split(';').map(m => m.trim()).filter(Boolean) : [];

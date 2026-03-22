@@ -6,7 +6,7 @@ import { Separator } from './ui/separator';
 import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
 import { exportToPDF } from '../utils/export';
 import { Skeleton } from './ui/skeleton';
-import { Member, ZONES } from './Members';
+import { Member, ZONES, normaliseBaptismInfo } from './Members';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -96,11 +96,13 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
   };
 
   // Format baptism date based on type
-  const formatBaptismDate = () => {
-    if (!member.baptismInfo) return 'Not recorded';
+  const formatBaptismDate = (info: NonNullable<Member['baptismInfo']>) => {
+    const { dateType, fullDate, month, year } = info;
     
-    const { dateType, fullDate, month, year } = member.baptismInfo;
-    
+    if (!dateType || dateType === 'forgotten') {
+      return 'Date not recorded';
+    }
+
     if (dateType === 'full' && fullDate) {
       return formatDate(fullDate);
     } else if (dateType === 'monthYear' && month && year) {
@@ -111,7 +113,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
       return year;
     }
     
-    return 'Not recorded';
+    return 'Date not recorded';
   };
 
   if (loading) {
@@ -189,6 +191,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
       </div>
     );
   }
+
+  const normalisedBaptism = member.baptismInfo ? normaliseBaptismInfo(member.baptismInfo) : undefined;
 
   const statusColorMap: Record<string, string> = {
     new: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
@@ -423,7 +427,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
           </Card>
 
           {/* Baptism Information */}
-          {member.baptismInfo && (
+          {normalisedBaptism && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -434,19 +438,25 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Baptism Date</label>
-                    <p>{formatBaptismDate()}</p>
+                    <label className="text-sm font-medium text-muted-foreground">Baptism Status</label>
+                    <p>{normalisedBaptism.baptismStatus === 'not_baptised' ? 'Not Baptised' : 'Baptised'}</p>
                   </div>
-                  {member.baptismInfo.previousCongregation && (
+                  {normalisedBaptism.baptismStatus === 'baptised' && (
                     <div>
-                      <label className="text-sm font-medium text-muted-foreground">Previous Congregation</label>
-                      <p>{member.baptismInfo.previousCongregation}</p>
+                      <label className="text-sm font-medium text-muted-foreground">Baptism Date</label>
+                      <p>{formatBaptismDate(normalisedBaptism)}</p>
                     </div>
                   )}
-                  {member.baptismInfo.roleInPreviousCongregation && (
+                  {member.baptismInfo?.previousCongregation && (
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Previous Congregation</label>
+                      <p>{member.baptismInfo?.previousCongregation}</p>
+                    </div>
+                  )}
+                  {member.baptismInfo?.roleInPreviousCongregation && (
                     <div className="md:col-span-2">
                       <label className="text-sm font-medium text-muted-foreground">Role in Previous Congregation</label>
-                      <p>{member.baptismInfo.roleInPreviousCongregation}</p>
+                      <p>{member.baptismInfo?.roleInPreviousCongregation}</p>
                     </div>
                   )}
                 </div>

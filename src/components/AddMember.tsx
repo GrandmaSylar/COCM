@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, User, Phone, MapPin, Droplets, Users, FileText, StickyNote, ChevronDown, Check, AlertTriangle, RefreshCw } from 'lucide-react';
-import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType } from './Members';
+import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, BaptismStatus } from './Members';
 import { Visitor } from './Visitors';
 import type { ChildMember } from './Children';
 import { Badge } from './ui/badge';
@@ -59,6 +59,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
   // Baptism Info State
   const [baptismInfo, setBaptismInfo] = useState<BaptismInfo>({
+    baptismStatus: 'baptised',
     dateType: 'full',
     fullDate: '',
     month: '',
@@ -186,20 +187,6 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
   const [isLoading, setIsLoading] = useState(false);
 
-  // Check if baptism date is filled based on dateType
-  const isBaptismDateFilled = useMemo(() => {
-    if (baptismInfo.dateType === 'not_baptised') {
-      return true; // Not required
-    } else if (baptismInfo.dateType === 'full') {
-      return !!baptismInfo.fullDate;
-    } else if (baptismInfo.dateType === 'monthYear') {
-      return !!baptismInfo.month && !!baptismInfo.year;
-    } else if (baptismInfo.dateType === 'yearOnly') {
-      return !!baptismInfo.year;
-    }
-    return false;
-  }, [baptismInfo]);
-
   // Calculate progress based on required fields
   const progressData = useMemo(() => {
     const requiredFields = [
@@ -210,7 +197,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
       { name: 'Phone Number', filled: !!formData.phone.trim(), section: 'contact' },
       { name: 'Residence Location', filled: !!formData.residenceLocation.trim(), section: 'location' },
       { name: 'Zone', filled: !!formData.zone, section: 'location' },
-      { name: 'Baptism Date', filled: isBaptismDateFilled, section: 'baptism' }
+      { name: 'Baptism Status', filled: !!baptismInfo.baptismStatus, section: 'baptism' }
     ];
 
     const filledCount = requiredFields.filter(f => f.filled).length;
@@ -218,7 +205,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     const percentage = Math.round((filledCount / totalCount) * 100);
 
     return { requiredFields, filledCount, totalCount, percentage };
-  }, [formData, isBaptismDateFilled]);
+  }, [formData, baptismInfo.baptismStatus]);
 
   // Get progress bar color based on percentage
   const getProgressColor = (percentage: number) => {
@@ -250,8 +237,25 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
         gender: formData.gender as 'male' | 'female',
         zone: formData.zone as Zone,
         maritalStatus: formData.maritalStatus || undefined,
-        status: (baptismInfo.dateType === 'not_baptised' ? 'not baptised' : 'new') as MemberStatus, // Auto-evaluate next steps
-        baptismInfo: baptismInfo.dateType === 'not_baptised' ? { dateType: 'not_baptised' } : baptismInfo,
+        status: (baptismInfo.baptismStatus === 'not_baptised' ? 'not baptised' : 'new') as MemberStatus, // Auto-evaluate next steps
+        baptismInfo: (() => {
+          if (baptismInfo.baptismStatus === 'not_baptised') return { baptismStatus: 'not_baptised' };
+          const sanitized = { ...baptismInfo };
+          if (sanitized.dateType === 'forgotten') {
+            sanitized.fullDate = '';
+            sanitized.month = '';
+            sanitized.year = '';
+          } else if (sanitized.dateType === 'yearOnly') {
+            sanitized.fullDate = '';
+            sanitized.month = '';
+          } else if (sanitized.dateType === 'monthYear') {
+            sanitized.fullDate = '';
+          } else if (sanitized.dateType === 'full') {
+            sanitized.month = '';
+            sanitized.year = '';
+          }
+          return sanitized;
+        })(),
         familyMembers,
         legalInfo,
         ministries: selectedMinistries,
@@ -398,7 +402,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
   const isValid = formData.firstName && formData.lastName && formData.phone &&
                   formData.gender && formData.dateOfBirth && formData.residenceLocation &&
-                  formData.zone && isBaptismDateFilled;
+                  formData.zone;
 
   // Section header component
   const SectionHeader = ({
@@ -796,31 +800,86 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
             <SectionHeader title="Baptism & Ministry" icon={Droplets} isOpen={sectionsOpen.baptism} hasRequired status={getSectionStatus('baptism')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
-                <div className="space-y-2">
-                  <Label>Baptism Date Precision</Label>
-                  <RadioGroup
-                    value={baptismInfo.dateType}
-                    onValueChange={(value: BaptismDateType) =>
-                      setBaptismInfo({ ...baptismInfo, dateType: value })
-                    }
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="full" id="full-date" />
-                      <Label htmlFor="full-date" className="font-normal">Full Date</Label>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Baptism Status</Label>
+                    <RadioGroup
+                      value={baptismInfo.baptismStatus}
+                      onValueChange={(value: BaptismStatus) => {
+                        if (value === 'not_baptised') {
+                          setBaptismInfo({
+                            ...baptismInfo,
+                            baptismStatus: 'not_baptised',
+                            dateType: undefined,
+                            fullDate: '',
+                            month: '',
+                            year: ''
+                          });
+                        } else {
+                          setBaptismInfo({
+                            ...baptismInfo,
+                            baptismStatus: 'baptised',
+                            dateType: 'full'
+                          });
+                        }
+                      }}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="baptised" id="status-baptised" />
+                        <Label htmlFor="status-baptised" className="font-normal">Baptised</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="not_baptised" id="status-not-baptised" />
+                        <Label htmlFor="status-not-baptised" className="font-normal">Not Baptised</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {baptismInfo.baptismStatus === 'baptised' && (
+                    <div className="space-y-2 border-l-2 border-muted pl-4">
+                      <Label>Baptism Date Precision</Label>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Date is optional. Select 'Forgotten / Not Known' if the date is not known.
+                      </p>
+                      <RadioGroup
+                        value={baptismInfo.dateType}
+                        onValueChange={(value: BaptismDateType) => {
+                          const updated = { ...baptismInfo, dateType: value };
+                          if (value === 'forgotten') {
+                            updated.fullDate = '';
+                            updated.month = '';
+                            updated.year = '';
+                          } else if (value === 'yearOnly') {
+                            updated.fullDate = '';
+                            updated.month = '';
+                          } else if (value === 'monthYear') {
+                            updated.fullDate = '';
+                          } else if (value === 'full') {
+                            updated.month = '';
+                            updated.year = '';
+                          }
+                          setBaptismInfo(updated);
+                        }}
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="full" id="full-date" />
+                          <Label htmlFor="full-date" className="font-normal">Full Date</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="monthYear" id="month-year" />
+                          <Label htmlFor="month-year" className="font-normal">Month & Year Only</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="yearOnly" id="year-only" />
+                          <Label htmlFor="year-only" className="font-normal">Year Only</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="forgotten" id="forgotten" />
+                          <Label htmlFor="forgotten" className="font-normal">Forgotten / Not Known</Label>
+                        </div>
+                      </RadioGroup>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="monthYear" id="month-year" />
-                      <Label htmlFor="month-year" className="font-normal">Month & Year Only</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="yearOnly" id="year-only" />
-                      <Label htmlFor="year-only" className="font-normal">Year Only</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="not_baptised" id="not-baptised" />
-                      <Label htmlFor="not-baptised" className="font-normal">Not Baptised</Label>
-                    </div>
-                  </RadioGroup>
+                  )}
                 </div>
 
                 {baptismInfo.dateType === 'full' && (
