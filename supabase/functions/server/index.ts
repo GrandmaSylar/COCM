@@ -26,7 +26,7 @@ function createAuthClient() {
   });
 }
 // Create Supabase client for auth operations
-function getSupabaseClient(accessToken) {
+function getSupabaseClient(accessToken?: string) {
   if (accessToken) {
     return createClient(supabaseUrl || 'https://missing-url.supabase.co', anonKey || 'missing-key', {
       global: {
@@ -39,7 +39,7 @@ function getSupabaseClient(accessToken) {
   return supabase;
 }
 // Helper to get user from token
-async function getUserFromToken(request) {
+async function getUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader) {
     return null;
@@ -77,7 +77,7 @@ async function checkPermission(userId: string, permission: string): Promise<bool
     }
   }
 
-  if (!SYSTEM_ROLES.includes(profile.role as any)) {
+  if (!SYSTEM_ROLES.includes(profile.role as typeof SYSTEM_ROLES[number])) {
     const { data: customRole } = await supabase
       .from('custom_roles')
       .select('permissions')
@@ -105,36 +105,38 @@ async function checkPermission(userId: string, permission: string): Promise<bool
   return false;
 }
 // Helper to convert camelCase to snake_case
-function toSnakeCase(obj) {
+function toSnakeCase(obj: unknown): unknown {
   if (Array.isArray(obj)) {
-    return obj.map((item)=>toSnakeCase(item));
+    return obj.map((item: unknown) => toSnakeCase(item));
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.keys(obj).reduce((acc, key)=>{
+    const record = obj as Record<string, unknown>;
+    return Object.keys(record).reduce((acc: Record<string, unknown>, key: string) => {
       const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
-      acc[snakeKey] = toSnakeCase(obj[key]);
+      acc[snakeKey] = toSnakeCase(record[key]);
       return acc;
-    }, {});
+    }, {} as Record<string, unknown>);
   }
   return obj;
 }
 // Helper to convert snake_case to camelCase
-function toCamelCase(obj) {
+function toCamelCase(obj: unknown): unknown {
   if (Array.isArray(obj)) {
-    return obj.map((item)=>toCamelCase(item));
+    return obj.map((item: unknown) => toCamelCase(item));
   }
   if (obj !== null && typeof obj === 'object') {
-    return Object.keys(obj).reduce((acc, key)=>{
-      let camelKey = key.replace(/_([a-z])/g, (_, letter)=>letter.toUpperCase());
+    const record = obj as Record<string, unknown>;
+    return Object.keys(record).reduce((acc: Record<string, unknown>, key: string) => {
+      let camelKey = key.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase());
 
       // Handle special field mappings (photo_url -> photo)
       if (camelKey === 'photoUrl') {
         camelKey = 'photo';
       }
 
-      acc[camelKey] = toCamelCase(obj[key]);
+      acc[camelKey] = toCamelCase(record[key]);
       return acc;
-    }, {});
+    }, {} as Record<string, unknown>);
   }
   return obj;
 }
@@ -592,7 +594,7 @@ app.get('/custom-roles', async (c) => {
       const users = usersByRole[r.name] || [];
       const creator = profiles?.find(p => p.id === r.created_by);
       return {
-        ...toCamelCase(r),
+        ...(toCamelCase(r) as Record<string, unknown>),
         createdByName: creator?.name || 'System',
         userCount: users.length,
         users
@@ -600,7 +602,7 @@ app.get('/custom-roles', async (c) => {
     });
 
     return c.json(result);
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -653,7 +655,7 @@ app.post('/custom-roles', async (c) => {
     });
 
     return c.json(toCamelCase(inserted), 201);
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -710,7 +712,7 @@ app.put('/custom-roles/:id', async (c) => {
     });
 
     return c.json(toCamelCase(updated));
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -728,10 +730,10 @@ app.delete('/custom-roles/:id', async (c) => {
 
     const roleName = roleToDelete.name;
 
-    let body: any = null;
+    let body: { reassignments?: Array<{ userId: string; newRole: string }> } | null = null;
     try {
       body = await c.req.json();
-    } catch (err) {
+    } catch (_err) {
       body = null;
     }
 
@@ -797,7 +799,7 @@ app.delete('/custom-roles/:id', async (c) => {
     });
 
     return c.json({ deleted: true, reassigned: 0 });
-  } catch (e) {
+  } catch (_e) {
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
@@ -956,7 +958,7 @@ app.post("/auth/signup", async (c)=>{
   } catch (error) {
     console.error('Signup error:', error);
     return c.json({
-      error: 'Internal server error during signup: ' + error.message
+      error: 'Internal server error during signup: ' + (error instanceof Error ? error.message : String(error))
     }, 500);
   }
 });
@@ -1075,8 +1077,7 @@ app.post("/auth/signin", async (c)=>{
     const requiresDeviceOtp = !profile.active_device_id || profile.active_device_id !== deviceId;
 
     // Check if 2FA is strictly enabled, or if it's a new device
-    // TEMPORARILY DISABLED 2FA TO UNBLOCK LOGIN
-    if (false && (requiresDeviceOtp || (profile.two_fa_method && profile.two_fa_method !== 'none'))) {
+    if (requiresDeviceOtp || (profile.two_fa_method && profile.two_fa_method !== 'none')) {
       const tempToken = crypto.randomUUID();
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
@@ -1096,7 +1097,7 @@ app.post("/auth/signin", async (c)=>{
 
       if (otpError) {
         console.error('Error storing OTP:', otpError);
-        return c.json({ error: 'Failed to initiate verification: ' + otpError.message }, 500);
+        return c.json({ error: 'Failed to initiate verification: ' + otpError?.message }, 500);
       }
 
       // Return 2FA required response (NO session returned)
@@ -1893,8 +1894,8 @@ app.get("/members/:id/analytics", async (c)=>{
     const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
     const allRecords = attendanceEntries
-      .map(entry => entry.attendance_record)
-      .filter(record => record !== null);
+      .map(entry => Array.isArray(entry.attendance_record) ? entry.attendance_record[0] : entry.attendance_record)
+      .filter((record: any) => record !== null && record !== undefined);
 
     const thisMonthRecords = allRecords.filter(record => {
       const recordDate = new Date(record.date);
@@ -2075,7 +2076,7 @@ app.post("/members", async (c)=>{
     const memberData = await c.req.json();
     const { familyMembers, ...memberInfo } = memberData;
     // Convert camelCase to snake_case for database
-    const dbMemberData = toSnakeCase(memberInfo);
+    const dbMemberData = toSnakeCase(memberInfo) as Record<string, any>;
 
     // Handle special field mappings (photo -> photo_url)
     if (dbMemberData.photo !== undefined) {
@@ -2106,7 +2107,7 @@ app.post("/members", async (c)=>{
     if (familyMembers && familyMembers.length > 0) {
       // Convert family members to snake_case
       const familyMembersData = familyMembers.map((fm: any) => {
-        const snakeFm = toSnakeCase(fm);
+        const snakeFm = toSnakeCase(fm) as Record<string, any>;
         // Remove the temp id and ensure member_id is set
         const { id: _tempId, ...rest } = snakeFm;
         return {
@@ -2162,7 +2163,7 @@ app.put("/members/:id", async (c)=>{
     const { familyMembers, ...memberInfo } = memberData;
 
     // Convert camelCase to snake_case for database
-    const dbMemberData = toSnakeCase(memberInfo);
+    const dbMemberData = toSnakeCase(memberInfo) as Record<string, any>;
 
     // Handle special field mappings (photo -> photo_url)
     if (dbMemberData.photo !== undefined) {
@@ -2178,7 +2179,7 @@ app.put("/members/:id", async (c)=>{
       'baptism_info', 'legal_info', 'ministries', 'position_held',
       'sabbatical_start_date', 'sabbatical_end_date', 'sabbatical_reason'
     ];
-    const updatePayload = {};
+    const updatePayload: Record<string, any> = {};
     for (const key of allowedColumns) {
       if (dbMemberData[key] !== undefined) {
         updatePayload[key] = dbMemberData[key];
@@ -2215,7 +2216,7 @@ app.put("/members/:id", async (c)=>{
       await supabase.from('family_members').delete().eq('member_id', id);
       if (familyMembers.length > 0) {
         const familyMembersData = familyMembers.map((fm: any) => {
-          const snakeFm = toSnakeCase(fm);
+          const snakeFm = toSnakeCase(fm) as Record<string, any>;
           // Remove the temp/old id and ensure member_id is set
           const { id: _tempId, ...rest } = snakeFm;
           return {
@@ -2314,8 +2315,8 @@ app.get("/attendance", async (c)=>{
       }, 500);
     }
     const transformed = records.map((record)=>{
-        const attendees = (record.attendance_entries || []).map((entry)=>entry.member_id);
-        const camelRecord = toCamelCase(record);
+        const attendees = (record.attendance_entries || []).map((entry: any)=>entry.member_id);
+        const camelRecord = toCamelCase(record) as Record<string, any>;
         return {
           ...camelRecord,
           attendees
@@ -2351,7 +2352,7 @@ app.post("/attendance", async (c)=>{
       .eq('attendance_type', recordType)
       .single();
 
-    let record;
+    let record: any;
     if (existingRecord) {
       // Update the existing record instead of creating a duplicate
       const { data: updated, error: updateError } = await supabase.from('attendance_records').update({
@@ -2377,7 +2378,7 @@ app.post("/attendance", async (c)=>{
       if (recordType === 'individual') {
         await supabase.from('attendance_entries').delete().eq('attendance_record_id', record.id);
         if (attendees && attendees.length > 0) {
-          const entries = attendees.map((memberId)=>({
+          const entries = attendees.map((memberId: string)=>({
               attendance_record_id: record.id,
               member_id: memberId
             }));
@@ -2411,7 +2412,7 @@ app.post("/attendance", async (c)=>{
 
       // Only create attendance entries for individual records
       if (recordType === 'individual' && attendees && attendees.length > 0) {
-        const entries = attendees.map((memberId)=>({
+        const entries = attendees.map((memberId: string)=>({
             attendance_record_id: record.id,
             member_id: memberId
           }));
@@ -2497,8 +2498,8 @@ app.get("/attendance/:id", async (c)=>{
       }
       return c.json({ error: 'Failed to fetch attendance record' }, 500);
     }
-    const attendees = (record.attendance_entries || []).map((entry) => entry.member_id);
-    const camelRecord = toCamelCase(record);
+    const attendees = (record.attendance_entries || []).map((entry: { member_id: string }) => entry.member_id);
+    const camelRecord = toCamelCase(record) as Record<string, any>;
     return c.json({ ...camelRecord, attendees });
   } catch (error) {
     console.error('Get attendance by id error:', error);
@@ -2566,7 +2567,7 @@ app.put("/attendance/:id", async (c)=>{
     if (existingRecord?.attendance_type === 'individual' && attendees) {
       await supabase.from('attendance_entries').delete().eq('attendance_record_id', id);
       if (attendees.length > 0) {
-        const entries = attendees.map((memberId)=>({
+        const entries = attendees.map((memberId: string)=>({
             attendance_record_id: id,
             member_id: memberId
           }));
@@ -3300,7 +3301,7 @@ app.get("/giving/types", async (c)=>{
     const transformed = types.map(type => {
       const creator = type.created_by ? profilesMap[type.created_by] : null;
       return {
-        ...toCamelCase(type),
+        ...(toCamelCase(type) as Record<string, unknown>),
         createdBy: creator ? creator.name : null,
         createdByEmail: creator ? creator.email : null
       };
@@ -3939,8 +3940,8 @@ app.get("/reports", async (c)=>{
     const startDateStr = startDate.toISOString().split('T')[0];
 
     // ── Prepare queries based on scope ──
-    const mainPromises: Promise<any>[] = [];
-    const childrenPromises: Promise<any>[] = [];
+    const mainPromises: PromiseLike<any>[] = [];
+    const childrenPromises: PromiseLike<any>[] = [];
 
     if (scope === 'main' || scope === 'all') {
       mainPromises.push(
@@ -3968,7 +3969,7 @@ app.get("/reports", async (c)=>{
     // ── Merge data sources ──
     let generalAttendance = mainResults[0]?.data || [];
     let allAttendance = mainResults[1]?.data || [];
-    let individualAttendance = mainResults[2]?.data || [];
+    let _individualAttendance = mainResults[2]?.data || [];
     let givingRecordsFull = mainResults[3]?.data || [];
     let allMembers = mainResults[4]?.data || [];
     let visitors = mainResults[5]?.data || [];
@@ -3986,7 +3987,7 @@ app.get("/reports", async (c)=>{
       if (scope === 'children') {
         generalAttendance = mappedChildrenAttendance;
         allAttendance = mappedChildrenAttendance;
-        individualAttendance = [];
+        _individualAttendance = [];
       } else {
         generalAttendance = [...generalAttendance, ...mappedChildrenAttendance];
         allAttendance = [...allAttendance, ...mappedChildrenAttendance];
@@ -4442,7 +4443,7 @@ app.get("/users", async (c)=>{
     }
 
     const usersWithTabs = (users || []).map((u: any) => ({
-      ...toCamelCase(u),
+      ...(toCamelCase(u) as Record<string, unknown>),
       tabAccess: tabAccessMap[u.id] || []
     }));
 
@@ -5495,7 +5496,7 @@ app.get("/service-records/by-date/:date", async (c) => {
       }
 
       services.push({
-        ...toCamelCase(sr),
+        ...(toCamelCase(sr) as Record<string, unknown>),
         attendance,
         giving,
         attendees,
@@ -5506,8 +5507,8 @@ app.get("/service-records/by-date/:date", async (c) => {
     // Combine totals across all services for this date
     let totalAttendance = 0;
     let totalGivingAmount = 0;
-    let allAttendees: any[] = [];
-    let allAbsentees: any[] = [];
+    const allAttendees: any[] = [];
+    const allAbsentees: any[] = [];
     const seenAttendeeIds = new Set<string>();
     const seenAbsenteeIds = new Set<string>();
 
@@ -5590,7 +5591,7 @@ app.get("/service-records/by-date/:date", async (c) => {
     }
 
     const childrenAttendance = (childrenAttendanceData || []).map((r: any) => ({
-      ...toCamelCase(r),
+      ...(toCamelCase(r) as Record<string, unknown>),
       entries: childrenAttendanceMap[r.id] || []
     }));
 
@@ -5644,7 +5645,7 @@ app.get("/service-records/by-date/:date", async (c) => {
       attendees: allAttendees,
       absentees: allAbsentees,
       visitors: (visitors || []).map((v: any) => toCamelCase(v)),
-      newMembers: (newMembers || []).map((m: any) => toCamelCase(m)),
+      newMembers: (newMembers || []).map((m: Record<string, unknown>) => toCamelCase(m)),
       childrenGiving: (childrenGivingData || []).map((r: any) => toCamelCase(r)),
       childrenAttendance,
       childrenVisitors: (childrenVisitorsData || []).map((r: any) => toCamelCase(r)),
@@ -5722,13 +5723,13 @@ app.get("/service-records/:id", async (c) => {
         giving = giv ? toCamelCase(giv) : null;
       }
 
-      services.push({ ...toCamelCase(rec), attendance, giving, attendees, absentees });
+      services.push({ ...(toCamelCase(rec) as Record<string, unknown>), attendance, giving, attendees, absentees });
     }
 
     let totalAttendance = 0;
     let totalGivingAmount = 0;
-    let allAttendees: any[] = [];
-    let allAbsentees: any[] = [];
+    const allAttendees: any[] = [];
+    const allAbsentees: any[] = [];
     const seenAttendeeIds = new Set<string>();
     const seenAbsenteeIds = new Set<string>();
 
@@ -5870,6 +5871,7 @@ app.get("/activity-log/export", async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+    const userRole = profile?.role || 'viewer';
 
     const userId = c.req.query('userId');
     const action = c.req.query('action');
@@ -6553,7 +6555,7 @@ app.post("/backups", async (c) => {
       };
 
       // Helper function to fetch all records with pagination (Supabase default limit is 1000)
-      async function fetchAllRecords(tableName: string, selectFields: string, filterDate?: string) {
+      const fetchAllRecords = async (tableName: string, selectFields: string, filterDate?: string) => {
         const allRecords: any[] = [];
         const pageSize = 1000;
         let offset = 0;
@@ -6659,7 +6661,7 @@ app.post("/backups", async (c) => {
         .from('backup_history')
         .update({
           status: 'failed',
-          error_message: backupError.message || 'Unknown error during backup'
+          error_message: backupError instanceof Error ? backupError.message : 'Unknown error during backup'
         })
         .eq('id', backupRecord.id);
 
@@ -6880,10 +6882,11 @@ app.post("/backups/restore", async (c) => {
 
       } catch (tableError) {
         console.error(`Error processing ${tableName}:`, tableError);
-        results.tables[tableName] = { error: tableError.message };
+        const tableErrMsg = tableError instanceof Error ? tableError.message : 'Unknown error';
+        results.tables[tableName] = { error: tableErrMsg };
         
         if (restoreFailureMode === 'atomic') {
-          return c.json({ error: tableError.message, failedTable: tableName, results }, 400);
+          return c.json({ error: tableErrMsg, failedTable: tableName, results }, 400);
         }
       }
     }
@@ -7038,7 +7041,7 @@ app.get('/children/members', async (c) => {
         parentsMap[p.child_member_id].push(toCamelCase(p));
       }
     }
-    return c.json((data || []).map((m: any) => ({ ...toCamelCase(m), parents: parentsMap[m.id] || [] })));
+    return c.json((data || []).map((m: any) => ({ ...(toCamelCase(m) as Record<string, unknown>), parents: parentsMap[m.id] || [] })));
   } catch (e) { console.error('GET /children/members error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -7055,7 +7058,7 @@ app.get('/children/members/:id', async (c) => {
     }
     if (!data) return c.json({ error: 'Child member not found' }, 404);
     const parents = await supabase.from('children_member_parents').select('*').eq('child_member_id', id);
-    return c.json({ ...toCamelCase(data), parents: (parents.data || []).map((p: any) => toCamelCase(p)) });
+    return c.json({ ...(toCamelCase(data) as Record<string, unknown>), parents: (parents.data || []).map((p: any) => toCamelCase(p)) });
   } catch (e) { console.error('GET /children/members/:id error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -7240,7 +7243,7 @@ app.post('/children/members', async (c) => {
 
     // Extract parents and photo before toSnakeCase
     const { parents, photo, ...memberInfo } = body;
-    const dbData = toSnakeCase(memberInfo);
+    const dbData = toSnakeCase(memberInfo) as Record<string, any>;
 
     // Handle special field mappings (photo -> photo_url)
     if (dbData.photo !== undefined) {
@@ -7280,7 +7283,7 @@ app.post('/children/members', async (c) => {
     // Save parents
     if (parents && parents.length > 0) {
       const parentRows = parents.map((p: any) => {
-        const snakeP = toSnakeCase(p);
+        const snakeP = toSnakeCase(p) as Record<string, unknown>;
         const { id: _tempId, ...rest } = snakeP;
         return {
           ...rest,
@@ -7326,7 +7329,7 @@ app.put('/children/members/:id', async (c) => {
 
     // Extract parents and photo before toSnakeCase
     const { parents, photo, ...memberInfo } = body;
-    const dbData = toSnakeCase(memberInfo);
+    const dbData = toSnakeCase(memberInfo) as Record<string, any>;
 
     // Handle special field mappings (photo -> photo_url)
     if (dbData.photo !== undefined) {
@@ -7361,7 +7364,7 @@ app.put('/children/members/:id', async (c) => {
       await supabase.from('children_member_parents').delete().eq('child_member_id', id);
       if (parents.length > 0) {
         const parentRows = parents.map((p: any) => {
-          const snakeP = toSnakeCase(p);
+          const snakeP = toSnakeCase(p) as Record<string, unknown>;
           const { id: _tempId, ...rest } = snakeP;
           return {
             ...rest,
@@ -7434,7 +7437,7 @@ app.get('/children/visitors', async (c) => {
       return c.json({ error: 'Failed to fetch children visitors' }, 500);
     }
     return c.json((data || []).map((v: any) => {
-      const camelV = toCamelCase(v);
+      const camelV = toCamelCase(v) as Record<string, unknown>;
       if (camelV.childrenVisitorGuardians) {
         camelV.guardians = camelV.childrenVisitorGuardians;
         delete camelV.childrenVisitorGuardians;
@@ -7509,7 +7512,7 @@ app.post('/children/visitors', async (c) => {
       description: `Added child visitor: ${body.firstName} ${body.lastName}`
     });
 
-    const result = toCamelCase(data);
+    const result = toCamelCase(data) as Record<string, unknown>;
     result.guardians = guardiansData ? guardiansData.map((g: any) => toCamelCase(g)) : [];
     return c.json(result, 201);
   } catch (e) { console.error('POST /children/visitors error:', e); return c.json({ error: 'Internal server error' }, 500); }
@@ -7594,7 +7597,7 @@ app.put('/children/visitors/:id', async (c) => {
       description: `Updated child visitor: ${body.firstName} ${body.lastName}`
     });
 
-    const result = toCamelCase(data);
+    const result = toCamelCase(data) as Record<string, unknown>;
     result.guardians = guardiansData ? guardiansData.map((g: any) => toCamelCase(g)) : [];
     return c.json(result);
   } catch (e) { console.error('PUT /children/visitors/:id error:', e); return c.json({ error: 'Internal server error' }, 500); }
@@ -7634,7 +7637,7 @@ app.get('/children/attendance/:id', async (c) => {
     const entries = await supabase.from('children_attendance_entries')
       .select('*, children_members(first_name, last_name)')
       .eq('attendance_record_id', id);
-    return c.json({ ...toCamelCase(data), entries: (entries.data || []).map((e: any) => toCamelCase(e)) });
+    return c.json({ ...(toCamelCase(data) as Record<string, unknown>), entries: (entries.data || []).map((e: any) => toCamelCase(e)) });
   } catch (e) { console.error('GET /children/attendance/:id error:', e); return c.json({ error: 'Internal server error' }, 500); }
 });
 
@@ -7977,6 +7980,7 @@ app.get('/children/analytics', async (c) => {
     const visitorConversion = { total: visitors.length, converted: convertedCount };
 
     // 8. baptismStats
+    const baptisedCount = members.filter(m => m.status !== 'not baptised').length;
     const baptismStats = { baptised: baptisedCount, notBaptised: totalMembers - baptisedCount };
 
     // 9. ageOutAlerts
@@ -8145,7 +8149,7 @@ app.post('/expenses', async (c) => {
 
     const rawBody = await c.req.json();
     // Accept camelCase payloads and normalize to snake_case
-    const body = toSnakeCase(rawBody);
+    const body = toSnakeCase(rawBody) as Record<string, any>;
     const { form_id, details, service_date, service_type, amount, payment_method_name } = body;
     
     if (!form_id || !details || !service_date || !service_type || amount === undefined || !payment_method_name) {
@@ -8195,7 +8199,7 @@ app.put('/expenses/:id', async (c) => {
     const id = c.req.param('id');
     const rawBody = await c.req.json();
     // Accept camelCase payloads and normalize to snake_case
-    const body = toSnakeCase(rawBody);
+    const body = toSnakeCase(rawBody) as Record<string, any>;
     
     const { data: existing, error: getErr } = await supabase.from('expense_records').select('form_id').eq('id', id).single();
     if (getErr || !existing) return c.json({ error: 'Record not found' }, 404);
