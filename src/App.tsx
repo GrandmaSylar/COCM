@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { AuthProvider, useAuth, TwoFAData } from './components/AuthContext';
 import { ThemeProvider } from './components/ThemeContext';
 import { Login } from './components/Login';
@@ -1079,6 +1080,7 @@ export default function App() {
               <AppContent />
               <TutorialOverlay />
               <Toaster position="top-right" />
+              <SpeedInsights />
             </div>
           </TutorialProvider>
         </AuthProvider>
