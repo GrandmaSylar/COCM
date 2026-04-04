@@ -344,6 +344,160 @@ async function getProfileForLog(userId: string) {
 }
 
 // ============================================================================
+// INVERSE LINK RECONCILIATION
+// ============================================================================
+function inverseOf(relationship: string, gender: string | null): string {
+  const map: Record<string, string> = {
+    'father': 'child',
+    'mother': 'child',
+    'sibling': 'sibling',
+    'spouse': 'spouse'
+  };
+  if (relationship === 'child') {
+    if (gender === 'male') return 'father';
+    if (gender === 'female') return 'mother';
+    return 'parent';
+  }
+  return map[relationship] || relationship; // fallback
+}
+
+async function applyInverseLinks(params: {
+  currentMemberId: string,
+  currentPool: 'members' | 'children_members',
+  currentGender: string | null,
+  currentFirstName: string,
+  currentLastName: string,
+  previousLinkedEntries: any[],
+  newLinkedEntries: any[],
+}) {
+  const { currentMemberId, currentPool, currentGender, currentFirstName, currentLastName, previousLinkedEntries, newLinkedEntries } = params;
+  
+  // Build maps keyed by linked id
+  const prevMap = new Map();
+  for (const entry of previousLinkedEntries) {
+    const id = entry.linked_member_id || entry.linked_child_member_id;
+    if (id) prevMap.set(id, entry);
+  }
+
+  const newMap = new Map();
+  for (const entry of newLinkedEntries) {
+    const id = entry.linkedMemberId || entry.linkedChildMemberId;
+    if (id) newMap.set(id, entry);
+  }
+
+  const removedKeys = Array.from(prevMap.keys()).filter(k => !newMap.has(k));
+  const addedKeys = Array.from(newMap.keys()).filter(k => !prevMap.has(k));
+  const changedKeys = Array.from(prevMap.keys()).filter(k => {
+    const newVal = newMap.get(k);
+    return newVal && newVal.relationship !== prevMap.get(k).relationship;
+  });
+
+  // Handle Removals
+  for (const id of removedKeys) {
+    const entry = prevMap.get(id);
+    if (currentPool === 'members') {
+      if (entry.linked_member_id) {
+        await supabase.from('family_members')
+          .delete()
+          .eq('member_id', id)
+          .eq('linked_member_id', currentMemberId);
+      } else if (entry.linked_child_member_id) {
+        await supabase.from('children_member_parents')
+          .delete()
+          .eq('child_member_id', entry.linked_child_member_id)
+          .eq('linked_member_id', currentMemberId);
+      }
+    } else if (currentPool === 'children_members') {
+      if (entry.linked_member_id) {
+        await supabase.from('family_members')
+          .delete()
+          .eq('member_id', entry.linked_member_id)
+          .eq('linked_child_member_id', currentMemberId);
+      } else if (entry.linked_child_member_id) {
+        // Disabled child->child inverse removal due to lack of source-child identifier schema support
+      }
+    }
+  }
+
+  // Handle Changed
+  for (const id of changedKeys) {
+    const entry = prevMap.get(id);
+    if (currentPool === 'members') {
+      if (entry.linked_member_id) {
+        await supabase.from('family_members').delete().eq('member_id', id).eq('linked_member_id', currentMemberId);
+      } else if (entry.linked_child_member_id) {
+        await supabase.from('children_member_parents').delete().eq('child_member_id', entry.linked_child_member_id).eq('linked_member_id', currentMemberId);
+      }
+    } else if (currentPool === 'children_members') {
+      if (entry.linked_member_id) {
+        await supabase.from('family_members').delete().eq('member_id', entry.linked_member_id).eq('linked_child_member_id', currentMemberId);
+      } else if (entry.linked_child_member_id) {
+        // Disabled child->child inverse update due to lack of source-child identifier schema support
+      }
+    }
+  }
+
+  const entriesToInsert = [...addedKeys, ...changedKeys].map(id => newMap.get(id));
+
+  for (const entry of entriesToInsert) {
+    if (currentPool === 'members') {
+      // Skip inverse insert when relationship is 'child' but gender is unknown
+      // — inverseOf('child', null) returns 'parent' which is not a valid UI relationship
+      if (entry.relationship === 'child' && !currentGender) {
+        continue;
+      }
+      if (entry.linkedMemberId) {
+        const { data: existingReverse } = await supabase.from('family_members')
+          .select('id').eq('member_id', entry.linkedMemberId).eq('linked_member_id', currentMemberId);
+        if (!existingReverse?.length) {
+          await supabase.from('family_members').insert({
+            member_id: entry.linkedMemberId,
+            relationship: inverseOf(entry.relationship, currentGender),
+            linked_member_id: currentMemberId,
+            is_linked: true,
+            first_name: currentFirstName,
+            last_name: currentLastName,
+            other_names: null,
+            phone: null
+          });
+        }
+      } else if (entry.linkedChildMemberId) {
+        const { data: existing } = await supabase.from('children_member_parents')
+          .select('id').eq('child_member_id', entry.linkedChildMemberId).eq('linked_member_id', currentMemberId);
+        if (!existing?.length) {
+          await supabase.from('children_member_parents').insert({
+            child_member_id: entry.linkedChildMemberId,
+            relationship: inverseOf(entry.relationship, currentGender),
+            linked_member_id: currentMemberId,
+            is_linked: true,
+            first_name: currentFirstName,
+            last_name: currentLastName
+          });
+        }
+      }
+    } else if (currentPool === 'children_members') {
+      if (entry.linkedMemberId) {
+        const { data: existing } = await supabase.from('family_members')
+          .select('id').eq('member_id', entry.linkedMemberId).eq('linked_child_member_id', currentMemberId);
+        if (!existing?.length) {
+          await supabase.from('family_members').insert({
+            member_id: entry.linkedMemberId,
+            relationship: 'child',
+            linked_child_member_id: currentMemberId,
+            linked_member_id: null,
+            is_linked: true,
+            first_name: currentFirstName,
+            last_name: currentLastName
+          });
+        }
+      } else if (entry.linkedChildMemberId) {
+        // Disabled child->child inverse insert due to lack of source-child identifier schema support
+      }
+    }
+  }
+}
+
+// ============================================================================
 // NOTIFICATION HELPERS
 // ============================================================================
 async function createNotification(opts: {
@@ -2105,6 +2259,15 @@ app.post("/members", async (c)=>{
         error: 'Failed to create member: ' + memberError.message
       }, 500);
     }
+    await applyInverseLinks({
+      currentMemberId: member.id,
+      currentPool: 'members',
+      currentGender: dbMemberData.gender ?? null,
+      currentFirstName: dbMemberData.first_name,
+      currentLastName: dbMemberData.last_name,
+      previousLinkedEntries: [],
+      newLinkedEntries: familyMembers ?? [],
+    });
     if (familyMembers && familyMembers.length > 0) {
       // Convert family members to snake_case
       const familyMembersData = familyMembers.map((fm: any) => {
@@ -2214,6 +2377,21 @@ app.put("/members/:id", async (c)=>{
       }, 500);
     }
     if (familyMembers) {
+      const { data: previousFamilyRows } = await supabase
+        .from('family_members')
+        .select('*')
+        .eq('member_id', id);
+
+      await applyInverseLinks({
+        currentMemberId: id,
+        currentPool: 'members',
+        currentGender: member.gender ?? null,
+        currentFirstName: member.first_name,
+        currentLastName: member.last_name,
+        previousLinkedEntries: (previousFamilyRows ?? []).filter((r: any) => r.is_linked),
+        newLinkedEntries: familyMembers,
+      });
+
       await supabase.from('family_members').delete().eq('member_id', id);
       if (familyMembers.length > 0) {
         const familyMembersData = familyMembers.map((fm: any) => {
@@ -2232,6 +2410,7 @@ app.put("/members/:id", async (c)=>{
         }
       }
     }
+
     const { data: completeMember } = await supabase.from('members').select(`
         *,
         family_members!family_members_member_id_fkey (*)
@@ -2266,7 +2445,8 @@ app.delete("/members/:id", async (c)=>{
     // Get member name before deleting
     const { data: memberToDelete } = await supabase.from('members').select('first_name, last_name').eq('id', id).single();
 
-    const { error } = await supabase.from('members').delete().eq('id', id);
+    // Clean up inverse links and delete member atomically using RPC
+    const { error } = await supabase.rpc('delete_member_txn', { target_member_id: id });
     if (error) {
       console.error('Error deleting member:', error);
       return c.json({
@@ -7294,6 +7474,16 @@ app.post('/children/members', async (c) => {
       await supabase.from('children_member_parents').insert(parentRows);
     }
 
+    await applyInverseLinks({
+      currentMemberId: data.id,
+      currentPool: 'children_members',
+      currentGender: data.gender ?? null,
+      currentFirstName: data.first_name,
+      currentLastName: data.last_name,
+      previousLinkedEntries: [],
+      newLinkedEntries: parents ?? [],
+    });
+
     const prof = await getProfileForLog(user.id);
     await logActivity({ userId: user.id, userName: prof.name, userRole: prof.role,
       action: 'create', entityType: 'child_member', entityId: data.id,
@@ -7362,6 +7552,11 @@ app.put('/children/members/:id', async (c) => {
     }
 
     if (parents) {
+      const { data: previousParentRows } = await supabase
+        .from('children_member_parents')
+        .select('*')
+        .eq('child_member_id', id);
+
       await supabase.from('children_member_parents').delete().eq('child_member_id', id);
       if (parents.length > 0) {
         const parentRows = parents.map((p: any) => {
@@ -7374,6 +7569,16 @@ app.put('/children/members/:id', async (c) => {
         });
         await supabase.from('children_member_parents').insert(parentRows);
       }
+
+      await applyInverseLinks({
+        currentMemberId: id,
+        currentPool: 'children_members',
+        currentGender: data.gender ?? null,
+        currentFirstName: data.first_name,
+        currentLastName: data.last_name,
+        previousLinkedEntries: (previousParentRows ?? []).filter((r: any) => r.is_linked),
+        newLinkedEntries: parents,
+      });
     }
 
     // Log activity
@@ -7402,6 +7607,12 @@ app.delete('/children/members/:id', async (c) => {
     // Get child member name before deleting
     const { data: childToDelete } = await supabase.from('children_members')
       .select('first_name, last_name').eq('id', id).single();
+
+    const { error: cleanupError } = await supabase.from('family_members').delete().eq('linked_child_member_id', id);
+    if (cleanupError) {
+      console.error('Error deleting child member inverse links:', cleanupError);
+      return c.json({ error: cleanupError.message }, 500);
+    }
 
     const { error } = await supabase.from('children_members').delete().eq('id', id);
     if (error) {

@@ -11,7 +11,7 @@ import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 interface EditMemberProps {
   member: Member;
   onBack: () => void;
@@ -74,6 +74,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   );
   // Track search state per family member
   const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
 
   // Legal Info State
   const [legalInfo, setLegalInfo] = useState<LegalInfo>(
@@ -287,6 +288,11 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   };
 
   const removeFamilyMember = (id: string) => {
+    const memberToRemove = familyMembers.find(m => m.id === id);
+    if (memberToRemove?.isLinked) {
+      setPendingRemovalId(id);
+      return;
+    }
     setFamilyMembers(familyMembers.filter(m => m.id !== id));
   };
 
@@ -1227,6 +1233,34 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                 />
               </div>
             </div>
+
+            <AlertDialog open={!!pendingRemovalId} onOpenChange={(open: boolean) => !open && setPendingRemovalId(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove Family Member</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {(() => {
+                      const m = familyMembers.find(m => m.id === pendingRemovalId);
+                      return `Removing ${m?.firstName || ''} ${m?.lastName || ''} will also remove you from their family list. Are you sure?`;
+                    })()}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setPendingRemovalId(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-red-500 hover:bg-red-600 text-white"
+                    onClick={() => {
+                      if (pendingRemovalId) {
+                        setFamilyMembers(familyMembers.filter(m => m.id !== pendingRemovalId));
+                        setPendingRemovalId(null);
+                      }
+                    }}
+                  >
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-3 pt-6">

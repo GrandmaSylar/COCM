@@ -40,6 +40,13 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Sync local state when the parent passes a different member
+  // (e.g. clicking "View Profile" on a linked family member while already on member-profile page)
+  useEffect(() => {
+    setMember(initialMember);
+    setLoading(true);
+  }, [initialMember.id]);
+
   useEffect(() => {
     const fetchMemberData = async () => {
       try {

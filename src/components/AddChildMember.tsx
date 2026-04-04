@@ -11,7 +11,7 @@ import { Badge } from './ui/badge';
 import { api } from '../services/api';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import type { ChildMember, ChildParent, ChildVisitor } from './Children';
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 interface AddChildMemberProps {
   onBack: () => void;
   onSave: (child: Omit<ChildMember, 'id' | 'joinDate'>) => Promise<void>;
@@ -77,6 +77,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     }))
   );
   const [parentSearchStates, setParentSearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [ageError, setAgeError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -179,6 +180,11 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
   };
 
   const removeParent = (id: string) => {
+    const parentToRemove = parents.find(p => p.id === id);
+    if (parentToRemove?.isLinked) {
+      setPendingRemovalId(id);
+      return;
+    }
     setParents(parents.filter(p => p.id !== id));
   };
 
@@ -275,7 +281,6 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
         photo,
         gender: formData.gender as 'male' | 'female',
         ...(initialData ? { status: initialData.status } : { status: 'new' }),
-        ministries: ["Children's Ministry"],
         parents: parents.map((p) => ({
           id: p.id,
           firstName: p.firstName,
@@ -842,6 +847,34 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
             </CollapsibleContent>
           </Collapsible>
         </Card>
+
+        <AlertDialog open={!!pendingRemovalId} onOpenChange={(open: boolean) => !open && setPendingRemovalId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove Family Member</AlertDialogTitle>
+              <AlertDialogDescription>
+                {(() => {
+                  const p = parents.find(p => p.id === pendingRemovalId);
+                  return `Removing ${p?.firstName || ''} ${p?.lastName || ''} will also remove you from their family list. Are you sure?`;
+                })()}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingRemovalId(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-red-500 hover:bg-red-600 text-white"
+                onClick={() => {
+                  if (pendingRemovalId) {
+                    setParents(parents.filter(p => p.id !== pendingRemovalId));
+                    setPendingRemovalId(null);
+                  }
+                }}
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2 sticky bottom-0 bg-background pb-4">

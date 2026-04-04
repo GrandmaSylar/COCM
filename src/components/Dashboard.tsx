@@ -123,7 +123,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   ];
 
   const filteredQuickActions = quickActions.filter(action =>
-    canAccess(action.permission) && hasTabAccess(action.tab)
+    isWidgetVisible('widget_quick_actions') && canAccess(action.permission) && hasTabAccess(action.tab)
   );
 
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
@@ -236,62 +236,122 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       <div id="dashboard-stats" className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children">
         {/* Members Card */}
         {isWidgetVisible('widget_total_members') && (
-        <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-1">
-            <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-24 h-24 text-blue-600" />
-            </div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
-                    <Users className="w-6 h-6" />
+          hasTabAccess('members') ? (
+            <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+                    <Users className="w-24 h-24 text-blue-600" />
                 </div>
-                <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                    {stats.totalMembers}
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                        {stats.totalMembers}
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Total Members</div>
+                    {stats.newMembersThisMonth > 0 && (
+                      <div className="mt-3 inline-flex items-center text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                        <TrendingUp className="w-3 h-3 mr-1" />
+                        +{stats.newMembersThisMonth} this month
+                      </div>
+                    )}
                 </div>
-                <div className="text-sm font-medium text-muted-foreground">Total Members</div>
-                {stats.newMembersThisMonth > 0 && (
-                  <div className="mt-3 inline-flex items-center text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
-                    <TrendingUp className="w-3 h-3 mr-1" />
-                    +{stats.newMembersThisMonth} this month
-                  </div>
-                )}
             </div>
-        </div>
+          ) : (
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 transition-all duration-300">
+                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
+                    <Users className="w-24 h-24 text-blue-600" />
+                </div>
+                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
+                    🔒 Restricted
+                </span>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 transition-transform duration-300">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                        —
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Total Members</div>
+                </div>
+            </div>
+          )
         )}
 
         {/* Attendance Card */}
         {isWidgetVisible('widget_attendance_week') && (
-        <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-1">
-            <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Calendar className="w-24 h-24 text-amber-600" />
-            </div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
-                    <Calendar className="w-6 h-6" />
+          hasTabAccess('attendance') ? (
+            <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+                    <Calendar className="w-24 h-24 text-amber-600" />
                 </div>
-                <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                    {stats.attendanceThisWeek}
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                        <Calendar className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                        {stats.attendanceThisWeek}
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
                 </div>
-                <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
             </div>
-        </div>
+          ) : (
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 transition-all duration-300">
+                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
+                    <Calendar className="w-24 h-24 text-amber-600" />
+                </div>
+                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
+                    🔒 Restricted
+                </span>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 transition-transform duration-300">
+                        <Calendar className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                        —
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
+                </div>
+            </div>
+          )
         )}
 
         {/* Giving Card */}
         {isWidgetVisible('widget_giving_month') && (
-        <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-1">
-            <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Banknote className="w-24 h-24 text-emerald-600" />
-            </div>
-            <div className="relative z-10">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
-                    <Banknote className="w-6 h-6" />
+          hasTabAccess('giving') ? (
+            <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-1">
+                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
+                    <Banknote className="w-24 h-24 text-emerald-600" />
                 </div>
-                <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                    {formatGhanaCedis(stats.givingThisMonth)}
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                        <Banknote className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                        {formatGhanaCedis(stats.givingThisMonth)}
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
                 </div>
-                <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
             </div>
-        </div>
+          ) : (
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 transition-all duration-300">
+                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
+                    <Banknote className="w-24 h-24 text-emerald-600" />
+                </div>
+                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
+                    🔒 Restricted
+                </span>
+                <div className="relative z-10">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 transition-transform duration-300">
+                        <Banknote className="w-6 h-6" />
+                    </div>
+                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                        —
+                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
+                </div>
+            </div>
+          )
         )}
       </div>
 
