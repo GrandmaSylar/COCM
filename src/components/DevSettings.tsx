@@ -67,6 +67,7 @@ export function DevSettings() {
       setEditingNotif(null);
       fetchData();
     } catch (err) {
+      console.error('Failed to save notification config:', err);
       toast.error('Failed to save configuration');
     }
   };
