@@ -163,18 +163,25 @@ export async function recalculateMemberStatuses(changedByUserId?: string) {
 // ============================================================================
 // ============================================================================
 export function inverseOf(relationship: string, gender: string | null): string {
-  const map: Record<string, string> = {
-    'father': 'child',
-    'mother': 'child',
-    'sibling': 'sibling',
-    'spouse': 'spouse'
-  };
-  if (relationship === 'child') {
+  const rel = relationship.toLowerCase();
+  
+  if (rel === 'father' || rel === 'mother' || rel === 'parent') return 'child';
+  
+  if (rel === 'child' || rel === 'son' || rel === 'daughter') {
     if (gender === 'male') return 'father';
     if (gender === 'female') return 'mother';
     return 'parent';
   }
-  return map[relationship] || relationship; // fallback
+
+  if (rel === 'sibling' || rel === 'brother' || rel === 'sister') {
+    if (gender === 'male') return 'brother';
+    if (gender === 'female') return 'sister';
+    return 'sibling';
+  }
+
+  if (rel === 'spouse') return 'spouse';
+  
+  return relationship; // fallback
 }
 
 export async function applyInverseLinks(params: {
@@ -224,13 +231,11 @@ export async function applyInverseLinks(params: {
           .eq('linked_member_id', currentMemberId);
       }
     } else if (currentPool === 'children_members') {
-      if (entry.linked_member_id) {
-        await supabase.from('family_members')
+      if (entry.linked_child_member_id) {
+        await supabase.from('children_member_parents')
           .delete()
-          .eq('member_id', entry.linked_member_id)
+          .eq('child_member_id', entry.linked_child_member_id)
           .eq('linked_child_member_id', currentMemberId);
-      } else if (entry.linked_child_member_id) {
-        // Disabled child->child inverse removal due to lack of source-child identifier schema support
       }
     }
   }
@@ -245,10 +250,11 @@ export async function applyInverseLinks(params: {
         await supabase.from('children_member_parents').delete().eq('child_member_id', entry.linked_child_member_id).eq('linked_member_id', currentMemberId);
       }
     } else if (currentPool === 'children_members') {
-      if (entry.linked_member_id) {
-        await supabase.from('family_members').delete().eq('member_id', entry.linked_member_id).eq('linked_child_member_id', currentMemberId);
-      } else if (entry.linked_child_member_id) {
-        // Disabled child->child inverse update due to lack of source-child identifier schema support
+      if (entry.linked_child_member_id) {
+        await supabase.from('children_member_parents')
+          .delete()
+          .eq('child_member_id', entry.linked_child_member_id)
+          .eq('linked_child_member_id', currentMemberId);
       }
     }
   }
@@ -292,25 +298,22 @@ export async function applyInverseLinks(params: {
         }
       }
     } else if (currentPool === 'children_members') {
-      if (entry.linkedMemberId) {
-        const { data: existing } = await supabase.from('family_members')
-          .select('id').eq('member_id', entry.linkedMemberId).eq('linked_child_member_id', currentMemberId);
+      if (entry.linkedChildMemberId) {
+        const { data: existing } = await supabase.from('children_member_parents')
+          .select('id').eq('child_member_id', entry.linkedChildMemberId).eq('linked_child_member_id', currentMemberId);
         if (!existing?.length) {
-          await supabase.from('family_members').insert({
-            member_id: entry.linkedMemberId,
-            relationship: 'child',
+          await supabase.from('children_member_parents').insert({
+            child_member_id: entry.linkedChildMemberId,
+            relationship: inverseOf(entry.relationship, currentGender),
             linked_child_member_id: currentMemberId,
-            linked_member_id: null,
             is_linked: true,
             first_name: currentFirstName,
             last_name: currentLastName
           });
         }
-      } else if (entry.linkedChildMemberId) {
-        // Disabled child->child inverse insert due to lack of source-child identifier schema support
       }
     }
   }
 }
 
-// ============================================================================
+// ============================================================================

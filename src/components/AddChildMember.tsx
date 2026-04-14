@@ -30,6 +30,7 @@ interface UIChildParent {
   hometown: string;
   isLinked?: boolean;
   linkedMemberId?: string;
+  linkedChildMemberId?: string;
 }
 
 export function AddChildMember({ onBack, onSave, childVisitorData, initialData }: AddChildMemberProps) {
@@ -74,9 +75,10 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
       hometown: p.hometown ?? '',
       isLinked: p.isLinked,
       linkedMemberId: p.linkedMemberId,
+      linkedChildMemberId: p.linkedChildMemberId,
     }))
   );
-  const [parentSearchStates, setParentSearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
+  const [parentSearchStates, setParentSearchStates] = useState<Record<string, { query: string; results: (Member | (ChildMember & { _pool?: string }))[] }>>({});
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [ageError, setAgeError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -104,8 +106,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
       { name: 'Last Name', filled: !!formData.lastName.trim(), section: 'basic' },
       { name: 'Gender', filled: !!formData.gender, section: 'basic' },
       { name: 'Date of Birth', filled: !!formData.dateOfBirth, section: 'basic' },
-      { name: 'Residence Location', filled: !!formData.residenceLocation.trim(), section: 'location' },
-      { name: 'At Least One Parent', filled: parents.length > 0, section: 'parents' }
+      { name: 'Residence Location', filled: !!formData.residenceLocation.trim(), section: 'location' }
     ];
 
     const filledCount = requiredFields.filter(f => f.filled).length;
@@ -209,10 +210,18 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     }
 
     try {
-      const members = await api.members.getAll();
-      const filtered = members.filter((m: Member) =>
+      const [members, children] = await Promise.all([
+        api.members.getAll(),
+        api.children.members.getAll()
+      ]);
+      const allMembers = [
+        ...members,
+        ...children.filter((c: any) => c.id !== initialData?.id).map((c: any) => ({ ...c, _pool: 'child' }))
+      ];
+      
+      const filtered = allMembers.filter((m: any) =>
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
-        m.phone.includes(query)
+        (m.phone && m.phone.includes(query))
       );
       setParentSearchStates(prev => ({
         ...prev,
@@ -227,18 +236,21 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     }
   };
 
-  const linkParentToExisting = (parentId: string, existingMember: Member) => {
+  const linkParentToExisting = (parentId: string, existingMember: any) => {
+    const isChild = existingMember._pool === 'child';
     setParents(parents.map(p =>
       p.id === parentId ? {
         ...p,
         firstName: existingMember.firstName,
         lastName: existingMember.lastName,
         otherNames: existingMember.otherNames || '',
-        phone: existingMember.phone,
+        phone: existingMember.phone || '',
+        relationship: isChild ? 'sibling' : p.relationship,
         occupation: existingMember.occupation || '',
         hometown: existingMember.hometown || '',
         isLinked: true,
-        linkedMemberId: existingMember.id
+        linkedMemberId: isChild ? undefined : existingMember.id,
+        linkedChildMemberId: isChild ? existingMember.id : undefined
       } : p
     ));
     setParentSearchStates(prev => ({
@@ -258,14 +270,15 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
         occupation: '',
         hometown: '',
         isLinked: false,
-        linkedMemberId: undefined
+        linkedMemberId: undefined,
+        linkedChildMemberId: undefined
       } : p
     ));
   };
 
   const isValid = !!(formData.firstName && formData.lastName &&
                   formData.gender && formData.dateOfBirth &&
-                  formData.residenceLocation && parents.length > 0 && !ageError);
+                  formData.residenceLocation && !ageError);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,7 +304,8 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
           occupation: p.occupation,
           hometown: p.hometown,
           isLinked: p.isLinked || false,
-          linkedMemberId: p.linkedMemberId || undefined
+          linkedMemberId: p.linkedMemberId || undefined,
+          linkedChildMemberId: p.linkedChildMemberId || undefined
         })),
       } as Omit<ChildMember, 'id' | 'joinDate'> & { photo?: string });
     } catch (error) {
@@ -650,12 +664,12 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
         {/* Parents / Guardians Section */}
         <Card>
           <Collapsible open={sectionsOpen.parents} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, parents: open }))}>
-            <SectionHeader title="Parents / Guardians" icon={Users} isOpen={sectionsOpen.parents} hasRequired status={getSectionStatus('parents')} />
+            <SectionHeader title="Parents / Guardians" icon={Users} isOpen={sectionsOpen.parents} status={getSectionStatus('parents')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Add parents or guardians. At least one is required.
+                    Add parents or guardians. (Optional)
                   </p>
                   <Button type="button" variant="outline" size="sm" onClick={addParent}>
                     <Plus className="w-4 h-4 mr-2" />
@@ -664,9 +678,9 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                 </div>
 
                 {parents.length === 0 ? (
-                  <div className="border-2 border-dashed border-red-500/25 bg-red-50/50 dark:bg-red-950/20 rounded-lg p-8 text-center">
-                    <p className="text-red-500 dark:text-red-400 font-medium">
-                      No parents or guardians added yet. At least one is required.
+                  <div className="border-2 border-dashed border-muted-foreground/25 bg-muted/10 rounded-lg p-8 text-center">
+                    <p className="text-muted-foreground">
+                      No parents or guardians added yet.
                     </p>
                   </div>
                 ) : (
@@ -701,7 +715,6 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                               <Select
                                 value={parent.relationship}
                                 onValueChange={(value: string) => updateParent(parent.id, 'relationship', value)}
-                                disabled={parent.isLinked}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
@@ -711,6 +724,8 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                                   <SelectItem value="father">Father</SelectItem>
                                   <SelectItem value="guardian">Guardian</SelectItem>
                                   <SelectItem value="sibling">Sibling</SelectItem>
+                                  <SelectItem value="brother">Brother</SelectItem>
+                                  <SelectItem value="sister">Sister</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -730,14 +745,19 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                                 </div>
                                 {(parentSearchStates[parent.id]?.results || []).length > 0 && (
                                   <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto bg-background shadow-md">
-                                    {parentSearchStates[parent.id].results.map(result => (
+                                    {parentSearchStates[parent.id].results.map((result: any) => (
                                       <div
                                         key={result.id}
                                         className="p-3 hover:bg-muted rounded cursor-pointer transition-colors"
                                         onClick={() => linkParentToExisting(parent.id, result)}
                                       >
-                                        <div className="font-medium">{result.firstName} {result.lastName}</div>
-                                        <div className="text-xs text-muted-foreground">{result.phone}</div>
+                                        <div className="flex justify-between items-center">
+                                          <div className="font-medium">{result.firstName} {result.lastName}</div>
+                                          <Badge variant="outline" className="text-[10px]">
+                                            {result._pool === 'child' ? 'Child Member' : 'Main Member'}
+                                          </Badge>
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">{result.phone || 'No phone'}</div>
                                       </div>
                                     ))}
                                   </div>

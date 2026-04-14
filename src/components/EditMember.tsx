@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Checkbox } from './ui/checkbox';
 import { Member, Zone, MemberStatus, ZONES, BaptismInfo, FamilyMember, LegalInfo, BaptismDateType, normaliseBaptismInfo, BaptismStatus } from './Members';
+import type { ChildMember } from './Children';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
@@ -73,7 +74,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     (member.familyMembers || []).map(fm => ({ ...fm, otherNames: fm.otherNames ?? '', phone: fm.phone ?? '', occupation: fm.occupation ?? '', hometown: fm.hometown ?? '' }))
   );
   // Track search state per family member
-  const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: Member[] }>>({});
+  const [familySearchStates, setFamilySearchStates] = useState<Record<string, { query: string; results: (Member | (ChildMember & { _pool?: string }))[] }>>({});
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
 
   // Legal Info State
@@ -323,7 +324,10 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         api.members.getAll(),
         api.children.members.getAll()
       ]);
-      const allMembers = [...members, ...children];
+      const allMembers = [
+        ...members,
+        ...children.map((c: any) => ({ ...c, _pool: 'child' }))
+      ];
 
       const filtered = allMembers.filter((m: any) =>
         `${m.firstName} ${m.lastName}`.toLowerCase().includes(query.toLowerCase()) ||
@@ -343,6 +347,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
   };
 
   const linkFamilyMemberToExisting = (familyMemberId: string, existingMember: any) => {
+    const isChild = existingMember._pool === 'child';
     setFamilyMembers(familyMembers.map(m =>
       m.id === familyMemberId ? {
         ...m,
@@ -353,7 +358,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
         occupation: existingMember.occupation || '',
         hometown: existingMember.hometown || '',
         isLinked: true,
-        linkedMemberId: existingMember.id
+        linkedMemberId: isChild ? undefined : existingMember.id,
+        linkedChildMemberId: isChild ? existingMember.id : undefined
       } : m
     ));
     // Clear search state for this family member
@@ -1041,7 +1047,11 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                                 <SelectItem value="father">Father</SelectItem>
                                 <SelectItem value="spouse">Spouse</SelectItem>
                                 <SelectItem value="child">Child</SelectItem>
+                                <SelectItem value="son">Son</SelectItem>
+                                <SelectItem value="daughter">Daughter</SelectItem>
                                 <SelectItem value="sibling">Sibling</SelectItem>
+                                <SelectItem value="brother">Brother</SelectItem>
+                                <SelectItem value="sister">Sister</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1061,14 +1071,19 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                               </div>
                               {(familySearchStates[member.id]?.results || []).length > 0 && (
                                 <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto">
-                                  {familySearchStates[member.id].results.map(result => (
+                                  {familySearchStates[member.id].results.map((result: any) => (
                                     <div
                                       key={result.id}
-                                      className="p-2 hover:bg-muted rounded cursor-pointer"
+                                      className="p-2 hover:bg-muted rounded cursor-pointer transition-colors"
                                       onClick={() => linkFamilyMemberToExisting(member.id, result)}
                                     >
-                                      <div>{result.firstName} {result.lastName}</div>
-                                      <div className="text-xs text-muted-foreground">{result.phone}</div>
+                                      <div className="flex justify-between items-center">
+                                        <div className="font-medium">{result.firstName} {result.lastName}</div>
+                                        <Badge variant="outline" className="text-[10px]">
+                                          {result._pool === 'child' ? 'Child Member' : 'Main Member'}
+                                        </Badge>
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">{result.phone || 'No phone'}</div>
                                     </div>
                                   ))}
                                 </div>

@@ -83,6 +83,8 @@ export interface FamilyMember {
   hometown?: string;
   isLinked?: boolean;
   linkedMemberId?: string;
+  linkedChildMemberId?: string;
+  childMemberId?: string;
 }
 
 export interface LegalInfo {

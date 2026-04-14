@@ -1161,7 +1161,11 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                                   <SelectItem value="father">Father</SelectItem>
                                   <SelectItem value="spouse">Spouse</SelectItem>
                                   <SelectItem value="child">Child</SelectItem>
+                                  <SelectItem value="son">Son</SelectItem>
+                                  <SelectItem value="daughter">Daughter</SelectItem>
                                   <SelectItem value="sibling">Sibling</SelectItem>
+                                  <SelectItem value="brother">Brother</SelectItem>
+                                  <SelectItem value="sister">Sister</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>

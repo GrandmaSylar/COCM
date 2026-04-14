@@ -1,4 +1,5 @@
 -- Section A: Drop the NOT NULL constraint on service_type
+ALTER TABLE children_visitors ADD COLUMN IF NOT EXISTS service_type TEXT;
 ALTER TABLE children_visitors ALTER COLUMN service_type DROP NOT NULL;
 
 -- Section B: Defensive re-creation of children_visitor_guardians

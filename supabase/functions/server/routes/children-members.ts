@@ -423,11 +423,9 @@ router.delete('/children/members/:id', async (c) => {
     const { data: childToDelete } = await supabase.from('children_members')
       .select('first_name, last_name').eq('id', id).single();
 
-    const { error: cleanupError } = await supabase.from('family_members').delete().eq('linked_child_member_id', id);
-    if (cleanupError) {
-      console.error('Error deleting child member inverse links:', cleanupError);
-      return c.json({ error: cleanupError.message }, 500);
-    }
+    // Clean up inverse links: remove children_member_parents rows
+    // where this child is referenced as a linked_child_member_id (child-to-child inverse links)
+    await supabase.from('children_member_parents').delete().eq('linked_child_member_id', id);
 
     const { error } = await supabase.from('children_members').delete().eq('id', id);
     if (error) {

@@ -5,7 +5,7 @@ import { toCamelCase, toSnakeCase } from "../lib/transform.ts";
 import { SYSTEM_ROLES } from "../lib/types.ts";
 // Additional helpers
 import { logActivity, getProfileForLog } from "../lib/activity-helpers.ts";
-import { recalculateMemberStatuses, applyInverseLinks } from "../lib/member-helpers.ts";
+import { recalculateMemberStatuses, applyInverseLinks, inverseOf } from "../lib/member-helpers.ts";
 import { createNotification, notifyTabUsers } from "../lib/notification-helpers.ts";
 import { normalizePhone, generateOtp, maskEmail, maskPhone, sendOtpEmail, sendOtpSms } from "../lib/two-factor-helpers.ts";
 
@@ -97,10 +97,15 @@ router.get("/members/:id", async (c)=>{
 
     // ── Bidirectional family linking ──
     // Find children_members who have a parent linked to this member
-    const { data: childParentLinks } = await supabase
+    // Use explicitly named foreign key to avoid ambiguity correctly.
+    const { data: childParentLinks, error: childParentLinksError } = await supabase
       .from('children_member_parents')
-      .select('child_member_id, relationship, children_members!inner(first_name, last_name, other_names, id)')
+      .select('child_member_id, relationship, children_members!children_member_parents_child_member_id_fkey(first_name, last_name, other_names, id)')
       .eq('linked_member_id', id);
+
+    if (childParentLinksError) {
+      console.error('Error fetching childParentLinks:', childParentLinksError);
+    }
 
     // Build synthetic family_members entries for each linked child
     const linkedChildren = (childParentLinks || []).map((link: any) => ({
@@ -113,11 +118,12 @@ router.get("/members/:id", async (c)=>{
       phone: null,
       is_linked: true,
       linked_member_id: null,
-      linked_child_member_id: link.child_member_id,
+      // linked_child_member_id: link.child_member_id, // Removed: non-existent column in family_members
+      child_member_id: link.child_member_id
     }));
 
-    const existingFamily = member.family_members || [];
-    const merged = { ...member, family_members: [...existingFamily, ...linkedChildren] };
+    // Merged is all family_members + linked child synthetic entries
+    const merged = { ...member, family_members: [...(member.family_members || []), ...linkedChildren] };
     return c.json(toCamelCase(merged));
   } catch (error) {
     console.error('Get member error:', error);
@@ -499,19 +505,43 @@ router.put("/members/:id", async (c)=>{
         .select('*')
         .eq('member_id', id);
 
+      const { data: previousChildParentRows } = await supabase
+        .from('children_member_parents')
+        .select('*')
+        .eq('linked_member_id', id);
+
+      const previousLinkedEntries = [
+        ...(previousFamilyRows ?? []).filter((r: any) => r.is_linked),
+        ...(previousChildParentRows ?? []).map((r: any) => ({
+          ...r,
+          linkedChildMemberId: r.child_member_id,
+          linked_member_id: null,
+          relationship: inverseOf(r.relationship, member.gender ?? null)
+        }))
+      ];
+
+      const normalizedNewEntries = familyMembers.map((fm: any) => ({
+        ...fm,
+        linkedChildMemberId: fm.linkedChildMemberId || fm.childMemberId || fm.child_member_id
+      }));
+
       await applyInverseLinks({
         currentMemberId: id,
         currentPool: 'members',
         currentGender: member.gender ?? null,
         currentFirstName: member.first_name,
         currentLastName: member.last_name,
-        previousLinkedEntries: (previousFamilyRows ?? []).filter((r: any) => r.is_linked),
-        newLinkedEntries: familyMembers,
+        previousLinkedEntries,
+        newLinkedEntries: normalizedNewEntries,
       });
 
+      // Only delete member-to-member family rows.
+      // We no longer track children in this table via linked_child_member_id.
       await supabase.from('family_members').delete().eq('member_id', id);
       if (familyMembers.length > 0) {
-        const familyMembersData = familyMembers.map((fm: any) => {
+        // Filter out child-linked entries — those are managed exclusively by the child routes
+        const memberOnlyFamily = familyMembers.filter((fm: any) => !fm.linkedChildMemberId && !fm.child_member_id);
+        const familyMembersData = memberOnlyFamily.map((fm: any) => {
           const snakeFm = toSnakeCase(fm) as Record<string, any>;
           // Remove the temp/old id and ensure member_id is set
           const { id: _tempId, ...rest } = snakeFm;
@@ -520,10 +550,12 @@ router.put("/members/:id", async (c)=>{
             member_id: id
           };
         });
-        console.log('Updating family members:', JSON.stringify(familyMembersData));
-        const { error: fmError } = await supabase.from('family_members').insert(familyMembersData);
-        if (fmError) {
-          console.error('Error inserting family members:', fmError);
+        if (familyMembersData.length > 0) {
+          console.log('Updating family members:', JSON.stringify(familyMembersData));
+          const { error: fmError } = await supabase.from('family_members').insert(familyMembersData);
+          if (fmError) {
+            console.error('Error inserting family members:', fmError);
+          }
         }
       }
     }
@@ -533,6 +565,31 @@ router.put("/members/:id", async (c)=>{
         family_members!family_members_member_id_fkey (*)
       `).eq('id', id).single();
 
+    // Fetch children parent links to synchronize the returned member object
+    const { data: childParentLinks, error: childParentLinksError } = await supabase
+      .from('children_member_parents')
+      .select('child_member_id, relationship, children_members!children_member_parents_child_member_id_fkey(first_name, last_name, other_names, id)')
+      .eq('linked_member_id', id);
+
+    if (childParentLinksError) {
+      console.error('Error fetching childParentLinks in PUT:', childParentLinksError);
+    }
+
+    const linkedChildren = (childParentLinks || []).map((link: any) => ({
+      id: `child-link-${link.child_member_id}`,
+      member_id: id,
+      relationship: 'child',
+      first_name: link.children_members?.first_name || '',
+      last_name: link.children_members?.last_name || '',
+      other_names: link.children_members?.other_names || null,
+      phone: null,
+      is_linked: true,
+      linked_member_id: null,
+      child_member_id: link.child_member_id
+    }));
+
+    const completeWithChildren = { ...completeMember, family_members: [...(completeMember?.family_members || []), ...linkedChildren] };
+
     // Log activity
     const logP2 = await getProfileForLog(user.id);
     await logActivity({
@@ -541,7 +598,7 @@ router.put("/members/:id", async (c)=>{
       description: `Updated member: ${member.first_name} ${member.last_name}`
     });
 
-    return c.json(toCamelCase(completeMember || member));
+    return c.json(toCamelCase(completeWithChildren));
   } catch (error) {
     console.error('Update member error:', error);
     return c.json({

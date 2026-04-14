@@ -404,8 +404,17 @@ function AppContent() {
     }
   };
 
-  const handleEditMember = (member: Member) => {
-    setSelectedMember(member);
+  const handleEditMember = async (member: Member) => {
+    try {
+      const fullMember = await api.members.getById(member.id);
+      setSelectedMember(fullMember || member);
+      if (!fullMember) {
+        toast.warning('Could not load full member data. Family links may be incomplete.');
+      }
+    } catch {
+      toast.warning('Could not load full member data. Family links may be incomplete.');
+      setSelectedMember(member);
+    }
     navigateTo('edit-member');
   };
 
@@ -429,7 +438,12 @@ function AppContent() {
       const updated = { ...dataToSave, photoUrl: finalPhotoUrl };
       await api.members.update(memberData.id, updated);
       toast.success('Member updated successfully!');
-      setSelectedMember(updated);
+      try {
+        const freshMember = await api.members.getById(memberData.id);
+        setSelectedMember(freshMember || updated);
+      } catch {
+        setSelectedMember(updated);
+      }
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('member-profile');
     } catch (error: any) {
@@ -582,6 +596,21 @@ function AppContent() {
   const handleViewChild = (child: ChildMember) => {
     setSelectedChild(child);
     navigateTo('children-profile');
+  };
+
+  const handleViewChildById = async (childId: string) => {
+    try {
+      const child = await api.children.members.getById(childId);
+      if (child) {
+        setSelectedChild(child);
+        navigateTo('children-profile');
+      } else {
+        toast.error('Child member not found');
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch child member:', error);
+      toast.error(error?.message || 'Failed to load child member profile');
+    }
   };
 
   const handleEditChild = (child: ChildMember) => {
@@ -748,6 +777,7 @@ function AppContent() {
             onEdit={handleEditMember}
             onDelete={handleDeleteMember}
             onViewMember={handleViewMemberById}
+            onViewChild={handleViewChildById}
             onViewAttendanceHistory={() => navigateTo('member-attendance-history')}
           />
         );
@@ -1018,6 +1048,7 @@ function AppContent() {
             onDelete={handleDeleteChild}
             onPromoteToMember={handlePromoteChildToMember}
             onViewMember={handleViewMemberById}
+            onViewChild={handleViewChildById}
           />
         );
 

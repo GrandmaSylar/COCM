@@ -6,7 +6,7 @@ import { Separator } from './ui/separator';
 import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
 import { exportToPDF } from '../utils/export';
 import { Skeleton } from './ui/skeleton';
-import { Member, ZONES, normaliseBaptismInfo } from './Members';
+import { Member, FamilyMember, ZONES, normaliseBaptismInfo } from './Members';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
 import { toast } from 'sonner';
@@ -21,10 +21,24 @@ interface MemberProfileProps {
   onEdit: (member: Member) => void;
   onDelete?: (member: Member) => void;
   onViewMember?: (memberId: string) => void;
+  onViewChild?: (childId: string) => void;
   onViewAttendanceHistory?: () => void;
 }
 
-export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember, onViewAttendanceHistory }: MemberProfileProps) {
+export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete, onViewMember, onViewChild, onViewAttendanceHistory }: MemberProfileProps) {
+  // Helper to navigate to the correct profile for a family member
+  const handleFamilyMemberClick = (fm: FamilyMember) => {
+    const childId = fm.childMemberId || fm.linkedChildMemberId;
+    if (childId && onViewChild) {
+      onViewChild(childId);
+    } else if (fm.linkedMemberId && onViewMember) {
+      onViewMember(fm.linkedMemberId);
+    }
+  };
+  const isFamilyMemberClickable = (fm: FamilyMember) => {
+    const childId = fm.childMemberId || fm.linkedChildMemberId;
+    return fm.isLinked && ((childId && onViewChild) || (fm.linkedMemberId && onViewMember));
+  };
   const { canAccess, isDev } = useAuth();
   const canEdit = canAccess('edit_members');
   const canDelete = canAccess('delete_members');
@@ -79,7 +93,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     };
     window.addEventListener('sync-queue-updated', handleSync);
     return () => window.removeEventListener('sync-queue-updated', handleSync);
-  }, [initialMember.id]);
+  }, [initialMember.id, initialMember.updatedAt]);
 
   // Calculate age
   const calculateAge = (dateOfBirth: string) => {
@@ -529,8 +543,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                         .map((parent) => (
                           <div
                             key={parent.id}
-                            className={`text-center ${parent.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                            onClick={() => parent.isLinked && parent.linkedMemberId && onViewMember?.(parent.linkedMemberId)}
+                            className={`text-center ${isFamilyMemberClickable(parent) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            onClick={() => isFamilyMemberClickable(parent) && handleFamilyMemberClick(parent)}
                           >
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
                               parent.relationship === 'father' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-pink-100 dark:bg-pink-900'
@@ -543,7 +557,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                             </div>
                             <p className="text-sm font-medium">{parent.firstName} {parent.lastName}</p>
                             <p className="text-xs text-muted-foreground capitalize">{parent.relationship}</p>
-                            {parent.isLinked && (
+                            {isFamilyMemberClickable(parent) && (
                               <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
                                 <CheckCircle className="w-2 h-2" />
                                 View Profile
@@ -567,8 +581,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                     {member.familyMembers.filter(f => f.relationship === 'sibling').map((sibling) => (
                       <div
                         key={sibling.id}
-                        className={`text-center ${sibling.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                        onClick={() => sibling.isLinked && sibling.linkedMemberId && onViewMember?.(sibling.linkedMemberId)}
+                        className={`text-center ${isFamilyMemberClickable(sibling) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                        onClick={() => isFamilyMemberClickable(sibling) && handleFamilyMemberClick(sibling)}
                       >
                         <div className={`w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-1 ${sibling.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -577,7 +591,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                         </div>
                         <p className="text-xs font-medium">{sibling.firstName}</p>
                         <p className="text-xs text-muted-foreground">Sibling</p>
-                        {sibling.isLinked && (
+                        {isFamilyMemberClickable(sibling) && (
                           <Badge variant="secondary" className="gap-1 mt-1 text-xs">
                             <CheckCircle className="w-2 h-2" />
                           </Badge>
@@ -620,8 +634,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                       .map((spouse) => (
                         <div
                           key={spouse.id}
-                          className={`text-center ${spouse.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                          onClick={() => spouse.isLinked && spouse.linkedMemberId && onViewMember?.(spouse.linkedMemberId)}
+                          className={`text-center ${isFamilyMemberClickable(spouse) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                          onClick={() => isFamilyMemberClickable(spouse) && handleFamilyMemberClick(spouse)}
                         >
                           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
                             member.gender === 'male' ? 'bg-pink-100 dark:bg-pink-900' : 'bg-blue-100 dark:bg-blue-900'
@@ -634,7 +648,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                           </div>
                           <p className="text-sm font-medium">{spouse.firstName} {spouse.lastName}</p>
                           <p className="text-xs text-muted-foreground">Spouse</p>
-                          {spouse.isLinked && (
+                          {isFamilyMemberClickable(spouse) && (
                             <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
                               <CheckCircle className="w-2 h-2" />
                               View Profile
@@ -659,8 +673,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                         .map((child) => (
                           <div
                             key={child.id}
-                            className={`text-center ${child.isLinked && onViewMember ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                            onClick={() => child.isLinked && child.linkedMemberId && onViewMember?.(child.linkedMemberId)}
+                            className={`text-center ${isFamilyMemberClickable(child) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            onClick={() => isFamilyMemberClickable(child) && handleFamilyMemberClick(child)}
                           >
                             <div className={`w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-1 ${child.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
                               <span className="text-sm font-medium text-green-600 dark:text-green-400">
@@ -669,7 +683,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                             </div>
                             <p className="text-xs font-medium">{child.firstName}</p>
                             <p className="text-xs text-muted-foreground">Child</p>
-                            {child.isLinked && (
+                            {isFamilyMemberClickable(child) && (
                               <Badge variant="secondary" className="gap-1 mt-1 text-xs cursor-pointer">
                                 <CheckCircle className="w-2 h-2" />
                                 View
@@ -688,7 +702,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                   {member.familyMembers.map((familyMember) => (
                     <div
                       key={familyMember.id}
-                      className={`flex items-start justify-between p-3 border rounded-lg ${familyMember.isLinked && onViewMember ? 'hover:bg-muted/50 transition-colors' : ''}`}
+                      className={`flex items-start justify-between p-3 border rounded-lg ${isFamilyMemberClickable(familyMember) ? 'hover:bg-muted/50 transition-colors' : ''}`}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -698,7 +712,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                           {familyMember.isLinked && (
                             <Badge variant="secondary" className="gap-1">
                               <CheckCircle className="w-3 h-3" />
-                              Church Member
+                              {(familyMember.childMemberId || familyMember.linkedChildMemberId) ? "Children's Member" : 'Church Member'}
                             </Badge>
                           )}
                         </div>
@@ -713,11 +727,11 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                           <p className="text-sm text-muted-foreground">Hometown: {familyMember.hometown}</p>
                         )}
                       </div>
-                      {familyMember.isLinked && familyMember.linkedMemberId && onViewMember && (
+                      {isFamilyMemberClickable(familyMember) && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => onViewMember(familyMember.linkedMemberId!)}
+                          onClick={() => handleFamilyMemberClick(familyMember)}
                         >
                           <ExternalLink className="w-4 h-4 mr-1" />
                           View Profile

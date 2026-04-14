@@ -1,4 +1,6 @@
 -- Adding missing columns to children_visitors
+CREATE TABLE IF NOT EXISTS public.children_visitors (id uuid PRIMARY KEY DEFAULT gen_random_uuid());
+
 ALTER TABLE children_visitors ADD COLUMN IF NOT EXISTS occupation TEXT;
 ALTER TABLE children_visitors ADD COLUMN IF NOT EXISTS contact_phone TEXT;
 

@@ -35,6 +35,7 @@ export interface ChildParent {
   hometown?: string;
   isLinked?: boolean;
   linkedMemberId?: string;
+  linkedChildMemberId?: string;
 }
 
 export interface ChildMember {

@@ -20,9 +20,10 @@ interface ChildProfileProps {
   onDelete: (child: ChildMember) => void;
   onPromoteToMember: (child: ChildMember) => void;
   onViewMember: (memberId: string) => void;
+  onViewChild?: (childId: string) => void;
 }
 
-export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, onPromoteToMember, onViewMember }: ChildProfileProps) {
+export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, onPromoteToMember, onViewMember, onViewChild }: ChildProfileProps) {
   const { canAccess, isDev } = useAuth();
   const [child, setChild] = useState<ChildMember>(initialChild);
   const [attendanceData, setAttendanceData] = useState<{
@@ -281,6 +282,15 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                               onClick={() => onViewMember(parent.linkedMemberId!)}
                             >
                               Linked Member
+                              <ExternalLink className="w-3 h-3 ml-1" />
+                            </Badge>
+                          ) : parent.isLinked && parent.linkedChildMemberId && onViewChild ? (
+                            <Badge 
+                              variant="secondary" 
+                              className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer gap-1"
+                              onClick={() => onViewChild(parent.linkedChildMemberId!)}
+                            >
+                              Linked Sibling
                               <ExternalLink className="w-3 h-3 ml-1" />
                             </Badge>
                           ) : (

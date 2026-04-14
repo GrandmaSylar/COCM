@@ -31,25 +31,57 @@ ALTER TABLE public.activity_log_config ENABLE ROW LEVEL SECURITY;
 
 -- Add policies for dev role access
 -- (Assuming profiles table has a 'role' column)
-CREATE POLICY "Devs can manage notification config" ON public.notification_type_config
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role = 'dev'
-        )
-    );
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'notification_type_config' AND policyname = 'Devs can manage notification config'
+    ) THEN
+        CREATE POLICY "Devs can manage notification config" ON public.notification_type_config
+            FOR ALL USING (
+                EXISTS (
+                    SELECT 1 FROM public.profiles 
+                    WHERE profiles.id = auth.uid() AND profiles.role = 'dev'
+                )
+            );
+    END IF;
+END
+$$;
 
-CREATE POLICY "Devs can manage activity log config" ON public.activity_log_config
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM public.profiles 
-            WHERE profiles.id = auth.uid() AND profiles.role = 'dev'
-        )
-    );
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'activity_log_config' AND policyname = 'Devs can manage activity log config'
+    ) THEN
+        CREATE POLICY "Devs can manage activity log config" ON public.activity_log_config
+            FOR ALL USING (
+                EXISTS (
+                    SELECT 1 FROM public.profiles 
+                    WHERE profiles.id = auth.uid() AND profiles.role = 'dev'
+                )
+            );
+    END IF;
+END
+$$;
 
 -- Also allow authenticated users to view enabled configs
-CREATE POLICY "Authenticated users can view notification config" ON public.notification_type_config
-    FOR SELECT TO authenticated USING (true);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'notification_type_config' AND policyname = 'Authenticated users can view notification config'
+    ) THEN
+        CREATE POLICY "Authenticated users can view notification config" ON public.notification_type_config
+            FOR SELECT TO authenticated USING (true);
+    END IF;
+END
+$$;
 
-CREATE POLICY "Authenticated users can view activity log config" ON public.activity_log_config
-    FOR SELECT TO authenticated USING (true);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE tablename = 'activity_log_config' AND policyname = 'Authenticated users can view activity log config'
+    ) THEN
+        CREATE POLICY "Authenticated users can view activity log config" ON public.activity_log_config
+            FOR SELECT TO authenticated USING (true);
+    END IF;
+END
+$$;

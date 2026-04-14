@@ -1,8 +1,9 @@
-
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { createClient } from "@supabase/supabase-js";
+// Force deploy comment 4
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // Create Hono app. Supabase invokes at /functions/v1/server so path is e.g. /members/:id (no /server prefix).
 const app = new Hono().basePath('/server');
 
