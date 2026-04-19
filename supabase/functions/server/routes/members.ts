@@ -111,7 +111,7 @@ router.get("/members/:id", async (c)=>{
     const linkedChildren = (childParentLinks || []).map((link: any) => ({
       id: `child-link-${link.child_member_id}`,
       member_id: id,
-      relationship: 'child',
+      relationship: inverseOf(link.relationship || 'parent', null),
       first_name: link.children_members?.first_name || '',
       last_name: link.children_members?.last_name || '',
       other_names: link.children_members?.other_names || null,
@@ -578,7 +578,7 @@ router.put("/members/:id", async (c)=>{
     const linkedChildren = (childParentLinks || []).map((link: any) => ({
       id: `child-link-${link.child_member_id}`,
       member_id: id,
-      relationship: 'child',
+      relationship: inverseOf(link.relationship || 'parent', null),
       first_name: link.children_members?.first_name || '',
       last_name: link.children_members?.last_name || '',
       other_names: link.children_members?.other_names || null,
