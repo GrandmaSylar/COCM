@@ -593,3 +593,406 @@ export function parseMemberImportRow(row: Record<string, string>) {
 
   return { data, errors };
 }
+
+export async function generateServiceSetupPDF(
+  formData: any, 
+  programme: any[], 
+  officiators: any[],
+  action: 'download' | 'preview' = 'download'
+): Promise<string | void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const center = pageWidth / 2;
+
+  // Red theme Color
+  const red = '#cb2d2c'; 
+
+  // 1. Borders
+  doc.setDrawColor(203, 45, 44);
+  doc.setLineWidth(0.4);
+  doc.rect(8, 8, pageWidth - 16, pageHeight - 16);
+  doc.setLineWidth(0.15);
+  doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+  // 2. Logos & Watermark
+  try {
+    const img = new Image();
+    img.src = '/newlogo.png';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+
+    // Top Corners
+    const canvas = document.createElement('canvas');
+    canvas.width = 150; canvas.height = 150;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, 150, 150);
+      const b64 = canvas.toDataURL('image/png');
+      doc.addImage(b64, 'PNG', 12, 12, 35, 35);
+      doc.addImage(b64, 'PNG', pageWidth - 47, 12, 35, 35);
+    }
+
+    // Watermark (Center)
+    const waterCanvas = document.createElement('canvas');
+    waterCanvas.width = 800; waterCanvas.height = 800; 
+    const wCtx = waterCanvas.getContext('2d');
+    if (wCtx) {
+      wCtx.globalAlpha = 0.07; // Light opacity
+      wCtx.drawImage(img, 0, 0, 800, 800);
+      const waterB64 = waterCanvas.toDataURL('image/png');
+      // Center placement: Page is 210 x 297. Watermark size 160x160.
+      doc.addImage(waterB64, 'PNG', center - 80, (pageHeight / 2) - 80, 160, 160);
+    }
+  } catch (e) {
+    console.warn('Logo load error', e);
+  }
+
+  // 3. Header Texts
+  doc.setFont('times', 'bolditalic');
+  doc.setFontSize(22);
+  doc.setTextColor(20, 20, 20);
+  doc.text('CHURCH OF CHRIST', center, 25, { align: 'center' });
+
+  doc.setFont('times', 'italic');
+  doc.setFontSize(16);
+  doc.text('—MATAHEKO —', center, 35, { align: 'center' });
+
+  // 4. Blue Banner
+  const bannerY = 48;
+  doc.setFillColor(11, 82, 161); // darker blue
+  doc.rect(10, bannerY, pageWidth - 20, 8, 'F');
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text('SUNDAY SERVICE', center, bannerY + 6, { align: 'center' });
+
+  // 5. MC & Date
+  const mcY = bannerY + 14;
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.text('MC:', 15, mcY);
+  
+  // Underline for MC
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+  doc.line(23, mcY + 1, 150, mcY + 1);
+  
+  if (formData.mcName) {
+    doc.setFont('helvetica', 'normal');
+    doc.text(formData.mcName, 25, mcY);
+  }
+  
+  doc.setFont('helvetica', 'bold');
+  doc.text('DATE:', 176, mcY, { align: 'right' });
+  doc.line(178, mcY + 1, pageWidth - 14, mcY + 1);
+  if (formData.serviceDate) {
+    doc.setFont('helvetica', 'normal');
+    const dateStr = formatDateForExport(formData.serviceDate);
+    doc.text(dateStr, 180, mcY);
+  }
+
+  // 6. Table Headers
+  const tableTop = mcY + 10;
+  doc.setDrawColor(203, 45, 44);
+  doc.setLineWidth(0.3);
+  doc.line(15, tableTop, pageWidth - 15, tableTop);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  
+  const colTime = 25;
+  const colDur = 55;
+  const colAct = 75;
+  const colOff = 165;
+
+  doc.text('TIME', colTime, tableTop + 5, { align: 'center' });
+  doc.text('DURATION', colDur, tableTop + 5, { align: 'center' });
+  doc.text('ACTIVITY', colAct, tableTop + 5);
+  doc.text('OFFICIATORS', colOff, tableTop + 5, { align: 'center' });
+
+  doc.line(15, tableTop + 7, pageWidth - 15, tableTop + 7);
+
+  // 7. Render Programme Rows
+  let y = tableTop + 14;
+  doc.setFontSize(9);
+  
+  const drawRedLine = (xPos: number, yPos: number, width: number) => {
+    doc.setDrawColor(203, 45, 44);
+    doc.setLineWidth(0.15);
+    doc.line(xPos, yPos + 1.5, xPos + width, yPos + 1.5);
+  };
+
+  const drawRedBlank = (xPos: number, yPos: number, width: number, value?: string, isBold = false) => {
+    drawRedLine(xPos, yPos, width);
+    if (value) {
+      if (isBold) doc.setFont('helvetica', 'bold');
+      else doc.setFont('helvetica', 'normal');
+      doc.text(value, xPos + 2, yPos);
+    }
+  };
+
+  for (let i = 0; i < programme.length; i++) {
+    const row = programme[i];
+    doc.setFont('helvetica', 'normal');
+    
+    // Time & Duration
+    const timeStr = [row.startTime, row.endTime].filter(Boolean).join(' - ');
+    doc.text(timeStr, colTime, y, { align: 'center' });
+    doc.text(row.duration || '', colDur, y, { align: 'center' });
+
+    // Activity Base
+    const acts = doc.splitTextToSize(row.activity || '', 55);
+    doc.text(acts, colAct, y);
+    
+    let activityHeight = acts.length * 5;
+    const actName = String(row.activity).toLowerCase();
+
+    if (actName.includes('scripture reading')) {
+      doc.setFont('helvetica', 'normal');
+      y += 8;
+      doc.text('  English:', colAct, y);
+      drawRedBlank(135, y, 60, row.assignedMemberName);
+      y += 8;
+      doc.text('  Twi:', colAct, y);
+      drawRedBlank(135, y, 60, ''); 
+      y += 10;
+    } 
+    else if (actName.includes('sermon') && !actName.includes('after')) {
+      drawRedBlank(135, y, 60, formData.preacherName || row.assignedMemberName);
+      y += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Topic:', colAct, y);
+      drawRedBlank(105, y, 90, formData.sermonTopic, true);
+      y += 8;
+      doc.text('Text:', colAct, y);
+      drawRedBlank(105, y, 90, [formData.scriptureEnglish, formData.scriptureTwi].filter(Boolean).join(' / '));
+      y += 10;
+    }
+    else if (actName.includes("lord's supper") || actName.includes('giving')) {
+      drawRedBlank(135, y, 60, row.assignedMemberName);
+      y += 6;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Assistants:', colAct, y);
+      
+      for (let slot = 1; slot <= 3; slot++) {
+        y += 7;
+        const offLeft = officiators.find(o => o.slot === slot);
+        const offRight = officiators.find(o => o.slot === slot + 3);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${slot}.`, colAct + 5, y);
+        drawRedBlank(colAct + 12, y, 35, offLeft?.memberName);
+        
+        doc.text(`${slot + 3}.`, colAct + 55, y);
+        drawRedBlank(colAct + 62, y, 35, offRight?.memberName);
+      }
+      y += 10;
+    }
+    else {
+      // Standard assign
+      drawRedBlank(135, y, 60, row.assignedMemberName);
+      y += Math.max(10, activityHeight + 4);
+    }
+  }
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Acts 2:38 - Repent and be baptised', center, pageHeight - 12, { align: 'center' });
+  doc.setLineWidth(0.15);
+  doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15); // line above footer
+
+  if (action === 'preview') {
+    return doc.output('bloburl');
+  } else {
+    const safeType = (formData.serviceType || 'service').toLowerCase().replace(/\s+/g, '-');
+    const safeDate = formData.serviceDate || 'date';
+    doc.save(`service-setup-${safeDate}-${safeType}.pdf`);
+  }
+}
+
+export async function generateExpenseRequisitionPDF(
+  expense: any,
+  action: 'download' | 'preview' = 'download'
+): Promise<string | void> {
+  const { jsPDF } = await import('jspdf');
+  const doc = new jsPDF('p', 'mm', 'a4');
+  
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const center = pageWidth / 2;
+  const leftMargin = 15;
+  const rightMargin = 15;
+
+  // Red theme Color
+  const red = '#cb2d2c'; 
+
+  // 1. Borders
+  doc.setDrawColor(203, 45, 44);
+  doc.setLineWidth(0.4);
+  doc.rect(8, 8, pageWidth - 16, pageHeight - 16);
+  doc.setLineWidth(0.15);
+  doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+  // 2. Logos & Watermark
+  try {
+    const img = new Image();
+    img.src = '/newlogo.png';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+
+    // Top Corner Logo (Left only)
+    const canvas = document.createElement('canvas');
+    canvas.width = 150; canvas.height = 150;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, 150, 150);
+      const b64 = canvas.toDataURL('image/png');
+      doc.addImage(b64, 'PNG', 12, 12, 35, 35);
+      // Removed right logo as per request
+    }
+
+    // Watermark (Center)
+    const waterCanvas = document.createElement('canvas');
+    waterCanvas.width = 800; waterCanvas.height = 800; 
+    const wCtx = waterCanvas.getContext('2d');
+    if (wCtx) {
+      wCtx.globalAlpha = 0.07;
+      wCtx.drawImage(img, 0, 0, 800, 800);
+      const waterB64 = waterCanvas.toDataURL('image/png');
+      doc.addImage(waterB64, 'PNG', center - 80, (pageHeight / 2) - 80, 160, 160);
+    }
+  } catch (e) {
+    console.warn('Logo load error', e);
+  }
+
+  // 3. Header Text & Address
+  doc.setTextColor(0, 0, 0);
+
+  // Address (Top Right)
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  const rightX = pageWidth - 15;
+  doc.text('Church of Christ, Mataheko', rightX, 18, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('P.O BOX KN 1050', rightX, 23, { align: 'right' });
+  doc.text('Accra', rightX, 28, { align: 'right' });
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text(`No: ${expense.formId || 'N/A'}`, rightX, 36, { align: 'right' });
+
+  // Main Header Title
+  doc.setFont('times', 'bold');
+  doc.setFontSize(22);
+  doc.text('CHURCH OF CHRIST', center, 22, { align: 'center' });
+  
+  doc.setFont('times', 'italic');
+  doc.setFontSize(24);
+  doc.text('—MATAHEKO—', center, 32, { align: 'center' });
+
+  // 4. Blue Banner
+  doc.setFillColor(24, 24, 43); // #18182b from ExpenseReceipt.tsx
+  doc.rect(leftMargin, 48, pageWidth - (leftMargin + rightMargin), 12, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.text('EXPENSE REQUISITION FORM', center, 56, { align: 'center' });
+
+  // Reset text color to black for the rest of the form
+  doc.setTextColor(0, 0, 0);
+
+  let y = 75;
+
+  const drawRedLine = (x: number, yPos: number, w: number) => {
+    doc.setDrawColor(203, 45, 44);
+    doc.setLineWidth(0.3);
+    doc.line(x, yPos + 1.5, x + w, yPos + 1.5);
+  };
+
+  const drawRedBlank = (xPos: number, yPos: number, width: number, value?: string, isBold = false) => {
+    drawRedLine(xPos, yPos, width);
+    if (value) {
+      if (isBold) doc.setFont('helvetica', 'bold');
+      else doc.setFont('helvetica', 'normal');
+      doc.text(value, xPos + 2, yPos);
+    }
+  };
+
+  // 6. Details of Expenditure
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('DETAILS OF EXPENDITURE', leftMargin, y);
+  y += 10;
+
+  const detailsText = expense.details || '';
+  const lines = doc.splitTextToSize(detailsText, pageWidth - (leftMargin + rightMargin + 10));
+  
+  // Draw lines with underscores
+  for (let i = 0; i < Math.max(4, lines.length); i++) {
+    const text = lines[i] || '';
+    doc.setFont('helvetica', 'normal');
+    doc.text(text, leftMargin + 2, y);
+    drawRedLine(leftMargin, y, pageWidth - (leftMargin + rightMargin));
+    y += 12;
+  }
+
+  y += 5;
+
+  // 7. Amount and Date
+  doc.setFont('helvetica', 'bold');
+  doc.text('AMOUNT GHS', leftMargin, y);
+  const amountStr = (expense.amount || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  drawRedBlank(leftMargin + 30, y, 60, amountStr, false);
+
+  doc.text('DATE', leftMargin + 100, y);
+  const dateStr = expense.expenseDate ? new Date(expense.expenseDate).toLocaleDateString('en-GB') : '';
+  drawRedBlank(leftMargin + 115, y, 60, dateStr, false);
+
+  y += 20;
+
+  // 8. Signatures
+  const drawSignatureRow = (label: string, name: string) => {
+    doc.setFont('helvetica', 'bold');
+    doc.text(label.toUpperCase(), leftMargin, y);
+    drawRedBlank(leftMargin + 40, y, pageWidth - (leftMargin + rightMargin + 45), name);
+    y += 15;
+  };
+
+  drawSignatureRow('Requested By', expense.requestedByName || '');
+  drawSignatureRow('Recommended By', expense.recommendedByName || '');
+  drawSignatureRow('Approved By', expense.approvedByName || '');
+
+  y += 5;
+
+  // 9. Bottom Signature Row
+  doc.setFont('helvetica', 'bold');
+  doc.text('DATE', leftMargin, y);
+  drawRedBlank(leftMargin + 20, y, 50, '');
+
+  doc.text('SIGNATURE', leftMargin + 85, y);
+  drawRedBlank(leftMargin + 115, y, 65, '');
+
+  // Footer
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text('Acts 2:38 - Repent and be baptised', center, pageHeight - 12, { align: 'center' });
+  doc.setLineWidth(0.15);
+  doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15);
+
+  if (action === 'preview') {
+    return doc.output('bloburl');
+  } else {
+    doc.save(`expense-requisition-${expense.formId || 'receipt'}.pdf`);
+  }
+}
+

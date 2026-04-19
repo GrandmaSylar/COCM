@@ -1,20 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
-import { ArrowLeft, Printer, Download, Edit, Save } from 'lucide-react';
+import { ArrowLeft, Download, Edit, Save, Printer, Eye } from 'lucide-react';
 import { api } from '../services/api';
-import { formatGhanaCedis as formatCurrency } from './ui/utils';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import { toast } from 'sonner';
-
-export const PAPER_SIZES = [
-  { value: 'a4', label: 'A4', format: 'a4', css: 'A4' },
-  { value: 'letter', label: 'Letter', format: 'letter', css: 'Letter' },
-  { value: 'legal', label: 'Legal', format: 'legal', css: 'Legal' },
-  { value: 'tabloid', label: 'Tabloid', format: [279.4, 431.8], css: 'Tabloid' },
-  { value: 'executive', label: 'Executive', format: [184.2, 266.7], css: 'Executive' },
-  { value: 'a5', label: 'A5', format: 'a5', css: 'A5' }
-];
+import { generateExpenseRequisitionPDF } from '../utils/export';
 
 interface ExpenseReceiptProps {
   expenseId?: string;
@@ -29,11 +18,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
   const [expense, setExpense] = useState<any>(null);
   const [loading, setLoading] = useState(!expenseData && !!expenseId);
   const [isDownloading, setIsDownloading] = useState(false);
-  const receiptRef = useRef<HTMLDivElement>(null);
-
-  const [paperSize, setPaperSize] = useState<string>('a4');
-  const [showDefaultPrompt, setShowDefaultPrompt] = useState(false);
-  const [pendingSize, setPendingSize] = useState<string | null>(null);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (expenseData) {
@@ -53,6 +38,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         setExpense(record);
       } catch (error) {
         console.error('Failed to fetch expense receipt:', error);
+        toast.error('Failed to load expense record');
       } finally {
         setLoading(false);
       }
@@ -60,54 +46,31 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
     fetchExpense();
   }, [expenseId, expenseData]);
 
+  // Generate preview when expense is loaded
   useEffect(() => {
-    api.preferences.get()
-      .then(res => setPaperSize(res.defaultPaperSize || 'a4'))
-      .catch(console.error);
-  }, []);
+    if (expense) {
+      const loadPreview = async () => {
+        try {
+          const url = await generateExpenseRequisitionPDF(expense, 'preview');
+          if (typeof url === 'string') {
+            setPreviewPdfUrl(url);
+          }
+        } catch (err) {
+          console.error('Preview Generation Error:', err);
+        }
+      };
+      loadPreview();
+    }
+  }, [expense]);
 
   const handleDownloadPDF = async () => {
-    if (!receiptRef.current || !expense) return;
+    if (!expense) return;
     try {
       setIsDownloading(true);
-      // Dynamically import libraries to keep main bundle size small
-      const html2canvasModule = await import('html2canvas');
-      const html2canvas = html2canvasModule.default;
-      const jsPDFModule = await import('jspdf');
-      const jsPDF = jsPDFModule.default;
-
-      const canvas = await html2canvas(receiptRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        windowWidth: 800,
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const selectedPaper = PAPER_SIZES.find(s => s.value === paperSize) || PAPER_SIZES[0];
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: selectedPaper.format as any,
-      });
-
-      let pdfWidth = pdf.internal.pageSize.getWidth();
-      let pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      let xOffset = 0;
-
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      if (pdfHeight > pageHeight) {
-        const scaleFactor = pageHeight / pdfHeight;
-        const originalPageWidth = pdfWidth;
-        pdfWidth = pdfWidth * scaleFactor;
-        pdfHeight = pdfHeight * scaleFactor;
-        xOffset = (originalPageWidth - pdfWidth) / 2;
-      }
-
-      pdf.addImage(imgData, 'PNG', xOffset, 0, pdfWidth, pdfHeight);
-      pdf.save(`${expense.formId || 'receipt'}.pdf`);
+      await generateExpenseRequisitionPDF(expense, 'download');
     } catch (error) {
       console.error('Failed to generate PDF:', error);
+      toast.error('Failed to generate PDF');
     } finally {
       setIsDownloading(false);
     }
@@ -115,8 +78,9 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
 
   if (loading) {
     return (
-      <div className="flex h-[50vh] items-center justify-center">
+      <div className="flex h-[50vh] items-center justify-center text-muted-foreground flex-col gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+        <p>Loading requisition...</p>
       </div>
     );
   }
@@ -131,230 +95,63 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8 px-4 overflow-x-auto">
-      {/* Action Buttons - Hidden when printing */}
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4 no-print print:hidden">
-        <Button variant="ghost" onClick={onBack} className="self-start sm:self-auto">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
+    <div className="max-w-5xl mx-auto py-8 px-4 h-[calc(100vh-100px)] flex flex-col">
+      {/* Action Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4 px-2">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 mr-2">
-            <span className="text-sm font-medium text-muted-foreground hidden sm:inline">Paper:</span>
-            <Select 
-              value={paperSize} 
-              onValueChange={(val) => {
-                setPendingSize(val);
-                setPaperSize(val);
-                setShowDefaultPrompt(true);
-              }}
-            >
-              <SelectTrigger className="w-[120px] h-9">
-                <SelectValue placeholder="Size" />
-              </SelectTrigger>
-              <SelectContent>
-                {PAPER_SIZES.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Button variant="ghost" onClick={onBack} size="icon">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex flex-col">
+            <h1 className="text-xl font-bold leading-none">Requisition Preview</h1>
+            <p className="text-sm text-muted-foreground mt-1">ID: {expense.formId || 'Draft'}</p>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2">
           {onEdit && (
-            <Button variant="outline" onClick={onEdit} disabled={isSubmitting}>
+            <Button variant="outline" onClick={onEdit} disabled={isSubmitting} className="gap-2">
               <Edit className="w-4 h-4" />
-              <span className="hidden sm:inline ml-2">Edit</span>
+              <span className="hidden sm:inline">Edit</span>
             </Button>
           )}
-          <Button variant="outline" onClick={() => window.print()} disabled={isSubmitting}>
-            <Printer className="w-4 h-4" />
-            <span className="hidden sm:inline ml-2">Print</span>
-          </Button>
-          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading || isSubmitting}>
+          
+          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading || isSubmitting} className="gap-2">
             <Download className="w-4 h-4" />
-            <span className="hidden sm:inline ml-2">{isDownloading ? 'Generating PDF...' : 'Download PDF'}</span>
+            <span className="hidden sm:inline">{isDownloading ? 'Generating...' : 'Download PDF'}</span>
           </Button>
+
           {onSave && (
-            <Button onClick={onSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white">
+            <Button onClick={onSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white gap-2">
               <Save className="w-4 h-4" />
-              <span className="hidden sm:inline ml-2">{isSubmitting ? 'Saving...' : 'Save Requisition'}</span>
+              <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save Requisition'}</span>
             </Button>
           )}
         </div>
       </div>
 
-      {/* Receipt Content */}
-      <div 
-        ref={receiptRef}
-        id="receipt-container"
-        className="bg-white text-black p-8 border rounded-xl shadow-sm mx-auto print:border-none print:shadow-none"
-        style={{ width: '800px', maxWidth: 'none', margin: '0 auto' }}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-start mb-4">
-          {/* Logo & Church Name */}
-          <div className="flex flex-row items-center gap-5">
-            <img src="/newlogo.png" alt="Church Logo" className="w-[100px] h-[100px] object-contain" crossOrigin="anonymous" />
-            <div className="flex flex-col items-start text-left font-sans">
-              <h1 className="text-2xl font-bold uppercase tracking-wide text-black m-0 leading-tight">Church of Christ</h1>
-              <h2 className="text-[26px] font-bold uppercase tracking-wider text-black m-0 leading-tight">Mataheko</h2>
-            </div>
+      {/* Main Preview Area */}
+      <div className="flex-1 bg-muted rounded-xl border relative overflow-hidden shadow-inner p-4">
+        {previewPdfUrl ? (
+          <iframe 
+            src={previewPdfUrl} 
+            className="w-full h-full rounded border bg-white shadow-sm" 
+            title="Expense Requisition PDF"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center flex-col gap-3 text-muted-foreground">
+            <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-primary"></div>
+            <p className="text-sm font-medium">Generating preview...</p>
           </div>
-          
-          {/* Right Address */}
-          <div className="flex flex-col items-end text-right text-[13px] font-bold text-black space-y-[4px] pt-1">
-            <p className="m-0">Church of Christ, Mataheko</p>
-            <p className="m-0 font-normal">P.O BOX KN 1050</p>
-            <p className="m-0 font-normal">Accra</p>
-            <p className="mt-4 text-xs text-gray-400 font-normal">No: {expense.formId}</p>
-          </div>
-        </div>
-
-        {/* Title Banner */}
-        <div className="bg-[#18182b] text-white text-center py-2.5 rounded mb-6">
-          <h3 className="text-xl font-bold uppercase tracking-wide m-0">Expense Requisition Form</h3>
-        </div>
-
-        {/* Details of Expenditure */}
-        <div className="mb-6">
-          <h4 className="font-bold text-[14px] mb-5 text-black tracking-wide uppercase">Details of Expenditure</h4>
-          
-          <div className="relative w-full">
-            {/* Underlines background */}
-            <div className="absolute inset-0 z-0 flex flex-col justify-start pointer-events-none">
-              <div className="border-b border-gray-400 w-full h-[40px]"></div>
-              <div className="border-b border-gray-400 w-full h-[40px]"></div>
-              <div className="border-b border-gray-400 w-full h-[40px]"></div>
-              <div className="border-b border-gray-400 w-full h-[40px]"></div>
-            </div>
-            
-            {/* Content text */}
-            <div 
-              className="relative z-10 w-full font-normal text-base leading-[40px] pt-1 px-1 whitespace-pre-wrap break-words min-h-[120px]" 
-            >
-              {expense.details}
-            </div>
-          </div>
-        </div>
-
-        {/* Amount and Date row */}
-        <div className="flex flex-row justify-between mb-8 gap-8 px-1">
-          <div className="flex font-bold text-sm flex-1 items-end">
-            <span className="whitespace-nowrap mr-6 tracking-wide">AMOUNT GHS</span>
-            <div className="border-b border-gray-400 flex-1 text-center font-normal pb-0.5 text-lg">
-              {formatCurrency(expense.amount).replace('₵', '').trim()} 
-            </div>
-          </div>
-          <div className="flex font-bold text-sm flex-1 items-end">
-            <span className="whitespace-nowrap mr-6 ml-8 tracking-wide">DATE</span>
-            <div className="border-b border-gray-400 flex-1 text-center font-normal pb-0.5 text-lg">
-              {expense.expenseDate ? new Date(expense.expenseDate).toLocaleDateString('en-GB') : ''}
-            </div>
-          </div>
-        </div>
-
-        {/* Signatures stack */}
-        <div className="space-y-6 mb-8 px-1">
-          <div className="flex font-bold text-[13px] items-end">
-            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Requested By</span>
-            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
-              {expense.requestedByName}
-            </div>
-          </div>
-          
-          <div className="flex font-bold text-[13px] items-end">
-            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Recommended By:</span>
-            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
-              {expense.recommendedByName}
-            </div>
-          </div>
-
-          <div className="flex font-bold text-[13px] items-end">
-            <span className="whitespace-nowrap w-[180px] tracking-wide uppercase">Approved By</span>
-            <div className="border-b border-gray-400 flex-1 pb-0.5 text-lg font-normal pl-4">
-              {expense.approvedByName}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Signature Row */}
-        <div className="flex flex-row justify-between mb-6 gap-8 px-1">
-          <div className="flex font-bold text-[13px] w-[35%] items-end">
-            <span className="whitespace-nowrap mr-6 tracking-wide">DATE</span>
-            <div className="border-b border-gray-400 flex-1 pb-2"></div>
-          </div>
-          <div className="flex font-bold text-[13px] flex-1 items-end ml-12">
-            <span className="whitespace-nowrap mr-6 tracking-wide">SIGNATURE</span>
-            <div className="border-b border-gray-400 flex-1 pb-2"></div>
-          </div>
-        </div>
-        
-        {/* Bottom thick lines */}
-        <div className="flex justify-between mt-auto gap-4 pt-4 px-1 pb-4">
-           <div className="border-b-[4px] border-black flex-1"></div>
-           <div className="border-b-[4px] border-black flex-1"></div>
-           <div className="border-b-[4px] border-black flex-1"></div>
-           <div className="border-b-[4px] border-black flex-1"></div>
-        </div>
+        )}
       </div>
-      
-      {/* CSS to hide elements during standard printing */}
-      <style>{`
-        @media print {
-          body { background-color: white !important; }
-          #sidebar-nav, #mobile-fab-nav, .no-print { display: none !important; }
-          .content-watermark { background: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
-          main { padding: 0 !important; margin: 0 !important; overflow: visible !important; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          @page { size: ${PAPER_SIZES.find(s => s.value === paperSize)?.css || 'A4'} portrait; margin: 10mm; }
-          #root { width: 800px !important; overflow: visible !important; }
-          #receipt-container { width: 100% !important; min-height: unset !important; page-break-inside: avoid; }
-        }
-      `}</style>
-      
-      {/* Default Paper Size Prompt */}
-      <Dialog open={showDefaultPrompt} onOpenChange={setShowDefaultPrompt}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Update Default Paper Size?</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-gray-500">
-              Use this as your new default paper size across devices?
-            </p>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowDefaultPrompt(false);
-                setPendingSize(null);
-              }}
-            >
-              No
-            </Button>
-            <Button 
-              onClick={async () => {
-                if (pendingSize) {
-                  try {
-                    await api.preferences.save({ defaultPaperSize: pendingSize });
-                    toast.success('Default paper size saved');
-                    setShowDefaultPrompt(false);
-                    setPendingSize(null);
-                  } catch (error: any) {
-                    console.error('Failed to save default paper size:', error);
-                    toast.error(error?.message || 'Failed to save default paper size');
-                  }
-                } else {
-                  setShowDefaultPrompt(false);
-                  setPendingSize(null);
-                }
-              }}
-            >
-              Yes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
+      <div className="mt-4 flex justify-center no-print">
+         <p className="text-xs text-muted-foreground flex items-center gap-2">
+           <Eye className="w-3 h-3" />
+           This is a native vector preview of the official requisition form
+         </p>
+      </div>
     </div>
   );
 }

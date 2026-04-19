@@ -16,13 +16,14 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt, History, HandHeart } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
 import { api, invalidateApiCache } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { THEME_PRESETS } from '../utils/themePresets';
+import { APP_VERSION, CHANGELOG } from '../utils/version';
 import { DevSettings } from './DevSettings';
 import { ImportMembers } from './ImportMembers';
 
@@ -56,10 +57,17 @@ const roleColors = {
 
 const allPermissions = [
   'manage_users', 'manage_roles', 'manage_permissions', 'view_all', 'edit_all', 'delete_all',
-  'manage_members', 'view_members', 'edit_members', 'delete_members',
+  'manage_members', 'view_members', 'edit_members',
   'manage_attendance', 'view_attendance', 'record_attendance',
   'manage_giving', 'view_giving', 'record_giving', 'manage_giving_types',
-  'view_reports', 'manage_settings', 'manage_services', 'manage_theme', 'grant_permissions'
+  'view_reports', 'manage_settings', 'manage_services', 'manage_theme', 'grant_permissions',
+  'create_members', 'update_members', 'delete_members',
+  'create_visitors', 'update_visitors', 'delete_visitors',
+  'create_attendance', 'update_attendance', 'delete_attendance',
+  'create_giving', 'update_giving', 'delete_giving',
+  'create_expenses', 'update_expenses', 'delete_expenses',
+  'create_children', 'update_children', 'delete_children',
+  'create_services', 'update_services', 'delete_services'
 ];
 
 // Helper function to convert hex to HSL (copied from ThemeContext for local use)
@@ -159,7 +167,8 @@ export const TAB_OPTIONS = [
   { id: 'services', label: 'Services', icon: Church },
   { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
   { id: 'children', label: 'Children', icon: Baby },
-  { id: 'expenses', label: 'Expenses', icon: Receipt }
+  { id: 'expenses', label: 'Expenses', icon: Receipt },
+  { id: 'ministry', label: 'Ministry', icon: HandHeart }
 ];
 
 export const WIDGET_OPTIONS = [
@@ -168,6 +177,19 @@ export const WIDGET_OPTIONS = [
   { id: 'widget_giving_month', label: 'Monthly Giving' },
   { id: 'widget_quick_actions', label: 'Quick Actions' }
 ];
+
+export const TAB_CRUD_PERMISSIONS: Record<string, string[]> = {
+  members: ['create_members', 'update_members', 'delete_members'],
+  visitors: ['create_visitors', 'update_visitors', 'delete_visitors'],
+  attendance: ['create_attendance', 'update_attendance', 'delete_attendance'],
+  giving: ['create_giving', 'update_giving', 'delete_giving'],
+  expenses: ['create_expenses', 'update_expenses', 'delete_expenses'],
+  children: ['create_children', 'update_children', 'delete_children'],
+  services: ['create_services', 'update_services', 'delete_services'],
+  reports: [],
+  'activity-log': [],
+  ministry: []
+};
 
 export function Settings({ onAddUser }: SettingsProps) {
   const {
@@ -734,6 +756,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
             {hasAdminAccess && <TabsTrigger value="import">Import Members</TabsTrigger>}
             <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
 
         {/* Users & Permissions Tab */}
@@ -1859,6 +1882,48 @@ export function Settings({ onAddUser }: SettingsProps) {
         
         </OfflineOverlay>
       </TabsContent>
+
+        <TabsContent value="about" className="space-y-6 w-full overflow-hidden">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <img src="/newlogo.png" alt="CoC.M logo" className="w-10 h-10 object-contain" />
+                  <div>
+                    <h2 className="text-xl font-bold">CoC.M — Church Management System</h2>
+                    <p className="text-sm text-muted-foreground">Empowering churches with modern management tools</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="w-fit">v{APP_VERSION}</Badge>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <History className="w-5 h-5" />
+              Changelog
+            </h3>
+            {CHANGELOG.map((entry) => (
+              <Card key={entry.version}>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="outline">v{entry.version}</Badge>
+                    <span className="text-sm text-muted-foreground">{entry.date}</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                    {entry.changes.map((change, i) => (
+                      <li key={i}>{change}</li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
       </Tabs>
 
       {/* Reset Password Dialog */}
@@ -3453,7 +3518,23 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
   };
 
   const toggleTab = (tabId: string) => {
-    setSelectedTabs(prev => prev.includes(tabId) ? prev.filter(t => t !== tabId) : [...prev, tabId]);
+    setSelectedTabs(prev => {
+      const isCurrentlySelected = prev.includes(tabId);
+      if (isCurrentlySelected) {
+        const tabPerms = TAB_CRUD_PERMISSIONS[tabId] || [];
+        if (tabPerms.length > 0) {
+          setSelectedPermissions(currentPerms => currentPerms.filter(p => !tabPerms.includes(p)));
+        }
+        return prev.filter(t => t !== tabId);
+      }
+      return [...prev, tabId];
+    });
+  };
+
+  const toggleCrudPermission = (permString: string) => {
+    setSelectedPermissions(prev => 
+      prev.includes(permString) ? prev.filter(p => p !== permString) : [...prev, permString]
+    );
   };
 
   const toggleWidget = (widgetId: string) => {
@@ -3533,23 +3614,59 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
 
           <Separator />
 
-          <div className="space-y-3">
+           <div className="space-y-3">
             <h3 className="font-semibold text-sm">Tab Access</h3>
-            <div className="flex flex-wrap gap-2">
-              {TAB_OPTIONS.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => toggleTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-colors ${
-                    selectedTabs.includes(tab.id) 
-                      ? 'bg-blue-100 border-blue-200 text-blue-800 dark:bg-blue-900/40 dark:border-blue-800 dark:text-blue-300' 
-                      : 'bg-transparent border-border text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
-              ))}
+            <div className="space-y-3 border rounded-lg p-3">
+              {TAB_OPTIONS.map(tab => {
+                const isSelected = selectedTabs.includes(tab.id);
+                const hasCrud = TAB_CRUD_PERMISSIONS[tab.id]?.length > 0;
+                const activeCrudPerms = hasCrud 
+                  ? TAB_CRUD_PERMISSIONS[tab.id].filter(p => selectedPermissions.includes(p)) 
+                  : [];
+                const isReadOnly = isSelected && hasCrud && activeCrudPerms.length === 0;
+
+                return (
+                  <div key={tab.id} className="flex flex-col space-y-2 pb-3 border-b last:border-0 last:pb-0">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`tab-${tab.id}`}
+                        checked={isSelected}
+                        onCheckedChange={() => toggleTab(tab.id)}
+                      />
+                      <label htmlFor={`tab-${tab.id}`} className="flex items-center gap-2 text-sm font-medium leading-none cursor-pointer flex-1">
+                        <div className="flex items-center gap-1.5 p-1 rounded-md bg-muted/50 border">
+                          <tab.icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        {tab.label}
+                      </label>
+                      {isReadOnly && (
+                        <Badge variant="outline" className="text-[10px]">Read only</Badge>
+                      )}
+                    </div>
+                    {isSelected && hasCrud && (
+                      <div className="pl-8 flex flex-wrap gap-4">
+                        {TAB_CRUD_PERMISSIONS[tab.id].map(perm => {
+                          const actionMatch = perm.match(/^(create|update|delete)/);
+                          const actionLabel = actionMatch ? actionMatch[1].charAt(0).toUpperCase() + actionMatch[1].slice(1) : perm;
+                          return (
+                            <div key={perm} className="flex items-center space-x-1.5">
+                              <Checkbox 
+                                id={`crud-${perm}`}
+                                checked={selectedPermissions.includes(perm)}
+                                onCheckedChange={() => toggleCrudPermission(perm)}
+                                className="w-3.5 h-3.5"
+                              />
+                              <label htmlFor={`crud-${perm}`} className="text-xs cursor-pointer text-muted-foreground hover:text-foreground">
+                                {actionLabel}
+                              </label>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

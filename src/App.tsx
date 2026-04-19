@@ -48,6 +48,7 @@ const Expenses = lazy(() => import('./components/Expenses').then(m => ({ default
 const AddExpense = lazy(() => import('./components/AddExpense').then(m => ({ default: m.AddExpense })));
 const EditExpense = lazy(() => import('./components/EditExpense').then(m => ({ default: m.EditExpense })));
 const ExpenseReceipt = lazy(() => import('./components/ExpenseReceipt').then(m => ({ default: m.ExpenseReceipt })));
+const Ministry = lazy(() => import('./components/Ministry').then(module => ({ default: module.Ministry })));
 
 // Types needed by App which can't easily be lazy-loaded alongside their components
 import type { Member } from './components/Members';
@@ -62,7 +63,7 @@ type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'da
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
                'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor' |
-               'expenses' | 'add-expense' | 'edit-expense' | 'expense-receipt';
+               'expenses' | 'add-expense' | 'edit-expense' | 'expense-receipt' | 'ministry';
 
 // Map sub-pages to their parent for back navigation
 const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
@@ -989,6 +990,9 @@ function AppContent() {
 
       case 'activity-log':
         return <ActivityLog />;
+
+      case 'ministry':
+        return <Ministry />;
 
       case 'notifications':
         return <Notifications onNotificationClick={handleNotificationClick} />;

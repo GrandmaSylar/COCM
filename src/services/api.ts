@@ -394,6 +394,37 @@ export const api = {
   },
 
   // ============================================================================
+  // SERVICE SETUPS
+  // ============================================================================
+
+  serviceSetups: {
+    getAll: (params?: { page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return fetchApi(`/service-setups${q ? '?' + q : ''}`);
+    },
+
+    getByDate: (date: string, serviceType?: string) => 
+      fetchApi(`/service-setups/by-date/${date}${serviceType ? `?serviceType=${encodeURIComponent(serviceType)}` : ''}`),
+
+    getById: (id: string) => fetchApi(`/service-setups/${id}`),
+
+    create: (data: any) => fetchApi('/service-setups', { 
+      method: 'POST', 
+      body: JSON.stringify(data) 
+    }),
+
+    update: (id: string, data: any) => fetchApi(`/service-setups/${id}`, { 
+      method: 'PUT', 
+      body: JSON.stringify(data) 
+    }),
+
+    delete: (id: string) => fetchApi(`/service-setups/${id}`, { method: 'DELETE' }),
+  },
+
+  // ============================================================================
   // ACTIVITY LOG
   // ============================================================================
 

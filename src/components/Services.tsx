@@ -10,6 +10,7 @@ import { Calendar, Users, Banknote, UserMinus, UserPlus, ChevronRight, ArrowLeft
 import { api } from '../services/api';
 import { formatGhanaCedis } from './ui/utils';
 import { toast } from 'sonner';
+import { ServiceSetup } from './ServiceSetup';
 
 interface ServiceDateSummary {
   serviceDate: string;
@@ -967,6 +968,27 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
   );
 }
 
+function SetupCard({ setup, onEdit }: { setup: any, onEdit: (setup: any) => void }) {
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return (
+    <div className="bg-card border rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-4 mb-3">
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="font-semibold">{formatDate(setup.serviceDate)}</span>
+          <Badge className={getServiceTypeBadgeClass(setup.serviceType)}>{setup.serviceType}</Badge>
+        </div>
+        <div className="text-sm text-muted-foreground flex items-center gap-1.5 pt-1">
+          <span className="font-medium text-foreground">MC:</span> {setup.mcName || 'TBA'} <span className="mx-1">&middot;</span>
+          <span className="font-medium text-foreground">Preacher:</span> {setup.preacherName || 'TBA'}
+        </div>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => onEdit(setup)}>
+        View / Edit
+      </Button>
+    </div>
+  );
+}
+
 export function Services({ onViewRecord, onViewMember, onConvertVisitor }: ServicesProps) {
   const [todayRecords, setTodayRecords] = useState<ServiceDateSummary[]>([]);
   const [pastRecords, setPastRecords] = useState<ServiceDateSummary[]>([]);
@@ -977,9 +999,27 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
   const [total, setTotal] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  
+  const [showSetupForm, setShowSetupForm] = useState(false);
+  const [editingSetup, setEditingSetup] = useState<any | null>(null);
+  const [savedSetups, setSavedSetups] = useState<any[]>([]);
+  const [loadingSetups, setLoadingSetups] = useState(true);
+
+  const fetchSetups = async () => {
+    setLoadingSetups(true);
+    try {
+      const res = await api.serviceSetups.getAll({ limit: 20 });
+      setSavedSetups((res.setups || res.items || res.data || res.records) ?? (Array.isArray(res) ? res : []));
+    } catch (err) {
+      console.error('Failed to fetch setups:', err);
+    } finally {
+      setLoadingSetups(false);
+    }
+  };
 
   useEffect(() => {
     fetchData(1);
+    fetchSetups();
   }, []);
 
   const fetchData = async (targetPage: number, showLoading = true) => {
@@ -1079,17 +1119,47 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
     return <ServiceDetailView sr={selectedRecord} onBack={() => setSelectedRecord(null)} onViewMember={onViewMember} onConvertVisitor={onConvertVisitor} />;
   }
 
+  if (showSetupForm) {
+    return (
+      <ServiceSetup
+        onBack={() => setShowSetupForm(false)}
+        onSaved={() => { setShowSetupForm(false); fetchSetups(); }}
+        initialSetup={editingSetup}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 relative">
       <div className="flex items-center justify-between">
         <h1>Services</h1>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-orange-500' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="default" onClick={() => { setEditingSetup(null); setShowSetupForm(true); }}>
+            <Calendar className="w-4 h-4 mr-2" />
+            Service Setup
+          </Button>
+          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-orange-500' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <StatsBar records={pastRecords} totalServices={total} loading={loading} />
+
+      {/* Service Setups */}
+      <div>
+        <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">
+          Service Setups
+        </h2>
+        {loadingSetups ? (
+          <Skeleton className="h-[72px] w-full rounded-xl mb-3" />
+        ) : savedSetups.length === 0 ? (
+          <p className="text-sm text-muted-foreground bg-card border rounded-xl p-4 text-center">No service setups yet.</p>
+        ) : (
+          savedSetups.map(setup => <SetupCard key={setup.id} setup={setup} onEdit={s => { setEditingSetup(s); setShowSetupForm(true); }} />)
+        )}
+      </div>
 
       {/* Today / Latest Services */}
       {todayRecords.length > 0 && (

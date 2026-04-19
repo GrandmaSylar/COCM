@@ -40,7 +40,8 @@ import {
   WifiOff,
   Loader2,
   AlertTriangle,
-  Share
+  Share,
+  HandHeart
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -49,6 +50,7 @@ import { useNetworkStatus } from "../hooks/useNetworkStatus";
 import { getPendingQueueCount, getConflicts } from "../services/offlineStore";
 import { retrySyncNow } from "../services/syncEngine";
 import { FixRetryPanel } from "./FixRetryPanel";
+import { APP_VERSION } from "../utils/version";
 import {
   updateSW,
   needsRefresh,
@@ -281,6 +283,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     { id: "attendance", label: "Attendance", icon: Calendar },
     { id: "giving", label: "Giving", icon: Banknote },
     { id: "expenses", label: "Expenses", icon: Receipt },
+    { id: "ministry", label: "Ministry", icon: HandHeart },
     { id: "reports", label: "Reports", icon: BarChart3 },
     { id: "activity-log", label: "Activity Log", icon: ClipboardList },
     { id: "help", label: "Help", icon: HelpCircle },
@@ -588,6 +591,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                             <LogOut className="w-4 h-4 mr-2" />
                             Log Out
                         </Button>
+                        <p className="text-xs text-muted-foreground/50 text-center mt-2">v{APP_VERSION}</p>
                     </div>
                 </div>
               </div>
@@ -685,6 +689,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                       <LogOut className="w-4 h-4 mr-2" />
                       Logout
                     </Button>
+                    <p className="text-xs text-muted-foreground/50 text-center mt-1">v{APP_VERSION}</p>
                   </div>
               </div>
             </div>
