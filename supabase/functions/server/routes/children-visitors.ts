@@ -19,6 +19,7 @@ router.get('/children/visitors', async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
     const { data, error } = await supabase
       .from('children_visitors').select('*, children_visitor_guardians(*)')
+      .eq('converted_to_member', false)
       .order('visit_date', { ascending: false });
     if (error) {
       console.error('Error fetching children visitors:', error);

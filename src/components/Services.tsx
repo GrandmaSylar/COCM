@@ -54,6 +54,7 @@ interface ServiceDateDetail {
   childrenVisitors?: any[];
   newChildMembers?: any[];
   expenses?: any[];
+  serviceSetup?: any;
   membersRegistered?: number;
   previousServiceGiving?: { totalGivingAmount: number; serviceDate: string };
 }
@@ -73,9 +74,10 @@ function getServiceTypeBadgeClass(serviceType: string): string {
   return 'bg-blue-100 text-blue-700 hover:bg-blue-100 border-none';
 }
 
-function QuickNav({ hasChildren, activeSection, onPillClick }: { hasChildren: boolean, activeSection: string, onPillClick: (id: string) => void }) {
+function QuickNav({ hasChildren, hasSetup, activeSection, onPillClick }: { hasChildren: boolean, hasSetup: boolean, activeSection: string, onPillClick: (id: string) => void }) {
   const pills = [
     { id: 'overview', label: 'Overview' },
+    ...(hasSetup ? [{ id: 'setup', label: 'Setup' }] : []),
     { id: 'finances', label: 'Finances' },
     { id: 'people', label: 'People' },
     ...(hasChildren ? [{ id: 'children', label: 'Children' }] : [])
@@ -105,12 +107,74 @@ function QuickNav({ hasChildren, activeSection, onPillClick }: { hasChildren: bo
   );
 }
 
+function ServiceSetupSection({ setup }: { setup: any }) {
+  if (!setup) return null;
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 flex flex-wrap gap-4 sm:gap-6">
+          {setup.mcName && (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Master of Ceremonies</div>
+              <div className="font-medium">{setup.mcName}</div>
+            </div>
+          )}
+          {setup.preacherName && (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Preacher</div>
+              <div className="font-medium">{setup.preacherName}</div>
+            </div>
+          )}
+          {setup.sermonTopic && (
+            <div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Theme / Topic</div>
+              <div className="font-medium">{setup.sermonTopic}</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {setup.programme && setup.programme.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3 pt-4 px-4">
+            <CardTitle className="text-base font-semibold">Order of Service</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+             <table className="w-full text-sm text-left">
+              <thead className="bg-muted text-muted-foreground uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-2 font-semibold w-20">Time</th>
+                  <th className="px-4 py-2 font-semibold">Activity</th>
+                  <th className="px-4 py-2 font-semibold">Assigned Person</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y text-sm">
+                {setup.programme.map((row: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-muted/50">
+                    <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">
+                      {row.startTime} {row.endTime ? `- ${row.endTime}` : ''}
+                    </td>
+                    <td className="px-4 py-2 font-medium">{row.activity}</td>
+                    <td className="px-4 py-2">{row.assignedMemberName || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
   const expensesTotal = (sr.expenses ?? []).reduce((s: number, e: any) => s + (e.amount || 0), 0);
   const netGiving = sr.totalGivingAmount - expensesTotal;
   const membersRegistered = sr.membersRegistered ?? sr.services?.[0]?.attendance?.membersRegistered ?? 0;
   const attendanceRate = membersRegistered > 0 ? Math.min(100, Math.round((sr.totalAttendance / membersRegistered) * 100)) : 0;
-  const childrenCount = (sr.childrenAttendance ?? []).flatMap(r => r.entries ?? []).length;
+  const childrenCount = (sr.childrenAttendance ?? []).reduce((sum: number, r: any) => {
+    const entryCount = (r.entries ?? []).length;
+    return sum + (entryCount > 0 ? entryCount : (r.totalCount || 0));
+  }, 0);
   const combinedAttendance = sr.totalAttendance + childrenCount;
   const noReasonCount = (sr.absentees ?? []).filter(a => !a.requestedPermission).length;
   const withPermissionCount = (sr.absentees ?? []).filter(a => a.requestedPermission).length;
@@ -551,7 +615,10 @@ function PeopleSection({
 }
 
 function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
-  const childrenAttendanceCount = sr.childrenAttendance?.reduce((sum: number, r: any) => sum + (r.entries?.length || 0), 0) || 0;
+  const childrenAttendanceCount = sr.childrenAttendance?.reduce((sum: number, r: any) => {
+    const entryCount = (r.entries ?? []).length;
+    return sum + (entryCount > 0 ? entryCount : (r.totalCount || 0));
+  }, 0) || 0;
   const childrenGivingTotal = sr.childrenGiving?.reduce((sum: number, g: any) => sum + (g.totalAmount || 0), 0) || 0;
   const childrenVisitorsCount = sr.childrenVisitors?.length || 0;
 
@@ -702,10 +769,13 @@ function ServiceDetailView({
   const [activeSection, setActiveSection] = useState('overview');
   
   const overviewRef = useRef<HTMLDivElement>(null);
+  const setupRef = useRef<HTMLDivElement>(null);
   const financesRef = useRef<HTMLDivElement>(null);
   const peopleRef = useRef<HTMLDivElement>(null);
   const childrenRef = useRef<HTMLDivElement>(null);
   const ratiosRef = useRef(new Map<string, number>());
+
+  const hasSetup = !!sr.serviceSetup;
 
   const hasChildren = 
     (sr.childrenAttendance?.length || 0) + 
@@ -736,6 +806,7 @@ function ServiceDetailView({
     });
     
     if (overviewRef.current) observer.observe(overviewRef.current);
+    if (setupRef.current) observer.observe(setupRef.current);
     if (financesRef.current) observer.observe(financesRef.current);
     if (peopleRef.current) observer.observe(peopleRef.current);
     if (childrenRef.current) observer.observe(childrenRef.current);
@@ -758,12 +829,19 @@ function ServiceDetailView({
         </div>
       </div>
 
-      <QuickNav hasChildren={hasChildren} activeSection={activeSection} onPillClick={setActiveSection} />
+      <QuickNav hasChildren={hasChildren} hasSetup={hasSetup} activeSection={activeSection} onPillClick={setActiveSection} />
 
       <div id="section-overview" ref={overviewRef} className="scroll-mt-28">
         <h2 className="text-lg font-bold mb-3">Overview</h2>
         <OverviewSection sr={sr} />
       </div>
+
+      {hasSetup && (
+        <div id="section-setup" ref={setupRef} className="scroll-mt-28 space-y-4 pt-4">
+          <h2 className="text-lg font-bold mb-3">Service Setup</h2>
+          <ServiceSetupSection setup={sr.serviceSetup} />
+        </div>
+      )}
 
       <div id="section-finances" ref={financesRef} className="scroll-mt-28 space-y-4 pt-4">
         <h2 className="text-lg font-bold mb-3">Finances</h2>

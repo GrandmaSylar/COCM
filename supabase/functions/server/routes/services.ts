@@ -643,7 +643,7 @@ router.get("/visitors", async (c)=>{
         error: 'Unauthorized'
       }, 401);
     }
-    const { data: visitors, error } = await supabase.from('visitors').select('*').order('visit_date', {
+    const { data: visitors, error } = await supabase.from('visitors').select('*').eq('converted_to_member', false).order('visit_date', {
       ascending: false
     });
     if (error) {
@@ -671,6 +671,7 @@ router.get("/visitors", async (c)=>{
         potentialZone: v.potential_zone,
         convertedToMember: v.converted_to_member,
         convertedMemberId: v.converted_member_id,
+        church: v.church,
         createdAt: v.created_at,
         updatedAt: v.updated_at,
         createdBy: v.created_by
@@ -708,6 +709,7 @@ router.post("/visitors", async (c)=>{
       notes: data.notes,
       follow_up_status: data.followUpStatus,
       potential_zone: data.potentialZone,
+      church: data.church || null,
       created_by: user.id
     }).select().single();
     if (error) {
@@ -770,7 +772,8 @@ router.put("/visitors/:id", async (c)=>{
       interested_in_membership: data.interestedInMembership,
       notes: data.notes,
       follow_up_status: data.followUpStatus,
-      potential_zone: data.potentialZone
+      potential_zone: data.potentialZone,
+      church: data.church || null
     }).eq('id', id).select().single();
     if (error) {
       console.error('Error updating visitor:', error);

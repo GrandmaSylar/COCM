@@ -35,9 +35,9 @@ export interface Visitor {
   interestedInMembership: boolean;
   notes: string;
   potentialZone?: Zone;
-  // Conversion tracking
   convertedToMember?: boolean;
   convertedMemberId?: string;
+  church?: string;
   // Audit fields
   createdAt?: string;
   updatedAt?: string;
@@ -373,6 +373,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     visitDate: new Date().toISOString().split('T')[0],
     serviceType: 'Sunday Main Service',
     referredBy: '',
+    church: '',
     interestedInMembership: false,
     notes: '',
     potentialZone: '' as Zone | ''
@@ -551,7 +552,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
             {/* Visit Information */}
             <div className="space-y-4">
               <h3 className="font-medium">Visit Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="visitDate">Visit Date</Label>
                   <Input
@@ -611,6 +612,15 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                       ))}
                     </div>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="church" className="flex items-center gap-2">Church / Congregation <Badge variant="outline" className="text-[10px] font-normal border-none bg-muted/50">Optional</Badge></Label>
+                  <Input
+                    id="church"
+                    value={formData.church}
+                    onChange={(e) => setFormData(prev => ({ ...prev, church: e.target.value }))}
+                    placeholder="Previous or current church"
+                  />
                 </div>
               </div>
 
@@ -691,6 +701,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
     visitDate: visitor.visitDate,
     serviceType: visitor.serviceType,
     referredBy: visitor.referredBy || '',
+    church: visitor.church || '',
     interestedInMembership: visitor.interestedInMembership,
     notes: visitor.notes || '',
     potentialZone: visitor.potentialZone || '' as Zone | ''
@@ -865,7 +876,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
             {/* Visit Information */}
             <div className="space-y-4">
               <h3 className="font-medium">Visit Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="edit-visitDate">Visit Date</Label>
                   <Input
@@ -925,6 +936,15 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                       ))}
                     </div>
                   )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-church" className="flex items-center gap-2">Church / Congregation <Badge variant="outline" className="text-[10px] font-normal border-none bg-muted/50">Optional</Badge></Label>
+                  <Input
+                    id="edit-church"
+                    value={formData.church}
+                    onChange={(e) => setFormData(prev => ({ ...prev, church: e.target.value }))}
+                    placeholder="Previous or current church"
+                  />
                 </div>
               </div>
 
@@ -1115,6 +1135,12 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
                 <div className="flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm">Referred by {visitor.referredBy}</span>
+                </div>
+              )}
+              {visitor.church && (
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">Church: {visitor.church}</span>
                 </div>
               )}
               {visitor.potentialZone && (

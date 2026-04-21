@@ -64,7 +64,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     fullDate: '',
     month: '',
     year: '',
-    previousCongregation: '',
+    previousCongregation: visitorData?.church || '',
     roleInPreviousCongregation: ''
   });
 

@@ -397,6 +397,19 @@ function AppContent() {
       }
 
       toast.success('Member added successfully!');
+      
+      // If promoting a child to member, delete the child record
+      if (selectedChild) {
+        try {
+          await api.children.members.delete(selectedChild.id);
+          setChildrenRefreshKey(prev => prev + 1);
+        } catch (childDeleteError) {
+          console.error('Failed to remove child record after promotion:', childDeleteError);
+          toast.warning('Member created, but the child record could not be removed automatically.');
+        }
+        setSelectedChild(null);
+      }
+      
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('members');
     } catch (error) {
@@ -580,6 +593,7 @@ function AppContent() {
 
       toast.success('Visitor converted to member successfully!');
       setMembersRefreshKey(prev => prev + 1);
+      setVisitorsRefreshKey(prev => prev + 1);
       setSelectedVisitor(null);
       navigateTo(convertOriginRef.current === 'services' ? 'services' : 'visitors');
       convertOriginRef.current = null;

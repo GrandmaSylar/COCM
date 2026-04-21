@@ -90,6 +90,10 @@ async function enrichAndGroupByDate(records: any[]) {
   const childrenAttendanceCountMap: Record<string, number> = {};
   const childrenVisitorsCountMap: Record<string, number> = {};
   const expensesTotalMap: Record<string, number> = {};
+  // Date-only fallback maps for when service_type keys don't match
+  const childrenGivingByDateMap: Record<string, number> = {};
+  const childrenAttendanceByDateMap: Record<string, number> = {};
+  const expensesByDateMap: Record<string, number> = {};
 
   if (allDates.length > 0) {
     const [
@@ -108,12 +112,14 @@ async function enrichAndGroupByDate(records: any[]) {
       for (const rec of cgData) {
         const key = `${rec.service_date}_${normalizeServiceType(rec.service_type)}`;
         childrenGivingTotalMap[key] = (childrenGivingTotalMap[key] || 0) + (rec.total_amount || 0);
+        childrenGivingByDateMap[rec.service_date] = (childrenGivingByDateMap[rec.service_date] || 0) + (rec.total_amount || 0);
       }
     }
     if (caData) {
       for (const rec of caData) {
         const key = `${rec.date}_${normalizeServiceType(rec.service_type)}`;
         childrenAttendanceCountMap[key] = (childrenAttendanceCountMap[key] || 0) + (rec.total_count || 0);
+        childrenAttendanceByDateMap[rec.date] = (childrenAttendanceByDateMap[rec.date] || 0) + (rec.total_count || 0);
       }
     }
     if (cvData) {
@@ -125,6 +131,7 @@ async function enrichAndGroupByDate(records: any[]) {
       for (const rec of expData) {
         const key = `${rec.service_date}_${normalizeServiceType(rec.service_type)}`;
         expensesTotalMap[key] = (expensesTotalMap[key] || 0) + (rec.amount || 0);
+        expensesByDateMap[rec.service_date] = (expensesByDateMap[rec.service_date] || 0) + (rec.amount || 0);
       }
     }
   }
@@ -137,10 +144,19 @@ async function enrichAndGroupByDate(records: any[]) {
     dateTypeMap[key].push(sr);
   }
 
+  // Check if there's only one service type per date (common case)
+  const dateToTypeCount: Record<string, number> = {};
+  for (const key of Object.keys(dateTypeMap)) {
+    const d = key.split('_')[0];
+    dateToTypeCount[d] = (dateToTypeCount[d] || 0) + 1;
+  }
+
   const grouped = Object.entries(dateTypeMap).map(([key, srs]) => {
     // key is date_type, we can get date from the first record
     const date = srs[0].service_date;
     const type = normalizeServiceType(srs[0].service_type);
+    const compositeKey = `${date}_${type}`;
+    const isOnlyTypeForDate = (dateToTypeCount[date] || 0) <= 1;
 
     let totalAttendance = 0;
     let totalGiving = 0;
@@ -161,6 +177,11 @@ async function enrichAndGroupByDate(records: any[]) {
       totalNewMembers += sr.members_registered || 0;
     }
 
+    // Use composite key first; if 0 and only one service type for the date, fall back to date-only
+    const childrenAttCount = childrenAttendanceCountMap[compositeKey] ?? (isOnlyTypeForDate ? (childrenAttendanceByDateMap[date] ?? 0) : 0);
+    const childrenGivTotal = childrenGivingTotalMap[compositeKey] ?? (isOnlyTypeForDate ? (childrenGivingByDateMap[date] ?? 0) : 0);
+    const expTotal = expensesTotalMap[compositeKey] ?? (isOnlyTypeForDate ? (expensesByDateMap[date] ?? 0) : 0);
+
     return {
       serviceDate: date,
       serviceTypes,
@@ -171,10 +192,10 @@ async function enrichAndGroupByDate(records: any[]) {
       visitorsCount: totalVisitors,
       membersRegistered: totalNewMembers,
       recordCount: srs.length,
-      childrenGivingTotal: childrenGivingTotalMap[`${date}_${type}`] ?? 0,
-      childrenAttendanceCount: childrenAttendanceCountMap[`${date}_${type}`] ?? 0,
+      childrenGivingTotal: childrenGivTotal,
+      childrenAttendanceCount: childrenAttCount,
       childrenVisitorsCount: childrenVisitorsCountMap[date] ?? 0,
-      expensesTotal: expensesTotalMap[`${date}_${type}`] ?? 0,
+      expensesTotal: expTotal,
     };
   });
 
@@ -415,22 +436,22 @@ router.get("/service-records/by-date/:date", async (c) => {
       .select('id, first_name, last_name, zone')
       .eq('join_date', date);
 
-    const childrenGivingQuery = supabase.from('children_giving_records').select('*').eq('service_date', date);
+    let childrenGivingQuery = supabase.from('children_giving_records').select('*').eq('service_date', date);
     if (candidateTypes.length > 0) {
-      childrenGivingQuery.in('service_type', candidateTypes);
+      childrenGivingQuery = childrenGivingQuery.in('service_type', candidateTypes);
     }
 
-    const childrenAttendanceQuery = supabase.from('children_attendance_records').select('*').eq('date', date);
+    let childrenAttendanceQuery = supabase.from('children_attendance_records').select('*').eq('date', date);
     if (candidateTypes.length > 0) {
-      childrenAttendanceQuery.in('service_type', candidateTypes);
+      childrenAttendanceQuery = childrenAttendanceQuery.in('service_type', candidateTypes);
     }
 
-    const expensesQuery = supabase.from('expense_records').select('*').eq('service_date', date);
+    let expensesQuery = supabase.from('expense_records').select('*').eq('service_date', date);
     if (candidateTypes.length > 0) {
-      expensesQuery.in('service_type', candidateTypes);
+      expensesQuery = expensesQuery.in('service_type', candidateTypes);
     }
 
-    const [
+    let [
       { data: childrenGivingData },
       { data: childrenAttendanceData },
       { data: childrenVisitorsData },
@@ -444,11 +465,19 @@ router.get("/service-records/by-date/:date", async (c) => {
       expensesQuery
     ]);
 
+    // Fallback: if service_type filter yielded no children attendance, retry without it
+    if (candidateTypes.length > 0 && (!childrenAttendanceData || childrenAttendanceData.length === 0)) {
+      const { data: fallbackData } = await supabase.from('children_attendance_records').select('*').eq('date', date);
+      if (fallbackData && fallbackData.length > 0) {
+        childrenAttendanceData = fallbackData;
+      }
+    }
+
     let childrenEntriesData: any[] = [];
     const recordIds = (childrenAttendanceData || []).map((r: any) => r.id);
     if (recordIds.length > 0) {
       const { data: entriesData } = await supabase.from('children_attendance_entries')
-        .select('*, children_members!inner(first_name, last_name)')
+        .select('*, children_members(first_name, last_name)')
         .in('attendance_record_id', recordIds);
       childrenEntriesData = entriesData || [];
     }
@@ -460,7 +489,9 @@ router.get("/service-records/by-date/:date", async (c) => {
       }
       childrenAttendanceMap[entry.attendance_record_id].push({
         id: entry.id,
-        childName: `${entry.children_members.first_name} ${entry.children_members.last_name}`
+        childName: entry.children_members
+          ? `${entry.children_members.first_name} ${entry.children_members.last_name}`
+          : `Child #${entry.child_member_id?.slice(0, 6) || 'unknown'}`
       });
     }
 
@@ -509,6 +540,9 @@ router.get("/service-records/by-date/:date", async (c) => {
       }
     }
 
+    // Fetch service setup for this date (match by date only to be robust against service_type string mismatches)
+    const { data: serviceSetupsData } = await supabase.from('service_setups').select('*').eq('service_date', date);
+
     return c.json({
       serviceDate: date,
       serviceTypes,
@@ -525,6 +559,7 @@ router.get("/service-records/by-date/:date", async (c) => {
       childrenVisitors: (childrenVisitorsData || []).map((r: any) => toCamelCase(r)),
       newChildMembers: (newChildMembersData || []).map((r: any) => toCamelCase(r)),
       expenses: (expensesData || []).map((r: any) => toCamelCase(r)),
+      serviceSetup: serviceSetupsData && serviceSetupsData.length > 0 ? toCamelCase(serviceSetupsData[0]) : null,
       ...extra
     });
   } catch (error) {
