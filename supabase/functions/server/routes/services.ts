@@ -693,7 +693,7 @@ router.post("/visitors", async (c)=>{
       }, 401);
     }
     const data = await c.req.json();
-    const { data: visitor, error } = await supabase.from('visitors').insert({
+    let createPayload: any = {
       first_name: data.firstName,
       last_name: data.lastName,
       other_names: data.otherNames,
@@ -711,7 +711,18 @@ router.post("/visitors", async (c)=>{
       potential_zone: data.potentialZone,
       church: data.church || null,
       created_by: user.id
-    }).select().single();
+    };
+
+    let { data: visitor, error } = await supabase.from('visitors').insert(createPayload).select().single();
+    
+    // Fallback if 'church' column doesn't exist yet
+    if (error && error.message && error.message.includes('column "church" of relation "visitors" does not exist')) {
+      delete createPayload.church;
+      const retry = await supabase.from('visitors').insert(createPayload).select().single();
+      visitor = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       console.error('Error creating visitor:', error);
       return c.json({
@@ -757,7 +768,7 @@ router.put("/visitors/:id", async (c)=>{
     }
     const id = c.req.param('id');
     const data = await c.req.json();
-    const { data: visitor, error } = await supabase.from('visitors').update({
+    let updatePayload: any = {
       first_name: data.firstName,
       last_name: data.lastName,
       other_names: data.otherNames,
@@ -776,11 +787,22 @@ router.put("/visitors/:id", async (c)=>{
       church: data.church || null,
       converted_to_member: data.convertedToMember ?? false,
       converted_member_id: data.convertedMemberId || null
-    }).eq('id', id).select().single();
+    };
+
+    let { data: visitor, error } = await supabase.from('visitors').update(updatePayload).eq('id', id).select().single();
+    
+    // Fallback if 'church' column doesn't exist yet
+    if (error && error.message && error.message.includes('column "church" of relation "visitors" does not exist')) {
+      delete updatePayload.church;
+      const retry = await supabase.from('visitors').update(updatePayload).eq('id', id).select().single();
+      visitor = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       console.error('Error updating visitor:', error);
       return c.json({
-        error: 'Failed to update visitor'
+        error: 'Failed to update visitor: ' + error.message
       }, 500);
     }
     return c.json(visitor);
@@ -1389,6 +1411,10 @@ router.get("/reports", async (c)=>{
       membersByMaritalStatus,
       membersByMinistry,
       membersByAge,
+      visitorConversion: [
+        { status: 'Converted', count: totalConvertedVisitors },
+        { status: 'Not Converted', count: totalVisitors - totalConvertedVisitors }
+      ].filter(d => d.count > 0),
       visitorsByStatus,
       visitorConversionRate: Math.round(visitorConversionRate * 10) / 10,
       summary: {

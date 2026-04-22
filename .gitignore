@@ -10,3 +10,5 @@ dev-dist/
 supabase/migrations/
 
 src/database-setup/
+# Local Netlify folder
+.netlify

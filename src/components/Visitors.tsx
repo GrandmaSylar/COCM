@@ -9,8 +9,8 @@ import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import {
-  Search, Plus, Phone, Mail, MapPin, Eye, Users, UserPlus,
-  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw, ChevronDown
+  Search, Plus, Phone, Mail, MapPin, Eye, Pencil, Users, UserPlus,
+  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw, ChevronDown, CheckCircle
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
@@ -1017,9 +1017,10 @@ interface VisitorProfileProps {
   onBack: () => void;
   onEdit: (visitor: Visitor) => void;
   onConvertToMember: (visitor: Visitor) => void;
+  onViewMember: (memberId: string) => void;
 }
 
-export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: VisitorProfileProps) {
+export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember, onViewMember }: VisitorProfileProps) {
   const { canAccess } = useAuth();
   const canManageVisitors = canAccess('manage_members');
 
@@ -1035,27 +1036,46 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember }: V
   return (
     <OfflineOverlay>
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1>Visitor Profile</h1>
-          <p className="text-muted-foreground">
-            View and manage visitor information
-          </p>
+      {/* Enhanced Header - Improved Mobile Layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2 hover:bg-muted/50">
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
+          </Button>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Visitor Profile</h1>
+            <p className="text-[11px] sm:text-sm text-muted-foreground line-clamp-1">
+              View and manage visitor information
+            </p>
+          </div>
         </div>
+        
         {canManageVisitors && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onEdit(visitor)}>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => onEdit(visitor)} className="flex-1 sm:flex-none h-9 sm:h-10">
+              <Pencil className="w-4 h-4 mr-2 hidden sm:inline-block" />
               Edit
             </Button>
-            {visitor.interestedInMembership && (
-              <Button onClick={() => onConvertToMember(visitor)} className="bg-green-600 hover:bg-green-700">
-                <UserPlus className="w-4 h-4 mr-2" />
-                Convert to Member
+            {visitor.convertedToMember ? (
+              <Button 
+                onClick={() => visitor.convertedMemberId && onViewMember(visitor.convertedMemberId)} 
+                variant="outline"
+                className="flex-1 sm:flex-none h-9 sm:h-10 border-primary text-primary hover:bg-primary/5"
+                disabled={!visitor.convertedMemberId}
+              >
+                {visitor.convertedMemberId ? <Eye className="w-4 h-4 mr-2" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                {visitor.convertedMemberId ? "View Member" : "Converted"}
               </Button>
+            ) : (
+              visitor.interestedInMembership && (
+                <Button 
+                  onClick={() => onConvertToMember(visitor)} 
+                  className="flex-1 sm:flex-none h-9 sm:h-10 bg-green-600 hover:bg-green-700 shadow-sm"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  <span className="whitespace-nowrap">Convert to Member</span>
+                </Button>
+              )
             )}
           </div>
         )}

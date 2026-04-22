@@ -4,9 +4,21 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.4.0",
+    date: "2026-04-22",
+    changes: [
+      "Converted visitors now remain visible in visitors list with greyed-out styling and 'Converted to Member' badge",
+      "Added 'Convert' button for all non-converted visitors (adults and children)",
+      "Children's ministry visitor registration now requires only first and last name",
+      "Replaced 'Visitor Follow-up Status' pie chart with 'Visitor Conversion' chart in Reports",
+      "Fixed visitor conversion not persisting in the database",
+      "Migrated deployment from Vercel to Netlify",
+    ],
+  },
   {
     version: "0.3.0",
     date: "2026-04-21",

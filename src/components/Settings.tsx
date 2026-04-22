@@ -748,32 +748,36 @@ export function Settings({ onAddUser }: SettingsProps) {
           }}
         >
           {/* Professional Sidebar Navigation for Desktop, Scrollable for Mobile */}
-          <div className="w-full lg:w-72 flex-shrink-0">
-            <TabsList className="flex flex-row lg:flex-col items-start lg:items-stretch w-full h-auto bg-transparent border-none overflow-x-auto lg:overflow-x-visible no-scrollbar gap-1 p-0.5">
+          <div className="w-full lg:w-72 flex-shrink-0 relative">
+            {/* Mobile Carousel Gradient Fades */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none lg:hidden" />
+            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background via-background/50 to-transparent z-10 pointer-events-none lg:hidden" />
+            
+            <TabsList className="flex flex-row lg:flex-col items-start lg:items-stretch w-full h-auto bg-transparent border-none overflow-x-auto lg:overflow-x-visible no-scrollbar gap-1 p-0.5 pr-10 lg:pr-0 scroll-smooth">
               
               {/* Account & Access Group */}
               <div className="hidden lg:block px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Account & Access
               </div>
               {hasAdminAccess && (
-                <TabsTrigger value="users" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="users" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <Users className="w-4 h-4" />
                   <span>Users & Permissions</span>
                 </TabsTrigger>
               )}
               {isDev && (
-                <TabsTrigger value="roles-and-permissions" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="roles-and-permissions" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <Shield className="w-4 h-4" />
                   <span>Roles & Permissions</span>
                 </TabsTrigger>
               )}
               {hasAdminAccess && (
-                <TabsTrigger value="import" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="import" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <Upload className="w-4 h-4" />
                   <span>Import Members</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="security" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+              <TabsTrigger value="security" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                 <Lock className="w-4 h-4" />
                 <span>Security</span>
               </TabsTrigger>
@@ -782,18 +786,18 @@ export function Settings({ onAddUser }: SettingsProps) {
               <div className="hidden lg:block mt-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Customization
               </div>
-              <TabsTrigger value="theme" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+              <TabsTrigger value="theme" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                 <Palette className="w-4 h-4" />
                 <span>Theme</span>
               </TabsTrigger>
               {isDev && (
-                <TabsTrigger value="dropdown-options" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="dropdown-options" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <ClipboardList className="w-4 h-4" />
                   <span>Dropdown Options</span>
                 </TabsTrigger>
               )}
               {isDev && (
-                <TabsTrigger value="dev-settings" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="dev-settings" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <LayoutGrid className="w-4 h-4" />
                   <span>Dev Settings</span>
                 </TabsTrigger>
@@ -804,12 +808,12 @@ export function Settings({ onAddUser }: SettingsProps) {
                 System
               </div>
               {hasAdminAccess && (
-                <TabsTrigger value="backup" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <TabsTrigger value="backup" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                   <Database className="w-4 h-4" />
                   <span>Backup & Restore</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="about" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+              <TabsTrigger value="about" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
                 <Info className="w-4 h-4" />
                 <span>About System</span>
               </TabsTrigger>

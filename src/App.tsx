@@ -8,6 +8,7 @@ import { OtpVerification } from './components/OtpVerification';
 import { Layout } from './components/Layout';
 import { SplashScreen } from './components/SplashScreen';
 import { Toaster } from './components/ui/sonner';
+import { clearCacheByPattern } from './hooks/useCachedData';
 
 // Lazy load main pages
 const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
@@ -412,6 +413,7 @@ function AppContent() {
         setSelectedChild(null);
       }
       
+      clearCacheByPattern('members-list');
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('members');
     } catch (error) {
@@ -460,6 +462,7 @@ function AppContent() {
       } catch {
         setSelectedMember(updated);
       }
+      clearCacheByPattern('members-list');
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('member-profile');
     } catch (error: any) {
@@ -473,6 +476,7 @@ function AppContent() {
       await api.members.delete(member.id);
       toast.success('Member deleted successfully!');
       setSelectedMember(null);
+      clearCacheByPattern('members-list');
       setMembersRefreshKey(prev => prev + 1);
       navigateTo('members');
     } catch (error) {
@@ -543,6 +547,7 @@ function AppContent() {
       
       setSelectedVisitor(prev => prev ? { ...prev, ...updatePayload } as Visitor : updatePayload as Visitor);
       
+      clearCacheByPattern('visitors-list');
       setVisitorsRefreshKey(prev => prev + 1);
       navigateTo('visitor-profile');
     } catch (error: any) {
@@ -553,6 +558,7 @@ function AppContent() {
 
   const handleSaveVisitor = (visitorData: Omit<Visitor, 'id'>) => {
     toast.success('Visitor added successfully!');
+    clearCacheByPattern('visitors-list');
     setVisitorsRefreshKey(prev => prev + 1);
     navigateTo('visitors');
   };
@@ -589,11 +595,14 @@ function AppContent() {
       if (selectedVisitor) {
         await api.visitors.update(selectedVisitor.id, {
           ...selectedVisitor,
-          convertedToMember: true
+          convertedToMember: true,
+          convertedMemberId: createdMember.id
         });
       }
 
       toast.success('Visitor converted to member successfully!');
+      clearCacheByPattern('visitors-list');
+      clearCacheByPattern('members-list');
       setMembersRefreshKey(prev => prev + 1);
       setVisitorsRefreshKey(prev => prev + 1);
       setSelectedVisitor(null);
@@ -925,6 +934,7 @@ function AppContent() {
             onBack={() => navigateTo('visitors')}
             onEdit={handleEditVisitor}
             onConvertToMember={handleConvertVisitorToMember}
+            onViewMember={handleViewMemberById}
           />
         );
 

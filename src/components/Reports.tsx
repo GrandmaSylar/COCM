@@ -115,7 +115,7 @@ export function Reports() {
   const [membersByAge, setMembersByAge] = useState<any[]>([]);
   const [givingByType, setGivingByType] = useState<any[]>([]);
   const [attendanceDenominations, setAttendanceDenominations] = useState<any[]>([]);
-  const [visitorsByStatus, setVisitorsByStatus] = useState<any[]>([]);
+  const [visitorConversion, setVisitorConversion] = useState<any[]>([]);
   const [visitorConversionRate, setVisitorConversionRate] = useState(0);
   const [expenseRecords, setExpenseRecords] = useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
@@ -221,7 +221,7 @@ export function Reports() {
       setMembersByAge(data.membersByAge || []);
       setGivingByType(data.givingByType || []);
       setAttendanceDenominations(data.attendanceDenominations || []);
-      setVisitorsByStatus(data.visitorsByStatus || []);
+      setVisitorConversion(data.visitorConversion || []);
       setVisitorConversionRate(data.visitorConversionRate || 0);
       setSummary(prev => ({ ...prev, ...(data.summary || {}) }));
     } catch (error) {
@@ -895,20 +895,20 @@ export function Reports() {
           </Card>
         )}
 
-        {/* Visitor Follow-up Status */}
-        {visitorsByStatus.length > 0 && (
+        {/* Visitor Conversion */}
+        {visitorConversion.length > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Smile className="w-4 h-4" />
-                Visitor Follow-up Status
+                Visitor Conversion
               </CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie
-                    data={visitorsByStatus}
+                    data={visitorConversion}
                     cx="50%"
                     cy="50%"
                     outerRadius={100}
@@ -918,12 +918,12 @@ export function Reports() {
                     labelLine={false}
                     label={renderCustomLabel}
                   >
-                    {visitorsByStatus.map((_, i) => (
-                      <Cell key={i} fill={`var(--chart-${(i % 5) + 1})`} />
+                    {visitorConversion.map((entry, i) => (
+                      <Cell key={i} fill={entry.status === 'Converted' ? '#22c55e' : '#9ca3af'} />
                     ))}
                   </Pie>
                   <Tooltip content={<PieTooltip />} />
-                  <Legend formatter={(value: string) => <span className="text-xs uppercase">{value}</span>} />
+                  <Legend formatter={(value: string) => <span className="text-xs">{value}</span>} />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
