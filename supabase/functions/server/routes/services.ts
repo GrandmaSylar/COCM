@@ -643,7 +643,7 @@ router.get("/visitors", async (c)=>{
         error: 'Unauthorized'
       }, 401);
     }
-    const { data: visitors, error } = await supabase.from('visitors').select('*').eq('converted_to_member', false).order('visit_date', {
+    const { data: visitors, error } = await supabase.from('visitors').select('*').order('visit_date', {
       ascending: false
     });
     if (error) {
@@ -773,7 +773,9 @@ router.put("/visitors/:id", async (c)=>{
       notes: data.notes,
       follow_up_status: data.followUpStatus,
       potential_zone: data.potentialZone,
-      church: data.church || null
+      church: data.church || null,
+      converted_to_member: data.convertedToMember ?? false,
+      converted_member_id: data.convertedMemberId || null
     }).eq('id', id).select().single();
     if (error) {
       console.error('Error updating visitor:', error);

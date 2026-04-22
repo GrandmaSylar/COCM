@@ -336,7 +336,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                       <Eye className="w-4 h-4 mr-2" />
                       View
                     </Button>
-                    {visitor.interestedInMembership && canManageVisitors && !visitor.convertedToMember && (
+                    {canManageVisitors && !visitor.convertedToMember && (
                       <Button
                         variant="default"
                         size="sm"
