@@ -3,7 +3,7 @@ node_modules/
 build/
 .vite/
 
-.vercel
+
 .claude/
 dev-dist/
 

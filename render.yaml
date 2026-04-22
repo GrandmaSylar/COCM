@@ -1,6 +1,0 @@
-services:
-  - type: web
-    name: cocm-church-db
-    runtime: static
-    staticPublishPath: build
-    buildCommand: npm install && chmod -R 755 node_modules/.bin && npm run build
