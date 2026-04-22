@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt, History, HandHeart } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt, History, HandHeart, Lock, Info, LayoutGrid } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
@@ -740,24 +740,83 @@ export function Settings({ onAddUser }: SettingsProps) {
 
         <Tabs 
           defaultValue={hasAdminAccess ? "users" : "security"} 
-          className="space-y-6 w-full"
+          className="w-full flex flex-col lg:flex-row gap-4 lg:gap-10"
           onValueChange={(value) => {
             if (value === "roles-and-permissions") {
               fetchCustomRoles();
             }
           }}
         >
-          <TabsList className="w-full overflow-x-auto flex flex-wrap h-auto">
-            {hasAdminAccess && <TabsTrigger value="users">Users & Permissions</TabsTrigger>}
-            {isDev && <TabsTrigger value="roles-and-permissions">Roles & Permissions</TabsTrigger>}
-            {isDev && <TabsTrigger value="dropdown-options">Dropdown Options</TabsTrigger>}
-            {isDev && <TabsTrigger value="dev-settings">Dev Settings</TabsTrigger>}
-            <TabsTrigger value="theme">Theme</TabsTrigger>
-            {hasAdminAccess && <TabsTrigger value="backup">Backup & Restore</TabsTrigger>}
-            {hasAdminAccess && <TabsTrigger value="import">Import Members</TabsTrigger>}
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="about">About</TabsTrigger>
-          </TabsList>
+          {/* Professional Sidebar Navigation for Desktop, Scrollable for Mobile */}
+          <div className="w-full lg:w-72 flex-shrink-0">
+            <TabsList className="flex flex-row lg:flex-col items-start lg:items-stretch w-full h-auto bg-transparent border-none overflow-x-auto lg:overflow-x-visible no-scrollbar gap-1 p-0.5">
+              
+              {/* Account & Access Group */}
+              <div className="hidden lg:block px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Account & Access
+              </div>
+              {hasAdminAccess && (
+                <TabsTrigger value="users" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <Users className="w-4 h-4" />
+                  <span>Users & Permissions</span>
+                </TabsTrigger>
+              )}
+              {isDev && (
+                <TabsTrigger value="roles-and-permissions" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <Shield className="w-4 h-4" />
+                  <span>Roles & Permissions</span>
+                </TabsTrigger>
+              )}
+              {hasAdminAccess && (
+                <TabsTrigger value="import" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <Upload className="w-4 h-4" />
+                  <span>Import Members</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="security" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <Lock className="w-4 h-4" />
+                <span>Security</span>
+              </TabsTrigger>
+
+              {/* Customization & Settings Group */}
+              <div className="hidden lg:block mt-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                Customization
+              </div>
+              <TabsTrigger value="theme" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <Palette className="w-4 h-4" />
+                <span>Theme</span>
+              </TabsTrigger>
+              {isDev && (
+                <TabsTrigger value="dropdown-options" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <ClipboardList className="w-4 h-4" />
+                  <span>Dropdown Options</span>
+                </TabsTrigger>
+              )}
+              {isDev && (
+                <TabsTrigger value="dev-settings" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <LayoutGrid className="w-4 h-4" />
+                  <span>Dev Settings</span>
+                </TabsTrigger>
+              )}
+
+              {/* System & About Group */}
+              <div className="hidden lg:block mt-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                System
+              </div>
+              {hasAdminAccess && (
+                <TabsTrigger value="backup" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                  <Database className="w-4 h-4" />
+                  <span>Backup & Restore</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="about" className="w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none">
+                <Info className="w-4 h-4" />
+                <span>About System</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <div className="flex-1 w-full overflow-hidden">
 
         {/* Users & Permissions Tab */}
         <TabsContent value="users" className="space-y-6 w-full overflow-hidden">
@@ -1923,8 +1982,8 @@ export function Settings({ onAddUser }: SettingsProps) {
             ))}
           </div>
         </TabsContent>
-
-      </Tabs>
+          </div>
+        </Tabs>
 
       {/* Reset Password Dialog */}
       <Dialog open={!!resetPasswordUserId} onOpenChange={(open) => {

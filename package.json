@@ -78,7 +78,9 @@
       "scripts": {
             "dev": "vite",
             "build": "vite build",
-            "test": "vitest"
+            "test": "vitest",
+            "preview": "vite preview",
+            "start": "vite preview --port 3000"
       },
       "overrides": {
             "dompurify": "^3.3.2"

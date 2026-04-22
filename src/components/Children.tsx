@@ -102,6 +102,8 @@ export interface ChildVisitor {
   contactPhone?: string;
   referredBy?: string;
   guardians: ChildVisitorGuardian[];
+  convertedToMember?: boolean;
+  convertedMemberId?: string;
 }
 
 // --- Helpers ---
@@ -411,7 +413,7 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
   );
 }
 
-function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh }: { refreshKey: number, onAddVisitor: () => void, onRefresh: () => void }) {
+function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh, onConvertVisitor }: { refreshKey: number, onAddVisitor: () => void, onRefresh: () => void, onConvertVisitor?: (v: ChildVisitor) => void }) {
   const { data: visitors, loading } = useCachedData<ChildVisitor[]>(
     `children-visitors-${refreshKey}`,
     () => api.children.visitors.getAll()
@@ -557,7 +559,7 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh }: { refreshKey
       ) : (
         <div className="space-y-4">
           {filteredVisitors.map(visitor => (
-            <Card key={visitor.id} className="hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5">
+            <Card key={visitor.id} className={`hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5 ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center font-bold text-secondary-foreground shrink-0 shadow-inner">
@@ -565,6 +567,14 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh }: { refreshKey
                   </div>
                   <div>
                     <h4 className="font-semibold text-lg">{visitor.firstName} {visitor.lastName}</h4>
+                    <div className="flex flex-wrap gap-2 mt-1 mb-2">
+                      {visitor.convertedToMember && (
+                        <Badge variant="outline" className="bg-muted text-muted-foreground">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Converted to Member
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                       <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(visitor.visitDate).toLocaleDateString()}</span>
                       <span className="text-muted-foreground/30">•</span>
@@ -579,6 +589,17 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh }: { refreshKey
                   </div>
                 </div>
                 <div className="flex items-center gap-3 w-full sm:w-auto">
+                  {!visitor.convertedToMember && onConvertVisitor && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => onConvertVisitor(visitor)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Convert
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -995,6 +1016,7 @@ export interface ChildrenProps {
   onViewChild: (child: ChildMember) => void;
   onMarkAttendance: () => void;
   onAddChildVisitor: () => void;
+  onConvertChildVisitor?: (visitor: ChildVisitor) => void;
   activeTab?: 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics';
   onTabChange?: (tab: 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics') => void;
 }
@@ -1004,6 +1026,7 @@ export function Children({
   onViewChild,
   onMarkAttendance,
   onAddChildVisitor,
+  onConvertChildVisitor,
   activeTab = 'members',
   onTabChange
 }: ChildrenProps) {
@@ -1071,6 +1094,7 @@ export function Children({
             refreshKey={visitorsRefreshKey} 
             onRefresh={() => setVisitorsRefreshKey(k => k + 1)}
             onAddVisitor={onAddChildVisitor} 
+            onConvertVisitor={onConvertChildVisitor}
           />
         )}
         {currentTab === 'attendance' && (

@@ -61,11 +61,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
   const progressData = useMemo(() => {
     const requiredFields = [
       { name: 'First Name', filled: !!formData.firstName.trim(), section: 'basic' },
-      { name: 'Last Name', filled: !!formData.lastName.trim(), section: 'basic' },
-      { name: 'Gender', filled: !!formData.gender, section: 'basic' },
-      { name: 'Date of Birth', filled: !!formData.dateOfBirth, section: 'basic' },
-      { name: 'Date of Visit', filled: !!formData.visitDate, section: 'basic' },
-      { name: 'Parents / Guardians', filled: guardians.length > 0 && !!guardians[0].fullName.trim(), section: 'guardians' }
+      { name: 'Last Name', filled: !!formData.lastName.trim(), section: 'basic' }
     ];
 
     const filledCount = requiredFields.filter(f => f.filled).length;
@@ -109,12 +105,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
   const isValid = !!(
     formData.firstName &&
     formData.lastName &&
-    formData.gender &&
-    formData.dateOfBirth &&
-    formData.visitDate &&
-    !ageError &&
-    guardians.length > 0 &&
-    guardians[0].fullName.trim() !== ''
+    !ageError
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -266,7 +257,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="gender">Gender *</Label>
+                    <Label htmlFor="gender">Gender</Label>
                     <Select value={formData.gender} onValueChange={(value: string) => handleInputChange('gender', value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Gender" />
@@ -278,15 +269,15 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                    <Input id="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => handleInputChange('dateOfBirth', e.target.value)} required />
+                    <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                    <Input id="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => handleInputChange('dateOfBirth', e.target.value)} />
                     {ageError && <p className="text-sm text-red-500 mt-1">{ageError}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="visitDate">Date of Visit *</Label>
-                    <Input id="visitDate" type="date" value={formData.visitDate} onChange={(e) => handleInputChange('visitDate', e.target.value)} required />
+                    <Label htmlFor="visitDate">Date of Visit</Label>
+                    <Input id="visitDate" type="date" value={formData.visitDate} onChange={(e) => handleInputChange('visitDate', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="occupation">Occupation</Label>
@@ -314,18 +305,18 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
 
         <Card>
           <Collapsible open={sectionsOpen.guardians} onOpenChange={(open: boolean) => setSectionsOpen(prev => ({ ...prev, guardians: open }))}>
-            <SectionHeader title="Parents / Guardians" icon={Users} isOpen={sectionsOpen.guardians} hasRequired status={getSectionStatus('guardians')} />
+            <SectionHeader title="Parents / Guardians" icon={Users} isOpen={sectionsOpen.guardians} status={getSectionStatus('guardians')} />
             <CollapsibleContent>
               <CardContent className="pt-0 pb-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Guardians *</Label>
+                  <Label>Guardians</Label>
                   <Button type="button" variant="outline" size="sm" onClick={addGuardian}>
                     <Plus className="w-4 h-4 mr-2" /> Add Guardian
                   </Button>
                 </div>
                 {guardians.length === 0 ? (
-                  <div className="border-2 border-dashed border-red-500/25 bg-red-50/50 dark:bg-red-950/20 rounded-lg p-8 text-center">
-                    <p className="text-red-500 dark:text-red-400 font-medium">At least one guardian is required.</p>
+                  <div className="border-2 border-dashed border-muted bg-muted/20 rounded-lg p-8 text-center">
+                    <p className="text-muted-foreground font-medium">No guardians added.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -340,8 +331,8 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                               </Button>
                             </div>
                             <div className="space-y-2">
-                              <Label>Full Name *</Label>
-                              <Input value={guardian.fullName} onChange={(e) => updateGuardian(guardian.id, 'fullName', e.target.value)} required />
+                              <Label>Full Name</Label>
+                              <Input value={guardian.fullName} onChange={(e) => updateGuardian(guardian.id, 'fullName', e.target.value)} />
                             </div>
                             <div className="space-y-2">
                               <Label>Residential Location</Label>

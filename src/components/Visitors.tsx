@@ -256,7 +256,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
           </Card>
         ) : (
           filteredVisitors.map((visitor) => (
-            <Card key={visitor.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <Card key={visitor.id} className={`shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -271,10 +271,16 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                           {visitor.firstName} {visitor.otherNames} {visitor.lastName}
                         </h3>
                         <div className="flex flex-wrap gap-2 mt-1">
-                          {visitor.interestedInMembership && (
+                          {visitor.interestedInMembership && !visitor.convertedToMember && (
                             <Badge variant="outline" className="badge-success">
                               <UserPlus className="w-3 h-3 mr-1" />
                               Interested in Membership
+                            </Badge>
+                          )}
+                          {visitor.convertedToMember && (
+                            <Badge variant="outline" className="bg-muted text-muted-foreground">
+                              <UserCheck className="w-3 h-3 mr-1" />
+                              Converted to Member
                             </Badge>
                           )}
                           {visitor.potentialZone && (
@@ -330,7 +336,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                       <Eye className="w-4 h-4 mr-2" />
                       View
                     </Button>
-                    {visitor.interestedInMembership && canManageVisitors && (
+                    {visitor.interestedInMembership && canManageVisitors && !visitor.convertedToMember && (
                       <Button
                         variant="default"
                         size="sm"

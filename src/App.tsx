@@ -53,7 +53,7 @@ const Ministry = lazy(() => import('./components/Ministry').then(module => ({ de
 // Types needed by App which can't easily be lazy-loaded alongside their components
 import type { Member } from './components/Members';
 import type { Visitor } from './components/Visitors';
-import type { ChildMember } from './components/Children';
+import type { ChildMember, ChildVisitor } from './components/Children';
 import { toast } from 'sonner';
 import { api } from './services/api';
 import { getFriendlyMessage } from './utils/error-handler';
@@ -62,7 +62,7 @@ import * as Sentry from '@sentry/react';
 type AppPage = 'login' | 'signup' | 'forgot-password' | 'otp-verification' | 'dashboard' | 'members' | 'add-member' | 'edit-member' | 'member-profile' |
                'attendance' | 'record-attendance' | 'mark-attendance' | 'attendance-detail' | 'visitors' | 'add-visitor' | 'visitor-profile' | 'edit-visitor' |
                'giving' | 'record-giving' | 'giving-detail' | 'manage-giving-types' | 'reports' | 'help' | 'settings' | 'add-user' | 'convert-visitor' |
-               'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor' |
+               'member-attendance-history' | 'services' | 'activity-log' | 'notifications' | 'children' | 'children-add' | 'children-profile' | 'children-edit' | 'children-mark-attendance' | 'children-add-visitor' | 'convert-child-visitor' |
                'expenses' | 'add-expense' | 'edit-expense' | 'expense-receipt' | 'ministry';
 
 // Map sub-pages to their parent for back navigation
@@ -87,6 +87,7 @@ const PAGE_PARENT: Partial<Record<AppPage, AppPage>> = {
   'children-edit': 'children-profile',
   'children-mark-attendance': 'children',
   'children-add-visitor': 'children',
+  'convert-child-visitor': 'children',
   'add-expense': 'expenses',
   'edit-expense': 'expenses',
   'expense-receipt': 'expenses',
@@ -109,6 +110,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<AppPage>(getInitialPage);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
+  const [selectedChildVisitor, setSelectedChildVisitor] = useState<ChildVisitor | null>(null);
   const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(null);
   const [selectedGivingId, setSelectedGivingId] = useState<string | null>(null);
   const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
@@ -130,7 +132,7 @@ function AppContent() {
     }
     return 'members';
   };
-  const [childrenActiveTab, setChildrenActiveTab] = useState<'members' | 'visitors' | 'attendance' | 'giving'>(getInitialChildrenTab);
+  const [childrenActiveTab, setChildrenActiveTab] = useState<'members' | 'visitors' | 'attendance' | 'giving' | 'analytics'>(getInitialChildrenTab);
 
   useEffect(() => {
     sessionStorage.setItem('childrenActiveTab', childrenActiveTab);
@@ -596,7 +598,7 @@ function AppContent() {
       setVisitorsRefreshKey(prev => prev + 1);
       setSelectedVisitor(null);
       navigateTo(convertOriginRef.current === 'services' ? 'services' : 'visitors');
-      convertOriginRef.current = null;
+      convertOriginRef.current = 'visitors';
     } catch (error) {
       console.error('Failed to convert visitor:', error);
       toast.error('Failed to convert visitor. Please try again.');
@@ -728,6 +730,46 @@ function AppContent() {
       navigateTo('children');
     } catch (error: any) {
       toast.error(error?.message || 'Failed to add child visitor. Please try again.');
+    }
+  };
+
+  const handleConvertChildVisitorToMember = (visitor: ChildVisitor) => {
+    setSelectedChildVisitor(visitor);
+    navigateTo('convert-child-visitor');
+  };
+
+  const handleSaveConvertedChildMember = async (data: any) => {
+    try {
+      const { photo, ...memberData } = data;
+      const createdChild = await api.children.members.create(memberData);
+      
+      if (photo && photo.startsWith('data:image')) {
+        try {
+          const res = await fetch(photo);
+          const blob = await res.blob();
+          const file = new File([blob], 'photo.jpg', { type: blob.type });
+          const photoUrl = await api.children.members.uploadPhoto(createdChild.id, file);
+          await api.children.members.update(createdChild.id, { ...createdChild, photo: undefined, photoUrl });
+        } catch (uploadError) {
+          console.error('Photo upload failed:', uploadError);
+        }
+      }
+
+      if (selectedChildVisitor) {
+        await api.children.visitors.update(selectedChildVisitor.id, {
+          ...selectedChildVisitor,
+          convertedToMember: true,
+          convertedMemberId: createdChild.id
+        });
+      }
+
+      toast.success('Child visitor converted to member successfully!');
+      setChildrenRefreshKey(prev => prev + 1);
+      setSelectedChildVisitor(null);
+      setChildrenActiveTab('members');
+      navigateTo('children');
+    } catch (error: any) {
+      toast.error(getFriendlyMessage(error));
     }
   };
 
@@ -1033,6 +1075,7 @@ function AppContent() {
             onViewChild={handleViewChild}
             onMarkAttendance={handleMarkChildrenAttendance}
             onAddChildVisitor={handleAddChildVisitor}
+            onConvertChildVisitor={handleConvertChildVisitorToMember}
             activeTab={childrenActiveTab}
             onTabChange={setChildrenActiveTab}
           />
@@ -1086,6 +1129,16 @@ function AppContent() {
               navigateTo('children');
             }}
             onSave={handleSaveChildVisitor}
+          />
+        );
+
+      case 'convert-child-visitor':
+        if (!selectedChildVisitor) { navigateTo('children', false); return null; }
+        return (
+          <AddChildMember
+            onBack={() => navigateTo('children')}
+            onSave={handleSaveConvertedChildMember}
+            childVisitorData={selectedChildVisitor}
           />
         );
 

@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: cocm-church-db
+    env: static
+    staticSiteDir: build
+    buildCommand: npm install && npm run build
