@@ -1,4 +1,4 @@
-import { isAdminOrDev } from "../lib/admin-helpers.ts";
+
 import { Hono } from "hono";
 import { supabase } from "../lib/supabase.ts";
 import { getUserFromToken, checkPermission } from "../lib/auth-helpers.ts";
@@ -34,7 +34,7 @@ router.post('/children/giving', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!await isAdminOrDev(user.id)) {
+    if (!await checkPermission(user.id, 'manage_members')) {
       console.warn('Unauthorized children giving attempt by', user.id);
       return c.json({ error: 'Forbidden' }, 403);
     }
@@ -72,7 +72,7 @@ router.put('/children/giving/:id', async (c) => {
     const user = await getUserFromToken(c.req.raw);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    if (!await isAdminOrDev(user.id)) {
+    if (!await checkPermission(user.id, 'manage_members')) {
       console.warn('Unauthorized children giving attempt by', user.id);
       return c.json({ error: 'Forbidden' }, 403);
     }

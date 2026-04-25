@@ -687,6 +687,20 @@ export function Settings({ onAddUser }: SettingsProps) {
 
   const hasAdminAccess = canManageUsers || canManageSettings;
 
+  const [activeTab, setActiveTab] = useState<string>(
+    typeof window !== 'undefined' && window.innerWidth < 1024 ? "menu" : (hasAdminAccess ? "users" : "security")
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024 && activeTab === "menu") {
+        setActiveTab(hasAdminAccess ? "users" : "security");
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeTab, hasAdminAccess]);
+
   return (
     <>
       <div className="space-y-6 w-full overflow-x-hidden">
@@ -739,88 +753,147 @@ export function Settings({ onAddUser }: SettingsProps) {
       )}
 
         <Tabs 
-          defaultValue={hasAdminAccess ? "users" : "security"} 
-          className="w-full flex flex-col lg:flex-row gap-4 lg:gap-10"
+          value={activeTab}
+          className="w-full flex flex-col gap-4 lg:gap-6 relative"
           onValueChange={(value) => {
+            setActiveTab(value);
             if (value === "roles-and-permissions") {
               fetchCustomRoles();
             }
           }}
         >
-          {/* Professional Sidebar Navigation for Desktop, Scrollable for Mobile */}
-          <div className="w-full lg:w-72 flex-shrink-0 relative">
-            {/* Mobile Carousel Gradient Fades */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none lg:hidden" />
-            <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background via-background/50 to-transparent z-10 pointer-events-none lg:hidden" />
+          {/* Menu wrapper */}
+          <div className={`w-full flex-shrink-0 relative ${activeTab !== 'menu' ? 'hidden lg:block' : 'block'}`}>
+            <div className="lg:hidden mb-4">
+              <h2 className="text-xl font-bold tracking-tight">Settings Menu</h2>
+              <p className="text-sm text-muted-foreground">Select a category to view and manage settings.</p>
+            </div>
             
-            <TabsList className="flex flex-row lg:flex-col items-start lg:items-stretch w-full h-auto bg-transparent border-none overflow-x-auto lg:overflow-x-visible no-scrollbar gap-1 p-0.5 pr-10 lg:pr-0 scroll-smooth">
+            <TabsList className="flex flex-col lg:flex-row lg:flex-wrap items-stretch lg:items-center w-full h-auto bg-transparent border-none gap-3 lg:gap-1 p-0 lg:p-1 lg:border-b">
               
               {/* Account & Access Group */}
-              <div className="hidden lg:block px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <div className="hidden px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Account & Access
               </div>
               {hasAdminAccess && (
-                <TabsTrigger value="users" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <Users className="w-4 h-4" />
-                  <span>Users & Permissions</span>
+                <TabsTrigger value="users" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <Users className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Users & Permissions</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Manage access and user accounts</span>
+                  </div>
                 </TabsTrigger>
               )}
               {isDev && (
-                <TabsTrigger value="roles-and-permissions" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <Shield className="w-4 h-4" />
-                  <span>Roles & Permissions</span>
+                <TabsTrigger value="roles-and-permissions" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <Shield className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Roles & Permissions</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Define system roles</span>
+                  </div>
                 </TabsTrigger>
               )}
               {hasAdminAccess && (
-                <TabsTrigger value="import" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <Upload className="w-4 h-4" />
-                  <span>Import Members</span>
+                <TabsTrigger value="import" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <Upload className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Import Members</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Bulk upload members data</span>
+                  </div>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="security" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                <Lock className="w-4 h-4" />
-                <span>Security</span>
+              <TabsTrigger value="security" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                  <Lock className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                </div>
+                <div className="flex flex-col lg:block">
+                  <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Security</span>
+                  <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Update passwords & security</span>
+                </div>
               </TabsTrigger>
 
               {/* Customization & Settings Group */}
-              <div className="hidden lg:block mt-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <div className="hidden px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 Customization
               </div>
-              <TabsTrigger value="theme" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                <Palette className="w-4 h-4" />
-                <span>Theme</span>
+              <TabsTrigger value="theme" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                  <Palette className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                </div>
+                <div className="flex flex-col lg:block">
+                  <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Theme</span>
+                  <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Customize app appearance</span>
+                </div>
               </TabsTrigger>
               {isDev && (
-                <TabsTrigger value="dropdown-options" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <ClipboardList className="w-4 h-4" />
-                  <span>Dropdown Options</span>
+                <TabsTrigger value="dropdown-options" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <ClipboardList className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Dropdown Options</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Manage dropdown selections</span>
+                  </div>
                 </TabsTrigger>
               )}
               {isDev && (
-                <TabsTrigger value="dev-settings" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <LayoutGrid className="w-4 h-4" />
-                  <span>Dev Settings</span>
+                <TabsTrigger value="dev-settings" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <LayoutGrid className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Dev Settings</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Advanced developer configurations</span>
+                  </div>
                 </TabsTrigger>
               )}
 
               {/* System & About Group */}
-              <div className="hidden lg:block mt-4 px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              <div className="hidden px-3 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                 System
               </div>
               {hasAdminAccess && (
-                <TabsTrigger value="backup" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                  <Database className="w-4 h-4" />
-                  <span>Backup & Restore</span>
+                <TabsTrigger value="backup" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                  <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                    <Database className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                  </div>
+                  <div className="flex flex-col lg:block">
+                    <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">Backup & Restore</span>
+                    <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Manage database backups</span>
+                  </div>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="about" className="w-auto lg:w-full justify-start gap-2 h-10 px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border-none shadow-none whitespace-nowrap">
-                <Info className="w-4 h-4" />
-                <span>About System</span>
+              <TabsTrigger value="about" className="w-full lg:w-auto justify-start gap-4 lg:gap-2 h-auto lg:h-9 py-3 lg:py-0 px-4 lg:px-3 data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-border/50 lg:border-none shadow-sm lg:shadow-none whitespace-normal lg:whitespace-nowrap text-left bg-card lg:bg-transparent rounded-xl lg:rounded-md items-center group">
+                <div className="w-10 h-10 lg:w-auto lg:h-auto rounded-full bg-primary/10 lg:bg-transparent flex items-center justify-center shrink-0 group-hover:bg-primary/20 lg:group-hover:bg-transparent transition-colors">
+                  <Info className="w-5 h-5 lg:w-4 lg:h-4 text-primary lg:text-inherit" />
+                </div>
+                <div className="flex flex-col lg:block">
+                  <span className="font-semibold lg:font-medium text-base lg:text-sm text-foreground lg:text-inherit">About System</span>
+                  <span className="text-xs text-muted-foreground lg:hidden mt-0.5 font-normal">Version and system info</span>
+                </div>
               </TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="flex-1 w-full overflow-hidden">
+          <div className={`flex-1 w-full overflow-hidden ${activeTab === 'menu' ? 'hidden lg:block' : 'block'}`}>
+            {/* Mobile Back Button */}
+            <div className="lg:hidden mb-4">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setActiveTab('menu')}
+                className="pl-0 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Settings
+              </Button>
+            </div>
 
         {/* Users & Permissions Tab */}
         <TabsContent value="users" className="space-y-6 w-full overflow-hidden">
