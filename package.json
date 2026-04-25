@@ -56,7 +56,7 @@
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
             "vaul": "^1.1.2",
-            "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
+            "@e965/xlsx": "^0.20.2"
       },
       "devDependencies": {
             "@testing-library/jest-dom": "^6.9.1",

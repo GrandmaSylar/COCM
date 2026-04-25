@@ -5,7 +5,7 @@ import { Badge } from './ui/badge';
 import { Download, Upload, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api, invalidateApiCache } from '../services/api';
-import * as XLSX from 'xlsx';
+import * as XLSX from '@e965/xlsx';
 import {
   MEMBER_IMPORT_COLUMNS,
   downloadMemberImportTemplate,
