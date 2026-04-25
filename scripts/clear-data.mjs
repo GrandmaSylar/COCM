@@ -5,7 +5,9 @@ import { fileURLToPath } from 'url';
 
 // Utility to parse .env file since dotenv might not be installed
 function loadEnv() {
-  const envPath = path.resolve(process.cwd(), '.env');
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const envPath = path.resolve(__dirname, '..', '.env');
   if (fs.existsSync(envPath)) {
     const content = fs.readFileSync(envPath, 'utf8');
     content.split('\n').forEach(line => {

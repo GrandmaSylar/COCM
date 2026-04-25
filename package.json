@@ -1,6 +1,6 @@
 {
       "name": "Church Management System MVP",
-      "version": "0.4.0",
+      "version": "0.6.0",
       "private": true,
       "dependencies": {
             "@braintree/sanitize-url": "^7.1.2",
@@ -56,7 +56,7 @@
             "sonner": "^2.0.3",
             "tailwind-merge": "*",
             "vaul": "^1.1.2",
-            "xlsx": "^0.18.5"
+            "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
       },
       "devDependencies": {
             "@testing-library/jest-dom": "^6.9.1",
@@ -80,9 +80,11 @@
             "build": "vite build",
             "test": "vitest",
             "preview": "vite preview",
-            "start": "vite preview --port 3000"
+            "start": "vite preview --port 3000",
+            "bump": "node scripts/bump-version.mjs"
       },
       "overrides": {
-            "dompurify": "^3.3.2"
+            "dompurify": "^3.3.2",
+            "serialize-javascript": "^7.0.5"
       }
 }

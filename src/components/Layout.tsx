@@ -306,7 +306,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
         <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between no-print">
           <div className="flex items-center gap-2">
             <img src="/newlogo.png" alt="logo" className="w-8 h-8 object-contain" />
-            <h1 className="text-lg font-medium">CoC.M</h1>
+            <h1 className="text-xl font-semibold">CoC.M</h1>
           </div>
           <div className="flex items-center gap-2">
             {/* Notification Bell for Mobile */}
@@ -635,14 +635,14 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
                                 onNavigate(item.id);
                                 setMobileMenuOpen(false);
                             }}
-                            className={`w-full flex items-center px-4 py-3 rounded-xl transition-all duration-200 ${
+                            className={`w-full flex items-center px-4 py-3 min-h-[44px] rounded-xl transition-all duration-200 ${
                                 isActive
                                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
                             }`}
                             >
                             <Icon className={`w-5 h-5 mr-3 ${isActive ? "animate-pulse" : ""}`} />
-                            <span className="font-medium text-sm">{item.label}</span>
+                            <span className="font-medium text-base">{item.label}</span>
                             </button>
                         );
                         })}

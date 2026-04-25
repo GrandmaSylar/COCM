@@ -20,6 +20,14 @@ module.exports = {
           sans: ["Inter", "system-ui", "sans-serif"],
           heading: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
         },
+        fontSize: {
+          "mobile-h1": ["1.5rem", { lineHeight: "1.2", fontWeight: "700" }],
+          "mobile-h2": ["1.25rem", { lineHeight: "1.3", fontWeight: "700" }],
+          "mobile-h3": ["1.125rem", { lineHeight: "1.4", fontWeight: "600" }],
+          "mobile-body": ["1rem", { lineHeight: "1.5" }],
+          "mobile-secondary": ["0.875rem", { lineHeight: "1.4" }],
+          "mobile-caption": ["0.75rem", { lineHeight: "1.4" }],
+        },
         colors: {
           border: "var(--border)",
           input: "var(--input)",

@@ -4,9 +4,35 @@ export interface ChangelogEntry {
   changes: string[];
 }
 
-export const APP_VERSION = "0.4.0";
+// Injected by Vite at build time (see vite.config.ts `define`)
+declare const __BUILD_DATE__: string;
+declare const __GIT_HASH__: string;
+
+export const APP_VERSION = "0.6.0";
+export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
+export const GIT_HASH = typeof __GIT_HASH__ !== 'undefined' ? __GIT_HASH__ : 'dev';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.6.0",
+    date: "2026-04-25",
+    changes: [
+      "Security updates, Vercel SPA routing fallback, Edge Function auth guard, and responsive UI improvements",
+    ],
+  },
+  {
+    version: "0.5.0",
+    date: "2026-04-25",
+    changes: [
+      "Redesigned Settings navigation for mobile — full-page menu with icons and descriptions",
+      "Reverted desktop Settings to horizontal tab bar layout",
+      "Added 'Check for Update' button in About System to force-refresh cached assets",
+      "Fixed member deletion failing due to missing foreign key cleanup for expenses and requisitions",
+      "Fixed custom role permissions not working for Children's Ministry (members, attendance, giving)",
+      "Fixed React warnings for Sheet/Dialog ref forwarding and controlled/uncontrolled Tabs",
+      "Fixed clear-data script not finding .env when run from scripts directory",
+    ],
+  },
   {
     version: "0.4.0",
     date: "2026-04-22",

@@ -3,9 +3,21 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { execSync } from 'child_process';
+
+// Get git info at build time
+function getGitHash() {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch { return 'unknown'; }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+    __GIT_HASH__: JSON.stringify(getGitHash()),
+  },
   plugins: [
     react(),
     VitePWA({

@@ -1046,7 +1046,7 @@ export function Children({
     <OfflineOverlay>
     <div className="space-y-8 animate-fade-in max-w-[1200px] mx-auto">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Children's Ministry</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Children's Ministry</h1>
         <p className="text-muted-foreground">
           Manage children records, visitors, attendance, and giving.
         </p>

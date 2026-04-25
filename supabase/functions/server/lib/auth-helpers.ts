@@ -6,11 +6,20 @@ export async function getUserFromToken(request: Request) {
   if (!authHeader) {
     return null;
   }
+  
   const token = authHeader.replace("Bearer ", "");
+  
+  // Guard: If the token is a new Supabase API key (not a JWT), 
+  // it means this is an unauthenticated/anon request fallback.
+  if (token.startsWith("sb_")) {
+    return null;
+  }
+
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser(token);
+  
   if (error || !user) {
     return null;
   }

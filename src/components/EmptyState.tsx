@@ -32,10 +32,10 @@ export function EmptyState({
           <Icon className="h-10 w-10 text-muted-foreground/50 group-hover:text-primary/60 group-hover:scale-110 transition-all duration-300" />
         </div>
       )}
-      <h3 className="text-lg font-semibold tracking-tight mb-2 text-foreground">
+      <h3 className="text-lg font-semibold leading-snug tracking-tight mb-2 text-foreground">
         {title}
       </h3>
-      <p className="text-muted-foreground max-w-sm mb-6 text-sm">
+      <p className="text-muted-foreground max-w-sm mb-6 text-base leading-relaxed">
         {description}
       </p>
       {action && (

@@ -94,8 +94,24 @@
   * {
     @apply border-border;
   }
+  html {
+    font-size: 16px;
+  }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.5;
+  }
+  h1 {
+    @apply text-2xl font-bold leading-tight lg:text-3xl;
+  }
+  h2 {
+    @apply text-xl font-bold leading-snug;
+  }
+  h3 {
+    @apply text-lg font-semibold leading-snug lg:text-xl;
+  }
+  p {
+    @apply text-base leading-relaxed;
   }
 }
 

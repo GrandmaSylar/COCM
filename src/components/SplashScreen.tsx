@@ -131,33 +131,17 @@ export function SplashScreen({ isReady, onComplete }: SplashScreenProps) {
         </div>
 
         {/* Church name */}
-        <p
-          className="splash-text-in"
-          style={{
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.04em',
-            fontSize: 20,
-            margin: 0,
-            color: isDark ? '#f9fafb' : '#111827',
-            animationDelay: '300ms',
-          }}
+        <h1
+          className="text-2xl lg:text-3xl font-bold leading-tight uppercase tracking-wide text-foreground splash-text-in m-0"
+          style={{ animationDelay: '300ms' }}
         >
           Church of Christ, Mataheko
-        </p>
+        </h1>
 
         {/* Tagline */}
         <p
-          className="splash-text-in"
-          style={{
-            fontWeight: 400,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            fontSize: 13,
-            margin: 0,
-            color: isDark ? '#9ca3af' : '#6b7280',
-            animationDelay: '500ms',
-          }}
+          className="text-base leading-relaxed uppercase tracking-wider text-muted-foreground splash-text-in m-0"
+          style={{ animationDelay: '500ms' }}
         >
           Managing God's House
         </p>

@@ -170,7 +170,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight mb-2">Finance &amp; Expenses</h1>
+            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Finance &amp; Expenses</h1>
             {!isOnline && (
               <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
                 <WifiOff className="w-3 h-3 mr-1" />

@@ -469,7 +469,7 @@ export function Help() {
         <div className="flex items-center gap-3">
           <HelpCircle className="w-8 h-8 text-primary" />
           <div>
-            <h1 className="text-3xl">Help & Guide</h1>
+            <h1 className="text-2xl lg:text-3xl">Help & Guide</h1>
             <p className="text-muted-foreground">
               Learn how to use the Church Management System
             </p>

@@ -213,10 +213,10 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       {/* Welcome Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
             {timeOfDay}, <span className="text-gradient">{user?.name}</span>
           </h1>
-          <p className="text-muted-foreground mt-1 text-lg">
+          <p className="text-muted-foreground mt-1 text-base lg:text-lg leading-relaxed">
             Here's an overview of your church's activity today.
           </p>
         </div>
@@ -245,7 +245,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
                         <Users className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
                         {stats.totalMembers}
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Total Members</div>
@@ -269,7 +269,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 transition-transform duration-300">
                         <Users className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
                         —
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Total Members</div>
@@ -289,7 +289,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
                         <Calendar className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
                         {stats.attendanceThisWeek}
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
@@ -307,7 +307,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 transition-transform duration-300">
                         <Calendar className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
                         —
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
@@ -327,7 +327,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
                         <Banknote className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
                         {formatGhanaCedis(stats.givingThisMonth)}
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
@@ -345,7 +345,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 transition-transform duration-300">
                         <Banknote className="w-6 h-6" />
                     </div>
-                    <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
+                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
                         —
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
@@ -358,7 +358,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
       {/* Quick Actions */}
       {isWidgetVisible('widget_quick_actions') && (
       <div id="dashboard-quick-actions" className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-        <h2 className="text-xl font-semibold mb-5 flex items-center text-foreground/90">
+        <h2 className="text-xl font-bold mb-5 flex items-center text-foreground/90">
             Quick Actions
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
@@ -376,7 +376,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 </div>
                 <div className="flex-1 min-w-0 z-10">
                   <div className="font-semibold text-base text-foreground group-hover:text-primary transition-colors">{action.label}</div>
-                  <div className="text-xs text-muted-foreground mt-1 truncate group-hover:text-muted-foreground/80">
+                  <div className="text-sm leading-snug text-muted-foreground mt-1 truncate group-hover:text-muted-foreground/80">
                     {action.description}
                   </div>
                 </div>
@@ -400,7 +400,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
 
       {/* Recent Activity */}
       <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <h2 className="text-xl font-semibold mb-5 text-foreground/90">Recent Activity</h2>
+          <h2 className="text-xl font-bold mb-5 text-foreground/90">Recent Activity</h2>
           {recentActivity.length > 0 ? (
             <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
               {recentActivity.map((activity, index) => (

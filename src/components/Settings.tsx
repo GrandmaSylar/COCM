@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { api, invalidateApiCache } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { THEME_PRESETS } from '../utils/themePresets';
-import { APP_VERSION, CHANGELOG } from '../utils/version';
+import { APP_VERSION, CHANGELOG, BUILD_DATE, GIT_HASH } from '../utils/version';
 import { DevSettings } from './DevSettings';
 import { ImportMembers } from './ImportMembers';
 
@@ -2030,7 +2030,65 @@ export function Settings({ onAddUser }: SettingsProps) {
                     <p className="text-sm text-muted-foreground">Empowering churches with modern management tools</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="w-fit">v{APP_VERSION}</Badge>
+                <div className="flex flex-col gap-1 items-end">
+                  <Badge variant="outline" className="w-fit">v{APP_VERSION}</Badge>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    Build: {new Date(BUILD_DATE).toLocaleDateString()} {new Date(BUILD_DATE).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-mono">
+                    Hash: {GIT_HASH}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <RefreshCw className="w-4 h-4" />
+                    Software Updates
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Check if a newer version of the app is available.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    toast.info('Checking for updates...');
+                    try {
+                      // Unregister all service workers to clear cached assets
+                      if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        for (const registration of registrations) {
+                          await registration.unregister();
+                        }
+                      }
+                      // Clear all caches
+                      if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        for (const name of cacheNames) {
+                          await caches.delete(name);
+                        }
+                      }
+                      toast.success('Update check complete. Reloading...');
+                      // Hard refresh after a brief delay
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 800);
+                    } catch (err) {
+                      console.error('Update check failed:', err);
+                      toast.error('Update check failed. Try refreshing manually.');
+                    }
+                  }}
+                  className="shrink-0"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Check for Update
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -3922,7 +3980,7 @@ function DeleteRoleDialog({ open, onOpenChange, deleteTarget, allRoles, allSyste
         <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
           {deleteTarget.users.map((u: any) => (
             <div key={u.id} className="flex items-center justify-between gap-3">
-              <span className="text-sm font-medium truncate">{u.name}</span>
+              <span className="text-base font-medium truncate">{u.name}</span>
               <Select 
                 value={reassignments[u.id] || ''} 
                 onValueChange={(val) => setReassignments(prev => ({ ...prev, [u.id]: val }))}

@@ -85,7 +85,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
           <div className="flex flex-col items-center mb-8 space-y-2 text-center">
             <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-24 h-24 object-contain mb-2" />
             <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base leading-relaxed text-muted-foreground">
               Sign in to Church of Christ, Mataheko
             </p>
           </div>
@@ -121,7 +121,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
                 <Label htmlFor="password" className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
                   Password
                 </Label>
-                <button type="button" onClick={onForgotPassword} className="text-xs text-primary hover:text-primary/80 hover:underline transition-all">
+                <button type="button" onClick={onForgotPassword} className="text-xs text-primary hover:text-primary/80 hover:underline transition-all min-h-[44px] flex items-center">
                   Forgot password?
                 </button>
               </div>
