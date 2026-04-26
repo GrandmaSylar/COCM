@@ -29,7 +29,7 @@ interface GivingRecord {
   serviceType: 'sunday_morning' | 'sunday_evening' | 'midweek' | 'special' | 'other';
   offerings: {
     offering: number;
-    donation: number;
+    donation?: number;
     thanksgiving: number;
     customTypes: { [key: string]: number }; // Dynamic custom types with amounts
   };
@@ -571,10 +571,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                       <p className="text-xs text-muted-foreground">Offering</p>
                       <p className="font-medium">{formatAmount(record.offerings.offering)}</p>
                     </div>
+                    {(record.offerings.donation ?? 0) > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground">Donation</p>
-                      <p className="font-medium">{formatAmount(record.offerings.donation)}</p>
+                      <p className="font-medium">{formatAmount(record.offerings.donation ?? 0)}</p>
                     </div>
+                    )}
                     <div>
                       <p className="text-xs text-muted-foreground">Thanksgiving</p>
                       <p className="font-medium">{formatAmount(record.offerings.thanksgiving)}</p>
@@ -872,7 +874,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
 
   // Offering amounts
   const [offeringAmount, setOfferingAmount] = useState('');
-  const [donationAmount, setDonationAmount] = useState('');
+
   const [thanksgivingAmount, setThanksgivingAmount] = useState('');
 
   // Custom types
@@ -969,7 +971,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
         serviceType: serviceInfo.type,
         offerings: {
           offering: parseFloat(offeringAmount) || 0,
-          donation: parseFloat(donationAmount) || 0,
+
           thanksgiving: parseFloat(thanksgivingAmount) || 0,
           customTypes: customTypesObj
         },
@@ -988,10 +990,9 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
 
   const calculateTotal = () => {
     const offering = parseFloat(offeringAmount) || 0;
-    const donation = parseFloat(donationAmount) || 0;
     const thanksgiving = parseFloat(thanksgivingAmount) || 0;
     const customTotal = Object.values(customTypeAmounts).reduce((sum, val) => sum + (parseFloat(val) || 0), 0);
-    return offering + donation + thanksgiving + customTotal;
+    return offering + thanksgiving + customTotal;
   };
 
   const calculatePaymentTotal = () => {
@@ -1064,7 +1065,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
             {/* Giving Amounts */}
             <div className="space-y-4">
               <h3>Giving Breakdown</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="offering">Offering (GH₵)</Label>
                   <Input
@@ -1077,19 +1078,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
                     placeholder="0.00"
                   />
                 </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="donation">Donation (GH₵)</Label>
-                  <Input
-                    id="donation"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={donationAmount}
-                    onChange={(e) => setDonationAmount(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
+
 
                 <div className="space-y-2">
                   <Label htmlFor="thanksgiving">Thanksgiving (GH₵)</Label>
@@ -1537,10 +1526,12 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
                   <p className="text-xs text-muted-foreground">Offering</p>
                   <p className="font-medium">{formatGhanaCedis(record.offerings.offering)}</p>
                 </div>
+                {(record.offerings.donation ?? 0) > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground">Donation</p>
-                  <p className="font-medium">{formatGhanaCedis(record.offerings.donation)}</p>
+                  <p className="font-medium">{formatGhanaCedis(record.offerings.donation ?? 0)}</p>
                 </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground">Thanksgiving</p>
                   <p className="font-medium">{formatGhanaCedis(record.offerings.thanksgiving)}</p>
@@ -1634,10 +1625,12 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
                 <Label htmlFor="edit-offering">Offering (GH₵)</Label>
                 <Input id="edit-offering" type="number" step="0.01" min="0" value={offeringAmount} onChange={(e) => setOfferingAmount(e.target.value)} placeholder="0.00" />
               </div>
+              {(parseFloat(donationAmount) || 0) > 0 && (
               <div className="space-y-2">
                 <Label htmlFor="edit-donation">Donation (GH₵)</Label>
                 <Input id="edit-donation" type="number" step="0.01" min="0" value={donationAmount} onChange={(e) => setDonationAmount(e.target.value)} placeholder="0.00" />
               </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="edit-thanksgiving">Thanksgiving (GH₵)</Label>
                 <Input id="edit-thanksgiving" type="number" step="0.01" min="0" value={thanksgivingAmount} onChange={(e) => setThanksgivingAmount(e.target.value)} placeholder="0.00" />

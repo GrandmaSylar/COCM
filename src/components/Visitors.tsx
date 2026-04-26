@@ -421,12 +421,14 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     try {
       await api.visitors.create({
         ...formData,
-        gender: formData.gender || 'male', // Ensure valid gender
+        gender: (formData.gender || 'male') as Visitor['gender'], // Ensure valid gender
         potentialZone: formData.potentialZone || undefined,
         followUpStatus: 'pending' // Default value for database constraint
-      } as Visitor);
+      } as Omit<Visitor, 'id'>);
+      
       onSave({
         ...formData,
+        gender: (formData.gender || 'male') as Visitor['gender'],
         potentialZone: formData.potentialZone || undefined
       });
     } catch (error) {

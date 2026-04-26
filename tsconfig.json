@@ -22,6 +22,6 @@
 
     "types": ["vite/client", "node"]
   },
-  "include": ["src/**/*", "supabase/**/*", "vite.config.ts"],
-  "exclude": ["node_modules", "dist", "build"]
+  "include": ["src/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "build", "supabase/functions"]
 }

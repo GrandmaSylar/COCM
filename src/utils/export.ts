@@ -810,7 +810,7 @@ export async function generateServiceSetupPDF(
   doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15); // line above footer
 
   if (action === 'preview') {
-    return doc.output('bloburl');
+    return doc.output('bloburl').toString();
   } else {
     const safeType = (formData.serviceType || 'service').toLowerCase().replace(/\s+/g, '-');
     const safeDate = formData.serviceDate || 'date';
@@ -990,7 +990,7 @@ export async function generateExpenseRequisitionPDF(
   doc.line(15, pageHeight - 15, pageWidth - 15, pageHeight - 15);
 
   if (action === 'preview') {
-    return doc.output('bloburl');
+    return doc.output('bloburl').toString();
   } else {
     doc.save(`expense-requisition-${expense.formId || 'receipt'}.pdf`);
   }

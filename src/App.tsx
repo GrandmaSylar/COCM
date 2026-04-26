@@ -415,7 +415,8 @@ function AppContent() {
       
       clearCacheByPattern('members-list');
       setMembersRefreshKey(prev => prev + 1);
-      navigateTo('members');
+      setSelectedMember(createdMember);
+      navigateTo('member-profile');
     } catch (error) {
       console.error('Failed to add member:', error);
       toast.error(getFriendlyMessage(error));
@@ -664,7 +665,8 @@ function AppContent() {
 
       toast.success('Child member added successfully!');
       setChildrenRefreshKey(prev => prev + 1);
-      navigateTo('children');
+      setSelectedChild(createdChild);
+      navigateTo('children-profile');
     } catch (error: any) {
       toast.error(getFriendlyMessage(error));
     }
