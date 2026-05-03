@@ -9,6 +9,7 @@ import { Layout } from './components/Layout';
 import { SplashScreen } from './components/SplashScreen';
 import { Toaster } from './components/ui/sonner';
 import { clearCacheByPattern } from './hooks/useCachedData';
+import { invalidateApiCache } from './services/api';
 
 // Lazy load main pages
 const Dashboard = lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
@@ -113,6 +114,7 @@ function AppContent() {
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
   const [selectedChildVisitor, setSelectedChildVisitor] = useState<ChildVisitor | null>(null);
   const [selectedAttendanceId, setSelectedAttendanceId] = useState<string | null>(null);
+  const [markAttendanceParams, setMarkAttendanceParams] = useState<{ date?: string, serviceType?: string }>({});
   const [selectedGivingId, setSelectedGivingId] = useState<string | null>(null);
   const [attendanceRefreshKey, setAttendanceRefreshKey] = useState(0);
   const [givingRefreshKey, setGivingRefreshKey] = useState(0);
@@ -490,7 +492,12 @@ function AppContent() {
     navigateTo('record-attendance');
   };
 
-  const handleMarkAttendance = () => {
+  const handleMarkAttendance = (params?: { date: string, serviceType: string }) => {
+    if (params) {
+      setMarkAttendanceParams(params);
+    } else {
+      setMarkAttendanceParams({});
+    }
     navigateTo('mark-attendance');
   };
 
@@ -905,7 +912,14 @@ function AppContent() {
       case 'mark-attendance':
         return (
           <MarkAttendance
-            onBack={() => navigateTo('attendance')}
+            initialDate={markAttendanceParams.date}
+            initialServiceType={markAttendanceParams.serviceType}
+            onBack={() => {
+              clearCacheByPattern('attendance-records');
+              invalidateApiCache('/attendance');
+              setAttendanceRefreshKey(prev => prev + 1);
+              navigateTo('attendance');
+            }}
             onSave={handleSaveMarkedAttendance}
           />
         );

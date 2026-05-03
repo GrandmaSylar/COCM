@@ -124,6 +124,7 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
 
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       ...options,
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,

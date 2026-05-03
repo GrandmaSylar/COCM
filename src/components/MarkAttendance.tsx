@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { AbsenteeReview } from './AbsenteeReview';
 import { useCachedData } from '../hooks/useCachedData';
+import { useRealtimeAttendance } from '../hooks/useRealtimeAttendance';
 
 interface AttendanceRecord {
   id: string;
@@ -32,6 +33,8 @@ interface AttendanceRecord {
 interface MarkAttendanceProps {
   onBack: () => void;
   onSave: (record: Omit<AttendanceRecord, 'id' | 'markedBy' | 'markedAt'>) => void;
+  initialDate?: string;
+  initialServiceType?: string;
 }
 
 const SUNDAY_MAIN_SERVICE = {
@@ -42,21 +45,67 @@ const SUNDAY_MAIN_SERVICE = {
   isPermanent: true
 };
 
-export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
-  const [serviceType, setServiceType] = useState('Sunday Main Service');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType }: MarkAttendanceProps) {
+  const [serviceType, setServiceType] = useState(initialServiceType || 'Sunday Main Service');
+  const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('13:00');
   const [members, setMembers] = useState<Member[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedZone, setSelectedZone] = useState('all');
-  const [attendanceStatus, setAttendanceStatus] = useState<Record<string, 'present' | 'absent' | 'unmarked'>>({});
   const [showOnlyUnmarked, setShowOnlyUnmarked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<'marking' | 'absentee-review'>('marking');
   const [savedRecordId, setSavedRecordId] = useState<string | null>(null);
   const [savedAbsentMemberIds, setSavedAbsentMemberIds] = useState<string[]>([]);
+
+  const [attendanceRecordId, setAttendanceRecordId] = useState<string | null>(null);
+  const [sessionCreatorId, setSessionCreatorId] = useState<string | null>(null);
+  const [sessionCreatorName, setSessionCreatorName] = useState<string>('');
+
+  const handleSessionFinalized = useCallback((data: { absentMemberIds: string[] }) => {
+    toast.info('Session finalized! Moving to Absentee Review...', { duration: 3000 });
+    setSavedRecordId(attendanceRecordId);
+    setSavedAbsentMemberIds(data.absentMemberIds);
+    setPhase('absentee-review');
+  }, [attendanceRecordId]);
+
+  const handleSessionCancelled = useCallback(() => {
+    toast.error('The attendance session has been cancelled by the initiator.', { duration: 4000 });
+    onBack();
+  }, [onBack]);
+
+  const { presentIds, isReady, toggleMember, broadcastFinalized, broadcastCancelled } = useRealtimeAttendance(
+    attendanceRecordId,
+    { onSessionFinalized: handleSessionFinalized, onSessionCancelled: handleSessionCancelled }
+  );
+
+  const handleCancelSession = async () => {
+    if (!attendanceRecordId) return;
+    if (!confirm('Are you sure you want to cancel this session? All recorded attendance will be deleted.')) return;
+    try {
+      await api.attendance.cancelSession(attendanceRecordId);
+      broadcastCancelled();
+      toast.info('Session cancelled.');
+      onBack();
+    } catch (err) {
+      console.error('Failed to cancel session:', err);
+      toast.error(getFriendlyMessage(err));
+    }
+  };
+
+  // Create/fetch session on mount (or when date/service changes)
+  useEffect(() => {
+    if (!date || !serviceType) return;
+    api.attendance.getOrCreate({ date, serviceType, startTime, endTime })
+      .then((res) => {
+        setAttendanceRecordId(res.id);
+        setSessionCreatorId(res.createdBy);
+        setSessionCreatorName(res.creatorName || '');
+      })
+      .catch(err => console.error("Failed to init attendance session:", err));
+  }, [date, serviceType]);
 
   const { user } = useAuth();
 
@@ -111,118 +160,68 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
     const matchesSearch = `${member.firstName} ${member.lastName} ${member.otherNames}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.zoneNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesZone = selectedZone === 'all' || member.zone === selectedZone;
-    const matchesUnmarked = !showOnlyUnmarked || attendanceStatus[member.id] === 'unmarked' || !attendanceStatus[member.id];
+    const matchesUnmarked = !showOnlyUnmarked || !presentIds.has(member.id);
     
     return matchesSearch && matchesZone && matchesUnmarked;
   });
 
-  // Initialize attendance status for all members
-  useEffect(() => {
-    const initialStatus: Record<string, 'present' | 'absent' | 'unmarked'> = {};
-    members.forEach(member => {
-      initialStatus[member.id] = 'unmarked';
-    });
-    setAttendanceStatus(initialStatus);
-  }, [members]);
-
-  const handleAttendanceToggle = (memberId: string, status: 'present' | 'absent') => {
-    setAttendanceStatus(prev => ({
-      ...prev,
-      [memberId]: prev[memberId] === status ? 'unmarked' : status
-    }));
+  // Enter key = instant mark
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && filteredMembers.length === 1) {
+      toggleMember(filteredMembers[0].id);
+      setSearchTerm('');
+    }
   };
 
-  const handleMarkAllPresent = () => {
-    const newStatus = { ...attendanceStatus };
-    filteredMembers.forEach(member => {
-      newStatus[member.id] = 'present';
-    });
-    setAttendanceStatus(newStatus);
-  };
-
-  const handleMarkAllAbsent = () => {
-    const newStatus = { ...attendanceStatus };
-    filteredMembers.forEach(member => {
-      newStatus[member.id] = 'absent';
-    });
-    setAttendanceStatus(newStatus);
-  };
-
-  const handleClearAll = () => {
-    const newStatus = { ...attendanceStatus };
-    filteredMembers.forEach(member => {
-      newStatus[member.id] = 'unmarked';
-    });
-    setAttendanceStatus(newStatus);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const presentMembers = Object.entries(attendanceStatus)
-      .filter(([_, status]) => status === 'present')
-      .map(([memberId]) => memberId);
-
-    const absentMembers = Object.entries(attendanceStatus)
-      .filter(([_, status]) => status === 'absent')
-      .map(([memberId]) => memberId);
-
-    // Validate that at least some attendance is marked
-    if (presentMembers.length === 0 && absentMembers.length === 0) {
-      toast.error('Please mark at least one member as present or absent before saving.');
+  const handleReviewAbsentees = async () => {
+    if (!attendanceRecordId) {
+      toast.error('Attendance session not ready yet.');
       return;
     }
 
     setIsLoading(true);
 
+    const allAbsentIds = members
+      .filter(m => !presentIds.has(m.id))
+      .map(m => m.id);
+
     try {
-      const result = await api.attendance.create({
+      // Finalize the session — updates total_count and sets status to 'finalized'
+      await api.attendance.finalize(attendanceRecordId);
+      toast.success(`Attendance finalized! ${presentIds.size} present.`);
+      // Notify all other devices to transition to absentee review
+      broadcastFinalized(presentIds.size, allAbsentIds);
+    } catch (err) {
+      console.error('Failed to finalize session:', err);
+      toast.error(getFriendlyMessage(err));
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(false);
+
+    if (allAbsentIds.length > 0) {
+      setSavedRecordId(attendanceRecordId);
+      setSavedAbsentMemberIds(allAbsentIds);
+      setPhase('absentee-review');
+    } else {
+      toast.info('No absentees to review!');
+      onSave({
         date,
         serviceType,
         startTime,
         endTime,
-        attendees: presentMembers,
-        totalCount: presentMembers.length,
-        isCustomService: serviceType !== 'Sunday Main Service',
-        attendanceType: 'individual'
+        presentMembers: Array.from(presentIds),
+        absentMembers: [],
+        totalPresent: presentIds.size
       });
-
-      console.log('Attendance saved successfully:', result);
-      toast.success(`Attendance saved! ${presentMembers.length} present, ${absentMembers.length} absent.`);
-
-      // Transition to absentee review if there are absent members
-      const allAbsentIds = members
-        .filter(m => !presentMembers.includes(m.id))
-        .map(m => m.id);
-
-      if (allAbsentIds.length > 0 && result?.id) {
-        setSavedRecordId(result.id);
-        setSavedAbsentMemberIds(allAbsentIds);
-        setPhase('absentee-review');
-      } else {
-        onSave({
-          date,
-          serviceType,
-          startTime,
-          endTime,
-          presentMembers,
-          absentMembers,
-          totalPresent: presentMembers.length
-        });
-      }
-    } catch (error: any) {
-      console.error('Failed to save attendance:', error);
-      toast.error(getFriendlyMessage(error));
-    } finally {
-      setIsLoading(false);
     }
   };
 
   // Calculate stats
-  const totalMarked = Object.values(attendanceStatus).filter(status => status !== 'unmarked').length;
-  const totalPresent = Object.values(attendanceStatus).filter(status => status === 'present').length;
-  const totalAbsent = Object.values(attendanceStatus).filter(status => status === 'absent').length;
-  const totalUnmarked = members.length - totalMarked;
+  const totalPresent = presentIds.size;
+  const totalAbsent = members.length - presentIds.size;
+  const totalUnmarked = totalAbsent;
 
   const getStatusColor = (status: 'present' | 'absent' | 'unmarked') => {
     switch (status) {
@@ -240,13 +239,9 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
       serviceType,
       startTime,
       endTime,
-      presentMembers: Object.entries(attendanceStatus)
-        .filter(([_, status]) => status === 'present')
-        .map(([memberId]) => memberId),
-      absentMembers: Object.entries(attendanceStatus)
-        .filter(([_, status]) => status === 'absent')
-        .map(([memberId]) => memberId),
-      totalPresent: Object.values(attendanceStatus).filter(s => s === 'present').length
+      presentMembers: Array.from(presentIds),
+      absentMembers: members.filter(m => !presentIds.has(m.id)).map(m => m.id),
+      totalPresent: presentIds.size
     });
   };
 
@@ -260,6 +255,9 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
         serviceDate={date}
         onComplete={handleAbsenteeComplete}
         onSkip={handleAbsenteeComplete}
+        isSessionCreator={user?.id === sessionCreatorId}
+        onBack={() => setPhase('marking')}
+        sessionCreatorName={sessionCreatorName}
       />
     );
   }
@@ -267,16 +265,26 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1>Mark Attendance</h1>
-          <p className="text-muted-foreground">
-            Mark individual members as present or absent
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="flex items-center gap-2">
+              Mark Attendance
+              <Badge className="bg-green-600 text-white text-[10px]">LIVE</Badge>
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Session by <strong>{sessionCreatorName || 'Loading...'}</strong>
+            </p>
+          </div>
         </div>
+        {user?.id === sessionCreatorId && (
+          <Button variant="destructive" size="sm" onClick={handleCancelSession}>
+            Cancel Session
+          </Button>
+        )}
       </div>
 
       {/* Service Information */}
@@ -377,6 +385,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                   placeholder="Search members..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
                   className="pl-10"
                 />
               </div>
@@ -402,22 +411,6 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                 <Label htmlFor="showOnlyUnmarked" className="text-sm">Show only unmarked</Label>
               </div>
             </div>
-
-            {/* Bulk Actions */}
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={handleMarkAllPresent}>
-                <UserCheck className="w-4 h-4 mr-2" />
-                Mark All Present
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleMarkAllAbsent}>
-                <UserX className="w-4 h-4 mr-2" />
-                Mark All Absent
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleClearAll}>
-                <X className="w-4 h-4 mr-2" />
-                Clear All
-              </Button>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -440,7 +433,7 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
               </Alert>
             ) : (
               filteredMembers.map((member) => {
-                const status = attendanceStatus[member.id] || 'unmarked';
+                const isPresent = presentIds.has(member.id);
                 return (
                   <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
                     <div className="flex items-center gap-3 min-w-0">
@@ -462,30 +455,19 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Badge className={`hidden sm:flex ${getStatusColor(status)}`}>
-                        {status === 'present' && <Check className="w-3 h-3 mr-1" />}
-                        {status === 'absent' && <X className="w-3 h-3 mr-1" />}
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      <Badge className={`hidden sm:flex ${isPresent ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                        {isPresent && <Check className="w-3 h-3 mr-1" />}
+                        {isPresent ? 'Present' : 'Not Present'}
                       </Badge>
                       
-                      <div className="flex gap-1">
-                        <Button
-                          variant={status === 'present' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => handleAttendanceToggle(member.id, 'present')}
-                          className={status === 'present' ? 'bg-green-600 hover:bg-green-700' : ''}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant={status === 'absent' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => handleAttendanceToggle(member.id, 'absent')}
-                          className={status === 'absent' ? 'bg-red-600 hover:bg-red-700' : ''}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant={isPresent ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => toggleMember(member.id)}
+                        className={isPresent ? 'bg-green-600 hover:bg-green-700' : ''}
+                      >
+                        {isPresent ? <Check className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                      </Button>
                     </div>
                   </div>
                 );
@@ -495,23 +477,29 @@ export function MarkAttendance({ onBack, onSave }: MarkAttendanceProps) {
         </CardContent>
       </Card>
 
-      {/* Submit */}
+      {/* Review Absentees */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <Alert className="flex-1 min-w-0">
               <AlertDescription>
-                <strong>Summary:</strong> {totalPresent} present, {totalAbsent} absent, {totalUnmarked} unmarked out of {members.length} total members.
+                <strong>Summary:</strong> {totalPresent} present, {totalAbsent} not present out of {members.length} total members.
               </AlertDescription>
             </Alert>
             
-            <Button
-              onClick={handleSubmit}
-              disabled={isLoading}
-              className="w-full sm:w-auto"
-            >
-              {isLoading ? 'Saving...' : 'Save Attendance'}
-            </Button>
+            {user?.id === sessionCreatorId ? (
+              <Button
+                onClick={handleReviewAbsentees}
+                disabled={!isReady || isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? 'Finalizing...' : 'Finalize & Review Absentees'}
+              </Button>
+            ) : (
+              <Badge variant="outline" className="text-xs whitespace-nowrap py-2 px-3">
+                Session initiator will finalize
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>

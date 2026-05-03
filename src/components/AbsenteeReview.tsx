@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -11,6 +11,7 @@ import { Search, Users, ArrowLeft, Save, SkipForward } from 'lucide-react';
 import { Member, ZONES } from './Members';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { supabase } from '../utils/supabase/client';
 
 interface AbsenteeInfo {
   memberId: string;
@@ -29,6 +30,9 @@ interface AbsenteeReviewProps {
   serviceDate: string;
   onComplete: () => void;
   onSkip: () => void;
+  isSessionCreator?: boolean;
+  onBack?: () => void;
+  sessionCreatorName?: string;
 }
 
 const ABSENCE_REASONS = ['Sick', 'Traveled', 'Schooling', 'Work', 'Family Emergency', 'Other'];
@@ -40,6 +44,9 @@ export function AbsenteeReview({
   serviceDate,
   onComplete,
   onSkip,
+  isSessionCreator,
+  onBack,
+  sessionCreatorName,
 }: AbsenteeReviewProps) {
   const [absentees, setAbsentees] = useState<Array<Member & { absenteeInfo?: any }>>([]);
   const [absenteeData, setAbsenteeData] = useState<Record<string, AbsenteeInfo>>({});
@@ -47,6 +54,10 @@ export function AbsenteeReview({
   const [selectedZone, setSelectedZone] = useState('all');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingAbsentees, setIsLoadingAbsentees] = useState(true);
+  const channelRef = useRef<any>(null);
+
+  // Track whether a state update came from broadcast (to avoid echo)
+  const isBroadcastUpdate = useRef(false);
 
   useEffect(() => {
     const fetchAbsentees = async () => {
@@ -93,7 +104,49 @@ export function AbsenteeReview({
     fetchAbsentees();
   }, [attendanceRecordId]);
 
-  const updateAbsenteeField = (memberId: string, field: keyof AbsenteeInfo, value: any) => {
+  // Real-time sync for absentee form changes
+  useEffect(() => {
+    const channel = supabase
+      .channel(`absentee-review-${attendanceRecordId}`, {
+        config: { broadcast: { self: false } }
+      })
+      .on('broadcast', { event: 'absentee_update' }, (payload) => {
+        const { memberId, field, value } = payload.payload;
+        console.log('[AbsenteeSync] Received update:', memberId, field, value);
+        isBroadcastUpdate.current = true;
+        setAbsenteeData(prev => ({
+          ...prev,
+          [memberId]: {
+            ...prev[memberId],
+            [field]: value,
+          }
+        }));
+        // Reset the flag after state update
+        setTimeout(() => { isBroadcastUpdate.current = false; }, 0);
+      })
+      .on('broadcast', { event: 'back_to_marking' }, () => {
+        console.log('[AbsenteeSync] Back to marking received');
+        toast.info('Returning to attendance marking...');
+        onBack?.();
+      })
+      .on('broadcast', { event: 'session_ended' }, () => {
+        console.log('[AbsenteeSync] Session ended received');
+        toast.success('Attendance session complete. Thank you for helping!', { duration: 4000 });
+        onComplete();
+      })
+      .subscribe((status) => {
+        console.log('[AbsenteeSync] Subscription status:', status);
+      });
+
+    channelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [attendanceRecordId, onBack]);
+
+  const updateAbsenteeField = useCallback((memberId: string, field: keyof AbsenteeInfo, value: any) => {
     setAbsenteeData(prev => ({
       ...prev,
       [memberId]: {
@@ -101,7 +154,16 @@ export function AbsenteeReview({
         [field]: value,
       }
     }));
-  };
+
+    // Broadcast the change to other devices (only if this was a local change)
+    if (!isBroadcastUpdate.current) {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'absentee_update',
+        payload: { memberId, field, value }
+      });
+    }
+  }, []);
 
   const filteredAbsentees = absentees.filter(member => {
     const matchesSearch = `${member.firstName} ${member.lastName} ${member.otherNames || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -124,6 +186,12 @@ export function AbsenteeReview({
       } else {
         toast.info('No absentee information to save.');
       }
+      // Notify all helpers that the session is over
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'session_ended',
+        payload: {}
+      });
       onComplete();
     } catch (error: any) {
       console.error('Failed to save absentee records:', error);
@@ -151,11 +219,29 @@ export function AbsenteeReview({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1>Absentee Review</h1>
-        <p className="text-muted-foreground">
-          Review absent members and record reasons for absence. You can skip this step if not needed.
-        </p>
+      <div className="flex items-center gap-4">
+        {isSessionCreator && onBack && (
+          <Button variant="ghost" size="sm" onClick={() => {
+            // Broadcast back_to_marking to all helpers
+            channelRef.current?.send({
+              type: 'broadcast',
+              event: 'back_to_marking',
+              payload: {}
+            });
+            onBack();
+          }}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        )}
+        <div>
+          <h1 className="flex items-center gap-2">
+            Absentee Review
+            <Badge className="bg-blue-600 text-white text-[10px]">LIVE</Badge>
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Session by <strong>{sessionCreatorName || 'Loading...'}</strong> — Changes sync in real time.
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
@@ -347,16 +433,25 @@ export function AbsenteeReview({
                 <strong>{absentees.length}</strong> absent members. <strong>{withPermission}</strong> with permission recorded.
               </AlertDescription>
             </Alert>
-            <div className="flex gap-2 w-full sm:w-auto">
-              <Button variant="outline" onClick={onSkip} className="flex-1 sm:flex-none">
-                <SkipForward className="w-4 h-4 mr-2" />
-                Skip
-              </Button>
-              <Button onClick={handleSave} disabled={isSaving} className="flex-1 sm:flex-none">
-                <Save className="w-4 h-4 mr-2" />
-                {isSaving ? 'Saving...' : 'Save Absentee Info'}
-              </Button>
-            </div>
+            {isSessionCreator ? (
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={() => {
+                  channelRef.current?.send({ type: 'broadcast', event: 'session_ended', payload: {} });
+                  onSkip();
+                }} className="flex-1 sm:flex-none">
+                  <SkipForward className="w-4 h-4 mr-2" />
+                  Skip
+                </Button>
+                <Button onClick={handleSave} disabled={isSaving} className="flex-1 sm:flex-none">
+                  <Save className="w-4 h-4 mr-2" />
+                  {isSaving ? 'Saving...' : 'Save Absentee Info'}
+                </Button>
+              </div>
+            ) : (
+              <Badge variant="outline" className="text-xs whitespace-nowrap py-2 px-3">
+                Session initiator will save
+              </Badge>
+            )}
           </div>
         </CardContent>
       </Card>

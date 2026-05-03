@@ -147,6 +147,20 @@ export const api = {
   // ============================================================================
   
   attendance: {
+    getOrCreate: (data: { date: string; serviceType: string; startTime: string; endTime: string }) =>
+      fetchApi('/attendance/session', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      }),
+
+    finalize: (id: string) =>
+      fetchApi(`/attendance/session/${id}/finalize`, { method: 'POST' }),
+
+    cancelSession: (id: string) =>
+      fetchApi(`/attendance/session/${id}/cancel`, { method: 'POST' }),
+
+    getLiveSessions: () => fetchApi('/attendance/live-sessions'),
+
     getAll: () => fetchApi('/attendance'),
     
     getById: (id: string) => fetchApi(`/attendance/${id}`),

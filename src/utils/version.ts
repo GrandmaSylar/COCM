@@ -8,11 +8,20 @@ export interface ChangelogEntry {
 declare const __BUILD_DATE__: string;
 declare const __GIT_HASH__: string;
 
-export const APP_VERSION = "0.7.0";
+export const APP_VERSION = "0.7.1";
 export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
 export const GIT_HASH = typeof __GIT_HASH__ !== 'undefined' ? __GIT_HASH__ : 'dev';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.7.1",
+    date: "2026-05-03",
+    changes: [
+      "Fixed browser HTTP cache persistently showing stale live sessions",
+      "Fixed 'Join Session' button not passing correct date/service causing new session creation on join",
+      "Disabled browser cache for all GET requests to ensure proper realtime cache syncing"
+    ],
+  },
   {
     version: "0.7.0",
     date: "2026-04-26",

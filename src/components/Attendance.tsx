@@ -55,7 +55,7 @@ interface CustomService {
 
 interface AttendanceProps {
   onRecordAttendance: () => void;
-  onMarkAttendance: () => void;
+  onMarkAttendance: (params?: { date: string, serviceType: string }) => void;
   onViewRecord: (id: string) => void;
 }
 
@@ -150,11 +150,16 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   ];
 
   const filteredRecords = records.filter(record => {
+    // Hide live (in-progress) sessions from the normal list
+    if ((record as any).status === 'live') return false;
     const matchesSearch = record.serviceType.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesService = selectedServiceType === 'all' || record.serviceType === selectedServiceType;
     const matchesType = selectedAttendanceType === 'all' || record.attendanceType === selectedAttendanceType;
     return matchesSearch && matchesService && matchesType;
   });
+
+  // Live sessions that volunteers can join
+  const liveSessions = records.filter(record => (record as any).status === 'live');
 
   // Calculate stats - prefer general (head count) records for trend stats
   const generalRecords = records.filter(r => r.attendanceType === 'general');
@@ -414,6 +419,41 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </SelectContent>
         </Select>
       </div>
+
+      {/* Live Session Banner */}
+      {liveSessions.length > 0 && canRecordAttendance && (
+        <div className="space-y-3">
+          {liveSessions.map((session: any) => (
+            <Card key={session.id} className="border-green-500/50 bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-green-600" />
+                      </div>
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
+                        {session.serviceType}
+                        <Badge className="bg-green-600 text-white text-[10px]">LIVE</Badge>
+                      </h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {session.attendees?.length || 0} marked present so far
+                      </p>
+                    </div>
+                  </div>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto" onClick={() => onMarkAttendance({ date: session.date, serviceType: session.serviceType })}>
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    Join Session
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Attendance Records */}
       <div className="space-y-4">

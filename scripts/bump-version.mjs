@@ -72,3 +72,12 @@ function bumpVersion() {
 }
 
 bumpVersion();
+
+/*How to use it: Before you deploy, run this in your terminal:
+
+
+npm run bump patch 
+"Added automated versioning and build metadata"
+
+(Options: patch, minor, or major)
+*/
