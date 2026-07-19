@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 interface EditMemberProps {
   member: Member;
@@ -231,7 +232,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
       setIsLoading(false);
       alertAction({
         title: 'Unable to Save Changes',
-        description: 'We encountered an unexpected error while trying to update this member record. Please ensure you have a stable internet connection and try again.',
+        description: getFriendlyMessage(error),
         variant: 'error'
       });
     }

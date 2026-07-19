@@ -14,6 +14,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 interface AddMemberProps {
@@ -268,7 +269,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
       console.error('Error saving member:', error);
       alertAction({
         title: 'Unable to Register Member',
-        description: 'An unexpected issue occurred while saving this member profile. Please verify your connection or contact system support if this continues.',
+        description: getFriendlyMessage(error),
         variant: 'error'
       });
     } finally {

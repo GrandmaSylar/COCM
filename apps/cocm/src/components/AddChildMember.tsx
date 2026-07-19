@@ -11,6 +11,7 @@ import { Badge } from './ui/badge';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { getFriendlyMessage } from '../utils/error-handler';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import type { ChildMember, ChildParent, ChildVisitor } from './Children';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
@@ -323,7 +324,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
       console.error('Error saving child member:', error);
       alertAction({
         title: 'Unable to Save Child Record',
-        description: 'An unexpected issue occurred while trying to save the child profile. Please check your network connection and try again.',
+        description: getFriendlyMessage(error),
         variant: 'error'
       });
     } finally {
