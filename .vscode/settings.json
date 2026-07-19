@@ -3,6 +3,6 @@
     "deno.enablePaths": [
         "supabase/functions"
     ],
-    "snyk.advanced.organization": "4f541ab7-d2bb-473f-91a5-2e01ed903685",
+    "snyk.advanced.organization": "d08285c3-658f-4045-99d8-20d9b58cd342",
     "snyk.advanced.autoSelectOrganization": true
 }

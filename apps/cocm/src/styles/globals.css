@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 1rem;
+
+    /* Light mode — defaults use hex so ThemeContext hex overrides work cleanly */
+    --background: #f8f9fc;
+    --foreground: #111827;
+
+    --card: #ffffff;
+    --card-foreground: #111827;
+
+    --popover: #ffffff;
+    --popover-foreground: #111827;
+
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+
+    --secondary: #f3f4f6;
+    --secondary-foreground: #374151;
+
+    --muted: #f3f4f6;
+    --muted-foreground: #6b7280;
+
+    --accent: #f3f4f6;
+    --accent-foreground: #374151;
+
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+
+    --border: #e5e7eb;
+    --input: #e5e7eb;
+    --ring: #2563eb;
+
+    /* Sidebar */
+    --sidebar: #f8f9fc;
+    --sidebar-foreground: #374151;
+    --sidebar-primary: #2563eb;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #eff6ff;
+    --sidebar-accent-foreground: #374151;
+    --sidebar-border: #e5e7eb;
+    --sidebar-ring: #2563eb;
+    --primary-gradient-end: #3b82f6;
+  }
+
+  .dark {
+    /* Dark mode */
+    --background: #0f1117;
+    --foreground: #f9fafb;
+
+    --card: #1a1d27;
+    --card-foreground: #f9fafb;
+
+    --popover: #1a1d27;
+    --popover-foreground: #f9fafb;
+
+    --primary: #60a5fa;
+    --primary-foreground: #1a1d27;
+
+    --secondary: #1f2335;
+    --secondary-foreground: #f9fafb;
+
+    --muted: #1f2335;
+    --muted-foreground: #9ca3af;
+
+    --accent: #1f2335;
+    --accent-foreground: #f9fafb;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --border: #2a2d3e;
+    --input: #2a2d3e;
+    --ring: #60a5fa;
+
+    /* Sidebar */
+    --sidebar: #0f1117;
+    --sidebar-foreground: #9ca3af;
+    --sidebar-primary: #60a5fa;
+    --sidebar-primary-foreground: #f9fafb;
+    --sidebar-accent: #1f2335;
+    --sidebar-accent-foreground: #f9fafb;
+    --sidebar-border: #2a2d3e;
+    --sidebar-ring: #60a5fa;
+    --primary-gradient-end: #93c5fd;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    font-size: 16px;
+  }
+  body {
+    @apply bg-background text-foreground;
+    line-height: 1.5;
+  }
+  h1 {
+    @apply text-2xl font-bold leading-tight lg:text-3xl;
+  }
+  h2 {
+    @apply text-xl font-bold leading-snug;
+  }
+  h3 {
+    @apply text-lg font-semibold leading-snug lg:text-xl;
+  }
+  p {
+    @apply text-base leading-relaxed;
+  }
+}
+
+@layer components {
+  /* Glassmorphism */
+  .glass {
+    background-color: rgb(255 255 255 / 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgb(255 255 255 / 0.2);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  .dark .glass {
+    background-color: rgb(0 0 0 / 0.7);
+    border-color: rgb(255 255 255 / 0.1);
+  }
+  
+  .glass-card {
+    background-color: var(--card);
+    opacity: 0.95;
+    backdrop-filter: blur(24px);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+  
+  /* Text Gradients */
+  .text-gradient {
+    background: linear-gradient(to right, var(--primary), var(--primary-gradient-end));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    font-weight: 700;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}

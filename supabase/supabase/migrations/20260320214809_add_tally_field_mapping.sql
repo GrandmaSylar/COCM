@@ -1,0 +1,1 @@
+ALTER TABLE public.tally_form_configs ADD COLUMN field_mapping jsonb DEFAULT '{}'::jsonb;
