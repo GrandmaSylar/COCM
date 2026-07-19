@@ -1,5 +1,6 @@
 {
-  "outputDirectory": "build",
+  "buildCommand": "npm run build:cocm",
+  "outputDirectory": "apps/cocm/build",
   "rewrites": [
     {
       "source": "/(.*)",
