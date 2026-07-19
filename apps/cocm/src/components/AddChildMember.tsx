@@ -9,6 +9,7 @@ import { ArrowLeft, Save, Upload, X, Plus, Trash2, Search, CheckCircle, User, Ph
 import { Member } from './Members';
 import { Badge } from './ui/badge';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import type { ChildMember, ChildParent, ChildVisitor } from './Children';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
@@ -141,11 +142,11 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
+        toast.warning('Please select an image file.');
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB.');
+        toast.warning('File size must be less than 10MB.');
         return;
       }
 

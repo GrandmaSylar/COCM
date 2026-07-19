@@ -12,6 +12,7 @@ import type { ChildMember } from './Children';
 import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 interface AddMemberProps {
@@ -286,13 +287,13 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('Please select an image file.');
+        toast.warning('Please select an image file.');
         return;
       }
 
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        alert('File size must be less than 10MB.');
+        toast.warning('File size must be less than 10MB.');
         return;
       }
 
