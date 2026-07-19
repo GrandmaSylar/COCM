@@ -76,7 +76,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
   const [selectedAttendanceType, setSelectedAttendanceType] = useState('all');
   const [showServiceManager, setShowServiceManager] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const { user, canAccess } = useAuth();
+  const { user, canAccess, confirmAction } = useAuth();
   const { isOnline } = useNetworkStatus();
 
   const { data: cachedAttendance, loading: loadingAttendance, refresh: refreshAttendance } = useCachedData<any[]>(
@@ -195,17 +195,23 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       toast.warning('Reconnect to delete records.');
       return;
     }
-    if (confirm('Are you sure you want to delete this custom service? This action cannot be undone.')) {
-      try {
-        await api.services.delete(serviceId);
-        clearCacheByPattern('custom-services');
-        setCustomServices(prev => prev.filter(service => service.id !== serviceId));
-        toast.success('Service deleted successfully');
-      } catch (error) {
-        console.error('Failed to delete service:', error);
-        toast.error(getFriendlyMessage(error));
+    confirmAction({
+      title: 'Delete Custom Service',
+      description: 'Are you sure you want to delete this custom service? This action cannot be undone.',
+      variant: 'destructive',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          await api.services.delete(serviceId);
+          clearCacheByPattern('custom-services');
+          setCustomServices(prev => prev.filter(service => service.id !== serviceId));
+          toast.success('Service deleted successfully');
+        } catch (error) {
+          console.error('Failed to delete service:', error);
+          toast.error(getFriendlyMessage(error));
+        }
       }
-    }
+    });
   };
 
   const handleToggleService = async (serviceId: string) => {

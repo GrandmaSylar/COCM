@@ -4,6 +4,16 @@ import { clearAllCache } from '../hooks/useCachedData';
 import { invalidateApiCache, ApiError } from '../services/api';
 import { getFriendlyMessage } from '../utils/error-handler';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
@@ -81,6 +91,15 @@ interface AuthContextType {
   getUserTemporaryPermissions: (userId: string) => TemporaryPermission[];
   assignRoleToUser: (userId: string, role: UserRole, temporary?: boolean, durationHours?: number) => void;
   allUsers: User[];
+  confirmAction: (options: {
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'default' | 'destructive';
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -126,6 +145,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(defaultPermissions);
   const [users, setUsers] = useState<User[]>(mockUsers);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'default' | 'destructive';
+    onConfirm: () => void;
+    onCancel?: () => void;
+  } | null>(null);
+
+  const confirmAction = (options: {
+    title: string;
+    description: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: 'default' | 'destructive';
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }) => {
+    setConfirmConfig(options);
+  };
 
   // Helper function to fetch user with temporary permissions
   const fetchUserWithPermissions = async (userId: string) => {
@@ -675,9 +715,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getUserTemporaryPermissions,
     assignRoleToUser,
     allUsers: users,
+    confirmAction,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {confirmConfig && (
+        <AlertDialog open={!!confirmConfig} onOpenChange={(open) => !open && setConfirmConfig(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
+              <AlertDialogDescription>{confirmConfig.description}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => {
+                confirmConfig.onCancel?.();
+                setConfirmConfig(null);
+              }}>
+                {confirmConfig.cancelText || 'Cancel'}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className={confirmConfig.variant === 'destructive' ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground' : 'bg-primary hover:bg-primary/95 text-primary-foreground'}
+                onClick={() => {
+                  confirmConfig.onConfirm();
+                  setConfirmConfig(null);
+                }}
+              >
+                {confirmConfig.confirmText || 'Confirm'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

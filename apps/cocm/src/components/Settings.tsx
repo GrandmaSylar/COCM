@@ -206,7 +206,8 @@ export function Settings({ onAddUser }: SettingsProps) {
     revokeTemporaryPermission,
     getUserTemporaryPermissions,
     assignRoleToUser,
-    allUsers
+    allUsers,
+    confirmAction
   } = useAuth();
 
   const { customColors, setCustomColors, resetColors, isSyncing } = useTheme();
@@ -469,19 +470,26 @@ export function Settings({ onAddUser }: SettingsProps) {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
-
-    try {
-      await api.users.delete(userId);
-      toast.success('User deleted successfully');
-      // Remove from both lists
-      setPendingUsers(prev => prev.filter(u => u.id !== userId));
-      setAllSystemUsers(prev => prev.filter(u => u.id !== userId));
-    } catch (error: any) {
-      console.error('Failed to delete user:', error);
-      toast.error(error?.message || 'Failed to delete user. Please try again.');
-    }
+    confirmAction({
+      title: 'Delete User Account',
+      description: 'Are you sure you want to delete this user? This action cannot be undone.',
+      variant: 'destructive',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        try {
+          await api.users.delete(userId);
+          toast.success('User deleted successfully');
+          // Remove from both lists
+          setPendingUsers(prev => prev.filter(u => u.id !== userId));
+          setAllSystemUsers(prev => prev.filter(u => u.id !== userId));
+        } catch (error: any) {
+          console.error('Failed to delete user:', error);
+          toast.error(getFriendlyMessage(error));
+        }
+      }
+    });
   };
+
 
   const handleEditContact = (systemUser: any) => {
     setEditingUserId(systemUser.id);
@@ -618,24 +626,31 @@ export function Settings({ onAddUser }: SettingsProps) {
   };
 
   const handleRejectUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to reject this user account?')) return;
-
-    try {
-      await api.users.reject(userId);
-      toast.success('User rejected successfully');
-      // Remove from pending list
-      setPendingUsers(prev => prev.filter(u => u.id !== userId));
-      // Update the user in allSystemUsers
-      setAllSystemUsers(prev => prev.map(u =>
-        u.id === userId
-          ? { ...u, isActive: false, approvalStatus: 'rejected' }
-          : u
-      ));
-    } catch (error) {
-      console.error('Failed to reject user:', error);
-      toast.error('Failed to reject user');
-    }
+    confirmAction({
+      title: 'Reject User Request',
+      description: 'Are you sure you want to reject this user account request?',
+      variant: 'destructive',
+      confirmText: 'Reject',
+      onConfirm: async () => {
+        try {
+          await api.users.reject(userId);
+          toast.success('User rejected successfully');
+          // Remove from pending list
+          setPendingUsers(prev => prev.filter(u => u.id !== userId));
+          // Update the user in allSystemUsers
+          setAllSystemUsers(prev => prev.map(u =>
+            u.id === userId
+              ? { ...u, isActive: false, approvalStatus: 'rejected' }
+              : u
+          ));
+        } catch (error) {
+          console.error('Failed to reject user:', error);
+          toast.error('Failed to reject user');
+        }
+      }
+    });
   };
+
 
   const handleChangeUserRole = async (userId: string, newRole: string) => {
     try {
