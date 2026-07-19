@@ -16,7 +16,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Textarea } from './ui/textarea';
-import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt, History, HandHeart, Lock, Info, LayoutGrid } from 'lucide-react';
+import { Plus, Edit, Trash2, Users, Shield, Mail, Phone, ArrowLeft, Save, Settings as SettingsIcon, Crown, Clock, Palette, Trash, Search, ArrowUpDown, UserPlus, Calendar, Banknote, BarChart3, Church, ClipboardList, Database, Download, Upload, RefreshCw, HardDrive, FileJson, AlertTriangle, CheckCircle, XCircle, ChevronDown, KeyRound, Circle, Baby, Loader2, Receipt, History, HandHeart, Lock, Info, LayoutGrid, Map } from 'lucide-react';
 import { useAuth, UserRole, TemporaryPermission } from './AuthContext';
 import { useTheme, ThemeColors, defaultColors } from './ThemeContext';
 import { toast } from 'sonner';
@@ -168,7 +168,8 @@ export const TAB_OPTIONS = [
   { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
   { id: 'children', label: 'Children', icon: Baby },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
-  { id: 'ministry', label: 'Ministry', icon: HandHeart }
+  { id: 'ministry', label: 'Ministry', icon: HandHeart },
+  { id: 'zones', label: 'Zones', icon: Map }
 ];
 
 export const WIDGET_OPTIONS = [
@@ -188,7 +189,8 @@ export const TAB_CRUD_PERMISSIONS: Record<string, string[]> = {
   services: ['create_services', 'update_services', 'delete_services'],
   reports: [],
   'activity-log': [],
-  ministry: []
+  ministry: [],
+  zones: []
 };
 
 export function Settings({ onAddUser }: SettingsProps) {
@@ -1265,34 +1267,36 @@ export function Settings({ onAddUser }: SettingsProps) {
                                       <span className="truncate">{systemUser.phone}</span>
                                     </div>
                                   )}
-                                  {isDev && systemUser.id !== user?.id && (
-                                    <Button size="sm" variant="ghost" className="h-6 text-xs mt-1 px-2" onClick={() => handleEditContact(systemUser)}>
-                                      <Edit className="w-3 h-3 mr-1" />
-                                      Edit contact
-                                    </Button>
-                                  )}
-                                  {/* Reset Password button for admin/dev */}
-                                  {(isDev || isAdmin) && systemUser.id !== user?.id && systemUser.approvalStatus === 'approved' && (
-                                    !(isAdmin && systemUser.role === 'dev') && (
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="h-6 text-xs mt-1 px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
-                                        onClick={() => {
-                                          setResetPasswordUserId(systemUser.id);
-                                          setResetPasswordUserName(systemUser.name);
-                                        }}
-                                      >
-                                        <KeyRound className="w-3 h-3 mr-1" />
-                                        Reset Password
+                                  <div className="flex flex-wrap gap-2 mt-1.5">
+                                    {isDev && systemUser.id !== user?.id && (
+                                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => handleEditContact(systemUser)}>
+                                        <Edit className="w-3 h-3 mr-1" />
+                                        Edit contact
                                       </Button>
-                                    )
-                                  )}
+                                    )}
+                                    {/* Reset Password button for admin/dev */}
+                                    {(isDev || isAdmin) && systemUser.id !== user?.id && systemUser.approvalStatus === 'approved' && (
+                                      !(isAdmin && systemUser.role === 'dev') && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                          onClick={() => {
+                                            setResetPasswordUserId(systemUser.id);
+                                            setResetPasswordUserName(systemUser.name);
+                                          }}
+                                        >
+                                          <KeyRound className="w-3 h-3 mr-1" />
+                                          Reset Password
+                                        </Button>
+                                      )
+                                    )}
+                                  </div>
                                 </>
                               )}
                               {isDev && systemUser.approvalStatus === 'approved' && systemUser.id !== user?.id && (
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2 min-w-0">
-                                  <Shield className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1.5" />
+                                  <Shield className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                   <span className="text-xs text-muted-foreground flex-shrink-0">Change Role:</span>
                                   <Select
                                     value={systemUser.role}
@@ -1366,45 +1370,35 @@ export function Settings({ onAddUser }: SettingsProps) {
                             {/* Tab Access (Dev Only) - Collapsible */}
                             {isDev && systemUser.role !== 'dev' && (
                               <Collapsible
-                                className="mt-4"
-                                open={tabAccessOpen[systemUser.id] || false}
-                                onOpenChange={(open) => setTabAccessOpen(prev => ({ ...prev, [systemUser.id]: open }))}
-                              >
-                                <div className="p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl">
-                                  <CollapsibleTrigger asChild>
-                                    <button className="flex items-center justify-between w-full">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
-                                          <Shield className="w-4 h-4 text-white" />
+                                  className="mt-4 w-full"
+                                  open={tabAccessOpen[systemUser.id] || false}
+                                  onOpenChange={(open) => setTabAccessOpen(prev => ({ ...prev, [systemUser.id]: open }))}
+                                >
+                                  <div className="p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl w-full">
+                                    <CollapsibleTrigger asChild>
+                                      <button type="button" className="flex items-center justify-between w-full">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
+                                            <Shield className="w-4 h-4 text-white" />
+                                          </div>
+                                          <span className="text-sm font-semibold text-secondary dark:text-blue-300">
+                                            Tab Access
+                                          </span>
                                         </div>
-                                        <span className="text-sm font-semibold text-secondary dark:text-blue-300">
-                                          Tab Access
-                                        </span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-muted-foreground">
-                                          {(systemUser.tabAccess || []).length} of {TAB_OPTIONS.length} tabs
-                                        </span>
-                                        <ChevronDown
-                                          className="h-4 w-4 text-muted-foreground transition-transform duration-300 ease-in-out"
-                                          style={{ transform: tabAccessOpen[systemUser.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                                        />
-                                      </div>
-                                    </button>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent className="mt-3">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
-                                      {[
-                                        { id: 'members', label: 'Members', icon: Users },
-                                        { id: 'visitors', label: 'Visitors', icon: UserPlus },
-                                        { id: 'attendance', label: 'Attendance', icon: Calendar },
-                                        { id: 'giving', label: 'Giving', icon: Banknote },
-                                        { id: 'reports', label: 'Reports', icon: BarChart3 },
-                                        { id: 'services', label: 'Services', icon: Church },
-                                        { id: 'activity-log', label: 'Activity Log', icon: ClipboardList },
-                                          { id: 'children', label: 'Children', icon: Baby },
-                                          { id: 'expenses', label: 'Expenses', icon: Receipt },
-                                        ].map(tab => {
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs text-muted-foreground">
+                                            {(systemUser.tabAccess || []).length} of {TAB_OPTIONS.length} tabs
+                                          </span>
+                                          <ChevronDown
+                                            className="h-4 w-4 text-muted-foreground transition-transform duration-300 ease-in-out"
+                                            style={{ transform: tabAccessOpen[systemUser.id] ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                                          />
+                                        </div>
+                                      </button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent className="mt-3">
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-1 sm:gap-2 overflow-hidden">
+                                        {TAB_OPTIONS.map(tab => {
                                         const hasAccess = (systemUser.tabAccess || []).includes(tab.id);
                                         return (
                                           <button
