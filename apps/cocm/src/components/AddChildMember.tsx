@@ -10,6 +10,7 @@ import { Member } from './Members';
 import { Badge } from './ui/badge';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { useAuth } from './AuthContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import type { ChildMember, ChildParent, ChildVisitor } from './Children';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
@@ -35,6 +36,7 @@ interface UIChildParent {
 }
 
 export function AddChildMember({ onBack, onSave, childVisitorData, initialData }: AddChildMemberProps) {
+  const { alertAction } = useAuth();
   const [formData, setFormData] = useState({
     firstName: initialData?.firstName || childVisitorData?.firstName || '',
     lastName: initialData?.lastName || childVisitorData?.lastName || '',
@@ -142,11 +144,19 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        toast.warning('Please select an image file.');
+        alertAction({
+          title: 'Unsupported File Type',
+          description: 'The selected file is not a supported image. Please select a valid photo file (such as JPG, JPEG, or PNG).',
+          variant: 'warning'
+        });
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        toast.warning('File size must be less than 10MB.');
+        alertAction({
+          title: 'File Too Large',
+          description: 'The image size exceeds the 10MB limit. Please upload a smaller image file.',
+          variant: 'warning'
+        });
         return;
       }
 
@@ -311,6 +321,11 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
       } as Omit<ChildMember, 'id' | 'joinDate'> & { photo?: string });
     } catch (error) {
       console.error('Error saving child member:', error);
+      alertAction({
+        title: 'Unable to Save Child Record',
+        description: 'An unexpected issue occurred while trying to save the child profile. Please check your network connection and try again.',
+        variant: 'error'
+      });
     } finally {
       setIsLoading(false);
     }

@@ -13,6 +13,7 @@ import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { useAuth } from './AuthContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 
 interface AddMemberProps {
@@ -23,6 +24,7 @@ interface AddMemberProps {
 }
 
 export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberProps) {
+  const { alertAction } = useAuth();
   const [formData, setFormData] = useState({
     firstName: visitorData?.firstName || childData?.firstName || '',
     lastName: visitorData?.lastName || childData?.lastName || '',
@@ -264,6 +266,11 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
       });
     } catch (error) {
       console.error('Error saving member:', error);
+      alertAction({
+        title: 'Unable to Register Member',
+        description: 'An unexpected issue occurred while saving this member profile. Please verify your connection or contact system support if this continues.',
+        variant: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -287,13 +294,21 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.warning('Please select an image file.');
+        alertAction({
+          title: 'Unsupported File Type',
+          description: 'The selected file is not an image. Please select a valid photo file (such as JPG, JPEG, or PNG).',
+          variant: 'warning'
+        });
         return;
       }
 
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        toast.warning('File size must be less than 10MB.');
+        alertAction({
+          title: 'File Too Large',
+          description: 'The photo file exceeds the 10MB limit. Please upload a smaller image file or compress it first.',
+          variant: 'warning'
+        });
         return;
       }
 

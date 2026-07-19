@@ -14,6 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from './ui/alert-dialog';
+import { CheckCircle2, AlertTriangle, XCircle, Info } from 'lucide-react';
 
 export type UserRole = 'dev' | 'admin' | 'pastor' | 'elder';
 
@@ -100,6 +101,13 @@ interface AuthContextType {
     onConfirm: () => void;
     onCancel?: () => void;
   }) => void;
+  alertAction: (options: {
+    title: string;
+    description: string;
+    variant?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
+    onConfirm?: () => void;
+  }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -165,6 +173,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onCancel?: () => void;
   }) => {
     setConfirmConfig(options);
+  };
+
+  const [alertConfig, setAlertConfig] = useState<{
+    title: string;
+    description: string;
+    variant?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
+    onConfirm?: () => void;
+  } | null>(null);
+
+  const alertAction = (options: {
+    title: string;
+    description: string;
+    variant?: 'info' | 'warning' | 'error' | 'success';
+    confirmText?: string;
+    onConfirm?: () => void;
+  }) => {
+    setAlertConfig(options);
   };
 
   // Helper function to fetch user with temporary permissions
@@ -716,6 +742,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assignRoleToUser,
     allUsers: users,
     confirmAction,
+    alertAction,
   };
 
   return (
@@ -743,6 +770,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }}
               >
                 {confirmConfig.confirmText || 'Confirm'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
+      {alertConfig && (
+        <AlertDialog open={!!alertConfig} onOpenChange={(open) => !open && setAlertConfig(null)}>
+          <AlertDialogContent className="border-t-4 border-t-primary max-w-md">
+            <div className="flex flex-col items-center text-center space-y-4 pt-4">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                alertConfig.variant === 'success' ? 'bg-green-50 text-green-600 dark:bg-green-950/50 dark:text-green-400' :
+                alertConfig.variant === 'error' ? 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400' :
+                alertConfig.variant === 'warning' ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400' :
+                'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400'
+              }`}>
+                {alertConfig.variant === 'success' && <CheckCircle2 className="w-8 h-8" />}
+                {alertConfig.variant === 'error' && <XCircle className="w-8 h-8" />}
+                {alertConfig.variant === 'warning' && <AlertTriangle className="w-8 h-8" />}
+                {(alertConfig.variant === 'info' || !alertConfig.variant) && <Info className="w-8 h-8" />}
+              </div>
+              <AlertDialogHeader className="space-y-2">
+                <AlertDialogTitle className="text-xl font-bold tracking-tight text-foreground">{alertConfig.title}</AlertDialogTitle>
+                <AlertDialogDescription className="text-sm text-muted-foreground leading-relaxed px-2">
+                  {alertConfig.description}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+            </div>
+            <AlertDialogFooter className="sm:justify-center mt-2">
+              <AlertDialogAction
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8"
+                onClick={() => {
+                  alertConfig.onConfirm?.();
+                  setAlertConfig(null);
+                }}
+              >
+                {alertConfig.confirmText || 'OK'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

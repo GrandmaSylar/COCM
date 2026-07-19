@@ -13,6 +13,7 @@ import { Badge } from './ui/badge';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { api } from '../services/api';
 import { toast } from 'sonner';
+import { useAuth } from './AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 interface EditMemberProps {
   member: Member;
@@ -21,6 +22,7 @@ interface EditMemberProps {
 }
 
 export function EditMember({ member, onBack, onSave }: EditMemberProps) {
+  const { alertAction } = useAuth();
   const [formData, setFormData] = useState({
     firstName: member.firstName || '',
     lastName: member.lastName || '',
@@ -227,6 +229,11 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     } catch (error) {
       console.error('Error updating member:', error);
       setIsLoading(false);
+      alertAction({
+        title: 'Unable to Save Changes',
+        description: 'We encountered an unexpected error while trying to update this member record. Please ensure you have a stable internet connection and try again.',
+        variant: 'error'
+      });
     }
   };
 
@@ -248,13 +255,21 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        toast.warning('Please select an image file.');
+        alertAction({
+          title: 'Unsupported File Type',
+          description: 'The selected file is not a supported image. Please upload a standard photo file (like JPG, JPEG, or PNG).',
+          variant: 'warning'
+        });
         return;
       }
       
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        toast.warning('File size must be less than 10MB.');
+        alertAction({
+          title: 'File Too Large',
+          description: 'The selected image is larger than 10MB. Please choose a smaller photo or compress it before uploading.',
+          variant: 'warning'
+        });
         return;
       }
       
