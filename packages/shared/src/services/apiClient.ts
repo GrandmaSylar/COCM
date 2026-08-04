@@ -2,8 +2,13 @@ import { supabase } from '../utils/supabase/client';
 import { isCoreEndpoint, isAllowlistedOfflineEndpoint, readCacheSnapshot, writeCacheSnapshot, invalidateModuleCache, addToSyncQueue, applyOptimisticWrite } from './offlineStore';
 import { toast } from 'sonner';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const publicAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env.VITE_SUPABASE_URL 
+  : (process.env.EXPO_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+
+const publicAnonKey = (typeof import.meta !== 'undefined' && import.meta.env)
+  ? import.meta.env.VITE_SUPABASE_ANON_KEY 
+  : (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY);
 
 const BASE_URL = `${supabaseUrl}/functions/v1/server`;
 
@@ -27,7 +32,7 @@ export class OfflineDeleteError extends Error {
 
 // Generate or retrieve a persistent Device ID for tracking active sessions
 export function getDeviceId(): string {
-  if (typeof window === 'undefined') return 'unknown'; // Server-side rendering fallback
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 'mobile-device';
   const DEVICE_ID_KEY = 'cocm_device_id';
   let deviceId = localStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
@@ -73,8 +78,10 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   }
 
   const requestPromise = (async () => {
+    const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
     // ── Offline fallback for GET requests ──────────────────────────────
-    if (!navigator.onLine && isGet) {
+    if (isOffline && isGet) {
       if (isCoreEndpoint(endpoint)) {
         const cached = await readCacheSnapshot(endpoint);
         if (cached !== undefined) {
@@ -84,7 +91,7 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
       throw new ApiError(503, 'Offline — data not available');
     }
 
-    if (!navigator.onLine && !isGet) {
+    if (isOffline && !isGet) {
       if (method === 'DELETE') {
         throw new OfflineDeleteError();
       }

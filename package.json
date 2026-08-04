@@ -8,12 +8,24 @@
   "scripts": {
     "dev:cocm": "npm run dev -w apps/cocm",
     "dev:new": "npm run dev -w apps/new-church",
+    "dev:mobile": "npm run start -w apps/mobile",
     "build:cocm": "npm run build -w apps/cocm",
     "build:new": "npm run build -w apps/new-church",
+    "build:mobile": "npm run build -w apps/mobile",
     "test:cocm": "npm run test -w apps/cocm",
     "bump": "node scripts/bump-version.mjs"
   },
   "devDependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "typescript": "~5.7"
+  },
+  "overrides": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "cocm-app": {
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
+    }
   }
 }
