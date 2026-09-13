@@ -96,8 +96,41 @@ router.get("/members/:id", async (c)=>{
     }
 
     // ── Bidirectional family linking ──
-    // Find children_members who have a parent linked to this member
-    // Use explicitly named foreign key to avoid ambiguity correctly.
+    // 1. Find adult members who have this member linked as their relative
+    const { data: inverseFamilyLinks, error: inverseFamilyError } = await supabase
+      .from('family_members')
+      .select('id, relationship, member_id, members!family_members_member_id_fkey(id, first_name, last_name, other_names, phone, gender, photo_url, occupation, hometown)')
+      .eq('linked_member_id', id);
+
+    if (inverseFamilyError) {
+      console.error('Error fetching inverseFamilyLinks:', inverseFamilyError);
+    }
+
+    const existingMemberIds = new Set(
+      (member.family_members || []).map((fm: any) => fm.linked_member_id || fm.id)
+    );
+
+    const linkedAdults = (inverseFamilyLinks || [])
+      .filter((inv: any) => inv.members && !existingMemberIds.has(inv.members.id))
+      .map((inv: any) => {
+        const other = inv.members;
+        return {
+          id: `inv-link-${inv.id}`,
+          member_id: id,
+          relationship: inverseOf(inv.relationship, other.gender),
+          first_name: other.first_name || '',
+          last_name: other.last_name || '',
+          other_names: other.other_names || null,
+          phone: other.phone || null,
+          is_linked: true,
+          linked_member_id: other.id,
+          photo_url: other.photo_url || null,
+          occupation: other.occupation || null,
+          hometown: other.hometown || null
+        };
+      });
+
+    // 2. Find children_members who have a parent linked to this member
     const { data: childParentLinks, error: childParentLinksError } = await supabase
       .from('children_member_parents')
       .select('child_member_id, relationship, children_members!children_member_parents_child_member_id_fkey(first_name, last_name, other_names, id)')
@@ -118,12 +151,18 @@ router.get("/members/:id", async (c)=>{
       phone: null,
       is_linked: true,
       linked_member_id: null,
-      // linked_child_member_id: link.child_member_id, // Removed: non-existent column in family_members
       child_member_id: link.child_member_id
     }));
 
-    // Merged is all family_members + linked child synthetic entries
-    const merged = { ...member, family_members: [...(member.family_members || []), ...linkedChildren] };
+    // Merged is all direct family_members + linked adult synthetic entries + linked child synthetic entries
+    const merged = { 
+      ...member, 
+      family_members: [
+        ...(member.family_members || []), 
+        ...linkedAdults, 
+        ...linkedChildren
+      ] 
+    };
     return c.json(toCamelCase(merged));
   } catch (error) {
     console.error('Get member error:', error);
@@ -372,8 +411,23 @@ router.post("/members", async (c)=>{
       dbMemberData.status = 'new';
     }
 
+    // Only pass columns that exist on members table (avoid 500 from name, etc.)
+    const allowedInsertColumns = [
+      'id', 'first_name', 'last_name', 'other_names', 'email', 'phone', 'second_phone',
+      'gender', 'date_of_birth', 'marital_status', 'residence_location', 'digital_address',
+      'zone', 'zone_number', 'notes', 'status', 'join_date', 'photo_url',
+      'baptism_info', 'legal_info', 'ministries', 'position_held',
+      'occupation', 'hometown'
+    ];
+    const insertPayload: Record<string, any> = {};
+    for (const key of allowedInsertColumns) {
+      if (dbMemberData[key] !== undefined) {
+        insertPayload[key] = dbMemberData[key];
+      }
+    }
+
     const { data: member, error: memberError } = await supabase.from('members').insert({
-      ...dbMemberData,
+      ...insertPayload,
       created_by: user.id
     }).select().single();
     if (memberError) {

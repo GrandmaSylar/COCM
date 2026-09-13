@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { ScrollView, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { YStack, XStack, Text, Button, Card, H1, Paragraph } from 'tamagui';
+import { Users, ClipboardCheck, PieChart } from '@tamagui/lucide-icons';
 import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
@@ -10,17 +11,20 @@ const ONBOARDING_SLIDES = [
   {
     title: 'Church Directory',
     description: 'Keep track of all members, contact details, profile summaries, zones, and registration records inside a single native dashboard.',
-    icon: '👥',
+    icon: Users,
+    color: '#007AFF',
   },
   {
     title: 'Attendance Tracker',
     description: 'Easily track general service attendance headcounts, check-in members, register visitors, and monitor active participation history.',
-    icon: '📝',
+    icon: ClipboardCheck,
+    color: '#FF9500',
   },
   {
     title: 'Giving & Finances',
     description: 'Record general tithes, thanksgiving offerings, special project logs, and capture expense receipts using your phone camera.',
-    icon: '📊',
+    icon: PieChart,
+    color: '#34C759',
   },
 ];
 
@@ -67,35 +71,41 @@ export default function OnboardingScreen() {
         scrollEventThrottle={16}
         style={{ flexGrow: 0 }}
       >
-        {ONBOARDING_SLIDES.map((slide, index) => (
-          <YStack 
-            key={index} 
-            width={width} 
-            paddingHorizontal={32} 
-            space="$4" 
-            alignItems="center" 
-            justifyContent="center"
-          >
-            <Card 
-              width={160} 
-              height={160} 
-              borderRadius={80} 
-              backgroundColor="$primary" 
-              opacity={0.08} 
-              position="absolute"
-              top={-10}
-            />
-            <Text fontSize={72} marginBottom="$4">{slide.icon}</Text>
-            
-            <H1 textAlign="center" fontWeight="800" color="$color" fontSize={28} letterSpacing={-0.5}>
-              {slide.title}
-            </H1>
-            
-            <Paragraph textAlign="center" color="$colorHover" fontSize={16} lineHeight={24} paddingHorizontal="$2">
-              {slide.description}
-            </Paragraph>
-          </YStack>
-        ))}
+        {ONBOARDING_SLIDES.map((slide, index) => {
+          const IconComponent = slide.icon;
+          return (
+            <YStack 
+              key={index} 
+              width={width} 
+              paddingHorizontal={32} 
+              space="$4" 
+              alignItems="center" 
+              justifyContent="center"
+            >
+              <YStack
+                width={120}
+                height={120}
+                borderRadius={60}
+                backgroundColor={`${slide.color}1A`}
+                borderWidth={2}
+                borderColor={`${slide.color}40`}
+                justifyContent="center"
+                alignItems="center"
+                marginBottom="$4"
+              >
+                <IconComponent size={56} color={slide.color} />
+              </YStack>
+              
+              <H1 textAlign="center" fontWeight="800" color="$color" fontSize={28} letterSpacing={-0.5}>
+                {slide.title}
+              </H1>
+              
+              <Paragraph textAlign="center" color="$colorHover" fontSize={16} lineHeight={24} paddingHorizontal="$2">
+                {slide.description}
+              </Paragraph>
+            </YStack>
+          );
+        })}
       </ScrollView>
 
       {/* Bottom Pager Controls */}

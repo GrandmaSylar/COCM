@@ -3,7 +3,7 @@ export { supabase } from './utils/supabase/client';
 export type { Database } from './utils/supabase/client';
 
 // Export API Client utilities
-export { fetchApi, invalidateApiCache, ApiError, OfflineDeleteError, getDeviceId } from './services/apiClient';
+export { fetchApi, invalidateApiCache, ApiError, OfflineDeleteError, getDeviceId, setAccessTokenGetter } from './services/apiClient';
 
 // Export Offline Store utilities
 export { 

@@ -42,7 +42,21 @@ export function getDeviceId(): string {
   return deviceId;
 }
 
+let customAccessTokenGetter: (() => Promise<string | null>) | null = null;
+
+export function setAccessTokenGetter(getter: () => Promise<string | null>) {
+  customAccessTokenGetter = getter;
+}
+
 async function getAccessToken(): Promise<string> {
+  if (customAccessTokenGetter) {
+    try {
+      const customToken = await customAccessTokenGetter();
+      if (customToken) return customToken;
+    } catch (e) {
+      console.warn('Custom access token getter failed:', e);
+    }
+  }
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token || publicAnonKey;
 }
