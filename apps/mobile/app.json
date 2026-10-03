@@ -1,25 +1,23 @@
 {
   "expo": {
-    "name": "Mobile",
+    "name": "CoC Mataheko",
     "slug": "cocm-mobile",
+    "scheme": "cocm",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#007AFF"
-    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cocmataheko.mobile"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#007AFF"
-      }
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.cocmataheko.mobile",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,14 +26,41 @@
       "expo-router",
       "expo-font",
       "expo-secure-store",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0F1115"
+          }
+        }
+      ],
       "expo-status-bar",
       "expo-sqlite",
       "expo-image",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "dcfcebc8-b0d0-4cf4-a66f-5ba02aaf4dbf"
+      }
+    },
+    "owner": "grandmaa",
+    "updates": {
+      "url": "https://u.expo.dev/dcfcebc8-b0d0-4cf4-a66f-5ba02aaf4dbf"
     }
   }
 }
