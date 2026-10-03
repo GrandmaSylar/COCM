@@ -225,6 +225,8 @@ export interface LocalSyncQueueItem {
   endpoint: string;
   payload: string;
   status: 'pending' | 'syncing' | 'error';
+  attempts?: number;
+  last_error?: string | null;
   created_at: string;
 }
 
@@ -274,332 +276,285 @@ export interface LocalAbsenteeRecord {
   created_at: string;
 }
 
-let dbInstance: SQLite.SQLiteDatabase | null = null;
+// ============================================================================
+// SCHEMA
+// ----------------------------------------------------------------------------
+// The single source of truth for the local database layout. On every launch
+// reconcileSchema() compares each table with PRAGMA table_info and rebuilds any
+// table that drifted (legacy columns, missing columns, changed NOT NULL/DEFAULT)
+// while preserving its rows, so devices that ran older builds converge on this.
+// ============================================================================
 
-export async function getLocalDb(): Promise<SQLite.SQLiteDatabase> {
-  if (dbInstance) return dbInstance;
-  
-  dbInstance = await SQLite.openDatabaseAsync('cocm_local.db');
-  
-  // Initialize Schema with Indexing for 0ms performance
-  await dbInstance.execAsync(`
-    PRAGMA journal_mode = WAL;
+type ColumnDef = [name: string, decl: string];
+interface TableDef { columns: ColumnDef[]; indexes?: string[] }
 
-    CREATE TABLE IF NOT EXISTS members (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      phone TEXT,
-      email TEXT,
-      role TEXT,
-      zone TEXT,
-      zone_number TEXT,
-      ministry TEXT,
-      photo_url TEXT,
-      local_photo_path TEXT,
-      status TEXT DEFAULT 'active',
-      raw_json TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_members_created_at ON members(created_at);
+const PK: ColumnDef = ['id', 'TEXT PRIMARY KEY NOT NULL'];
 
-    CREATE TABLE IF NOT EXISTS system_dropdown_options (
-      id TEXT PRIMARY KEY NOT NULL,
-      category TEXT NOT NULL,
-      label TEXT NOT NULL,
-      value TEXT NOT NULL,
-      sort_order INTEGER DEFAULT 0,
-      is_active INTEGER DEFAULT 1,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_options_cat ON system_dropdown_options(category, is_active);
+const SCHEMA: Record<string, TableDef> = {
+  members: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['phone', 'TEXT'], ['email', 'TEXT'], ['role', 'TEXT'], ['zone', 'TEXT'],
+      ['zone_number', 'TEXT'], ['ministry', 'TEXT'], ['photo_url', 'TEXT'], ['local_photo_path', 'TEXT'],
+      ['status', "TEXT DEFAULT 'active'"], ['raw_json', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_members_created_at ON members(created_at)'],
+  },
+  system_dropdown_options: {
+    columns: [PK, ['category', 'TEXT NOT NULL'], ['label', 'TEXT NOT NULL'], ['value', 'TEXT NOT NULL'],
+      ['sort_order', 'INTEGER DEFAULT 0'], ['is_active', 'INTEGER DEFAULT 1'], ['updated_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_options_cat ON system_dropdown_options(category, is_active)'],
+  },
+  zones: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['code', 'TEXT NOT NULL'], ['description', 'TEXT'], ['updated_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_zones_code ON zones(code)'],
+  },
+  visitors: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['phone', 'TEXT'], ['email', 'TEXT'], ['visit_date', 'TEXT NOT NULL'],
+      ['potential_zone', 'TEXT'], ['follow_up_status', "TEXT DEFAULT 'pending'"], ['notes', 'TEXT'], ['raw_json', 'TEXT'],
+      ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_visitors_date ON visitors(visit_date)'],
+  },
+  children_members: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['date_of_birth', 'TEXT NOT NULL'], ['gender', 'TEXT'], ['zone', 'TEXT'],
+      ['status', "TEXT DEFAULT 'active'"], ['guardian_name', 'TEXT'], ['guardian_phone', 'TEXT'], ['raw_json', 'TEXT'],
+      ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_children_name ON children_members(name)'],
+  },
+  children_member_parents: {
+    columns: [PK, ['child_member_id', 'TEXT NOT NULL'], ['first_name', 'TEXT NOT NULL'], ['last_name', 'TEXT NOT NULL'],
+      ['other_names', 'TEXT'], ['phone', 'TEXT'], ['relationship', 'TEXT NOT NULL'], ['occupation', 'TEXT'], ['hometown', 'TEXT'],
+      ['is_linked', 'INTEGER DEFAULT 0'], ['linked_member_id', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_cmp_child_id ON children_member_parents(child_member_id)'],
+  },
+  family_members: {
+    columns: [PK, ['member_id', 'TEXT NOT NULL'], ['relationship', 'TEXT NOT NULL'], ['first_name', 'TEXT NOT NULL'],
+      ['last_name', 'TEXT NOT NULL'], ['other_names', 'TEXT'], ['phone', 'TEXT'], ['occupation', 'TEXT'], ['hometown', 'TEXT'],
+      ['is_linked', 'INTEGER DEFAULT 0'], ['linked_member_id', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: [
+      'CREATE INDEX IF NOT EXISTS idx_fm_member_id ON family_members(member_id)',
+      'CREATE INDEX IF NOT EXISTS idx_fm_linked_id ON family_members(linked_member_id)',
+    ],
+  },
+  children_visitors: {
+    columns: [PK, ['first_name', 'TEXT NOT NULL'], ['last_name', 'TEXT NOT NULL'], ['gender', 'TEXT'], ['date_of_birth', 'TEXT'],
+      ['visit_date', 'TEXT NOT NULL'], ['notes', 'TEXT'], ['guardian_name', 'TEXT'], ['guardian_phone', 'TEXT'], ['raw_json', 'TEXT'],
+      ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_cv_visit_date ON children_visitors(visit_date)'],
+  },
+  children_attendance_records: {
+    columns: [PK, ['date', 'TEXT NOT NULL'], ['service_type', 'TEXT NOT NULL'], ['total_count', 'INTEGER DEFAULT 0'],
+      ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_car_date ON children_attendance_records(date)'],
+  },
+  children_attendance_entries: {
+    columns: [PK, ['attendance_record_id', 'TEXT NOT NULL'], ['child_id', 'TEXT NOT NULL'], ['present', 'INTEGER DEFAULT 1'],
+      ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_cae_record ON children_attendance_entries(attendance_record_id)'],
+  },
+  children_giving_records: {
+    columns: [PK, ['service_date', 'TEXT NOT NULL'], ['service_type', 'TEXT NOT NULL'], ['total_amount', 'REAL NOT NULL'],
+      ['notes', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_cgr_date ON children_giving_records(service_date)'],
+  },
+  activity_logs: {
+    columns: [PK, ['action', 'TEXT NOT NULL'], ['details', 'TEXT'], ['user_id', 'TEXT'], ['created_at', 'TEXT NOT NULL'],
+      ['user_name', 'TEXT'], ['user_role', 'TEXT'], ['entity_type', 'TEXT'], ['description', 'TEXT'], ['metadata', 'TEXT']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_activity_created_at ON activity_logs(created_at)'],
+  },
+  giving_records: {
+    columns: [PK, ['service_name', 'TEXT'], ['service_date', 'TEXT NOT NULL'], ['service_type', 'TEXT NOT NULL'],
+      ['offering_amount', 'REAL DEFAULT 0'], ['donation_amount', 'REAL DEFAULT 0'], ['thanksgiving_amount', 'REAL DEFAULT 0'],
+      ['custom_types', "TEXT DEFAULT '{}'"], ['total_amount', 'REAL NOT NULL'], ['cash_amount', 'REAL DEFAULT 0'],
+      ['mobile_money_amount', 'REAL DEFAULT 0'], ['card_amount', 'REAL DEFAULT 0'], ['bank_transfer_amount', 'REAL DEFAULT 0'],
+      ['notes', 'TEXT'], ['created_by', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_giving_date ON giving_records(service_date)'],
+  },
+  custom_giving_types: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['description', 'TEXT'], ['is_active', 'INTEGER DEFAULT 1'], ['created_by', 'TEXT'],
+      ['created_at', 'TEXT NOT NULL']],
+  },
+  attendance_entries: {
+    columns: [PK, ['attendance_record_id', 'TEXT NOT NULL'], ['member_id', 'TEXT NOT NULL'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_attendance_record ON attendance_entries(attendance_record_id)'],
+  },
+  expenses: {
+    columns: [PK, ['form_id', 'TEXT NOT NULL'], ['details', 'TEXT NOT NULL'], ['amount', 'REAL NOT NULL'],
+      ['service_date', 'TEXT NOT NULL'], ['service_type', 'TEXT NOT NULL'], ['payment_method_id', 'TEXT'],
+      ['payment_method_name', 'TEXT NOT NULL'], ['reference_number', 'TEXT'], ['receipt_local_path', 'TEXT'],
+      ['requested_by_name', 'TEXT'], ['recommended_by_name', 'TEXT'], ['approved_by_name', 'TEXT'],
+      ['status', "TEXT DEFAULT 'approved'"], ['created_by', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(service_date)'],
+  },
+  expense_payment_methods: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['is_active', 'INTEGER DEFAULT 1'], ['created_at', 'TEXT']],
+  },
+  custom_services: {
+    columns: [PK, ['name', 'TEXT NOT NULL'], ['description', 'TEXT'], ['start_date', 'TEXT NOT NULL'], ['end_date', 'TEXT NOT NULL'],
+      ['start_time', 'TEXT NOT NULL'], ['end_time', 'TEXT NOT NULL'], ['days_of_week', 'TEXT NOT NULL'],
+      ['is_active', 'INTEGER DEFAULT 1'], ['created_by', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_cs_name ON custom_services(name)'],
+  },
+  attendance_records: {
+    columns: [PK, ['date', 'TEXT NOT NULL'], ['service_type', 'TEXT NOT NULL'], ['start_time', 'TEXT'], ['end_time', 'TEXT'],
+      ['total_count', 'INTEGER DEFAULT 0'], ['is_custom_service', 'INTEGER DEFAULT 0'], ['custom_service_id', 'TEXT'],
+      ['status', "TEXT DEFAULT 'finalized'"], ['attendance_type', "TEXT DEFAULT 'individual'"],
+      ['men_count', 'INTEGER DEFAULT 0'], ['women_count', 'INTEGER DEFAULT 0'], ['children_count', 'INTEGER DEFAULT 0'],
+      ['visitors_count', 'INTEGER DEFAULT 0'], ['created_by', 'TEXT'], ['created_at', 'TEXT NOT NULL']],
+    indexes: [
+      'CREATE INDEX IF NOT EXISTS idx_ar_date ON attendance_records(date)',
+      'CREATE INDEX IF NOT EXISTS idx_ar_status ON attendance_records(status)',
+    ],
+  },
+  absentee_records: {
+    columns: [PK, ['attendance_record_id', 'TEXT NOT NULL'], ['member_id', 'TEXT NOT NULL'],
+      ['requested_permission', 'INTEGER DEFAULT 0'], ['reason', 'TEXT'], ['reason_notes', 'TEXT'], ['absence_start_date', 'TEXT'],
+      ['absence_end_date', 'TEXT'], ['until_further_notice', 'INTEGER DEFAULT 0'], ['created_at', 'TEXT NOT NULL']],
+    indexes: ['CREATE INDEX IF NOT EXISTS idx_absentee_rec ON absentee_records(attendance_record_id, member_id)'],
+  },
+  sync_queue: {
+    columns: [PK, ['action', 'TEXT NOT NULL'], ['endpoint', 'TEXT NOT NULL'], ['payload', 'TEXT NOT NULL'],
+      ['status', "TEXT DEFAULT 'pending'"], ['created_at', 'TEXT NOT NULL'], ['attempts', 'INTEGER DEFAULT 0'],
+      ['last_error', 'TEXT']],
+  },
+};
 
-    CREATE TABLE IF NOT EXISTS zones (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      code TEXT NOT NULL,
-      description TEXT,
-      updated_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_zones_code ON zones(code);
+/**
+ * Legacy column names whose values should carry over into a renamed column
+ * when a table is rebuilt (only used when the legacy column actually exists).
+ */
+const LEGACY_SOURCES: Record<string, Record<string, string[]>> = {
+  giving_records: { total_amount: ['amount'], service_date: ['date', 'created_at'] },
+  children_giving_records: { total_amount: ['amount'], service_date: ['date', 'created_at'] },
+  expenses: { amount: ['total_amount'], service_date: ['date', 'created_at'] },
+  visitors: { visit_date: ['date', 'created_at'] },
+  children_visitors: { visit_date: ['date', 'created_at'] },
+  attendance_records: { date: ['service_date', 'created_at'] },
+  children_attendance_records: { date: ['service_date', 'created_at'] },
+};
 
-    CREATE TABLE IF NOT EXISTS visitors (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      phone TEXT,
-      email TEXT,
-      visit_date TEXT NOT NULL,
-      potential_zone TEXT,
-      follow_up_status TEXT DEFAULT 'pending',
-      notes TEXT,
-      raw_json TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_visitors_date ON visitors(visit_date);
+interface ParsedColumn { type: string; notNull: boolean; pk: boolean; dflt: string | null }
 
-    CREATE TABLE IF NOT EXISTS children_members (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      date_of_birth TEXT NOT NULL,
-      gender TEXT,
-      zone TEXT,
-      status TEXT DEFAULT 'active',
-      guardian_name TEXT,
-      guardian_phone TEXT,
-      raw_json TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_children_name ON children_members(name);
+function parseDecl(decl: string): ParsedColumn {
+  const dflt = decl.match(/DEFAULT\s+(.+)$/i);
+  return {
+    type: decl.split(/\s+/)[0].toUpperCase(),
+    notNull: /NOT NULL/i.test(decl),
+    pk: /PRIMARY KEY/i.test(decl),
+    dflt: dflt ? dflt[1].trim() : null,
+  };
+}
 
-    CREATE TABLE IF NOT EXISTS children_member_parents (
-      id TEXT PRIMARY KEY NOT NULL,
-      child_member_id TEXT NOT NULL,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      other_names TEXT,
-      phone TEXT,
-      relationship TEXT NOT NULL,
-      occupation TEXT,
-      hometown TEXT,
-      is_linked INTEGER DEFAULT 0,
-      linked_member_id TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_cmp_child_id ON children_member_parents(child_member_id);
+const q = (name: string) => `"${name.replace(/"/g, '""')}"`;
+const NOW_SQL = `strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`;
 
-    CREATE TABLE IF NOT EXISTS family_members (
-      id TEXT PRIMARY KEY NOT NULL,
-      member_id TEXT NOT NULL,
-      relationship TEXT NOT NULL,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      other_names TEXT,
-      phone TEXT,
-      occupation TEXT,
-      hometown TEXT,
-      is_linked INTEGER DEFAULT 0,
-      linked_member_id TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_fm_member_id ON family_members(member_id);
-    CREATE INDEX IF NOT EXISTS idx_fm_linked_id ON family_members(linked_member_id);
+function createTableSql(name: string, def: TableDef): string {
+  return `CREATE TABLE IF NOT EXISTS ${q(name)} (${def.columns.map(([c, d]) => `${q(c)} ${d}`).join(', ')})`;
+}
 
-    CREATE TABLE IF NOT EXISTS children_visitors (
-      id TEXT PRIMARY KEY NOT NULL,
-      first_name TEXT NOT NULL,
-      last_name TEXT NOT NULL,
-      gender TEXT,
-      date_of_birth TEXT,
-      visit_date TEXT NOT NULL,
-      notes TEXT,
-      guardian_name TEXT,
-      guardian_phone TEXT,
-      raw_json TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_cv_visit_date ON children_visitors(visit_date);
+/** Value used when a NOT NULL column has no data to carry over. */
+function fillValue(column: string, col: ParsedColumn): string {
+  if (col.dflt !== null) return col.dflt;
+  if (col.type === 'TEXT') return /(_at|date)$/.test(column) || column === 'date' ? NOW_SQL : `''`;
+  return '0';
+}
 
-    CREATE TABLE IF NOT EXISTS children_attendance_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      date TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      total_count INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_car_date ON children_attendance_records(date);
+/** SELECT expression that produces `column` from the old table's rows. */
+function copyExpr(table: string, column: string, col: ParsedColumn, oldCols: Set<string>): string {
+  const sources = (LEGACY_SOURCES[table]?.[column] ?? []).filter(s => oldCols.has(s) && s !== column);
+  const parts: string[] = [];
+  if (oldCols.has(column)) {
+    // A legacy ALTER added numeric columns as DEFAULT 0, so prefer the legacy
+    // value when the new column was never really written.
+    parts.push(sources.length && col.type !== 'TEXT' ? `NULLIF(${q(column)}, 0)` : q(column));
+  }
+  parts.push(...sources.map(q));
+  if (col.notNull) parts.push(fillValue(column, col));
+  if (parts.length === 0) return col.dflt ?? 'NULL';
+  return parts.length === 1 ? parts[0] : `COALESCE(${parts.join(', ')})`;
+}
 
-    CREATE TABLE IF NOT EXISTS children_attendance_entries (
-      id TEXT PRIMARY KEY NOT NULL,
-      attendance_record_id TEXT NOT NULL,
-      child_id TEXT NOT NULL,
-      present INTEGER DEFAULT 1,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_cae_record ON children_attendance_entries(attendance_record_id);
+function tableMatches(def: TableDef, info: { name: string; type: string; notnull: number; dflt_value: string | null; pk: number }[]): boolean {
+  if (info.length !== def.columns.length) return false;
+  const byName = new Map(info.map(i => [i.name, i]));
+  return def.columns.every(([name, decl]) => {
+    const actual = byName.get(name);
+    if (!actual) return false;
+    const want = parseDecl(decl);
+    return (actual.type || '').toUpperCase() === want.type
+      && !!actual.notnull === want.notNull
+      && actual.pk > 0 === want.pk
+      && (actual.dflt_value ?? null) === want.dflt;
+  });
+}
 
-    CREATE TABLE IF NOT EXISTS children_giving_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      service_date TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      total_amount REAL NOT NULL,
-      notes TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_cgr_date ON children_giving_records(service_date);
+async function rebuildTable(db: SQLite.SQLiteDatabase, table: string, def: TableDef, oldCols: Set<string>) {
+  const tmp = `${table}__rebuild`;
+  const targetCols = def.columns.map(([c]) => c);
+  const exprs = def.columns.map(([c, d]) => copyExpr(table, c, parseDecl(d), oldCols));
 
-    CREATE TABLE IF NOT EXISTS activity_logs (
-      id TEXT PRIMARY KEY NOT NULL,
-      action TEXT NOT NULL,
-      details TEXT,
-      user_id TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_activity_created_at ON activity_logs(created_at);
-
-    CREATE TABLE IF NOT EXISTS giving_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      service_name TEXT,
-      service_date TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      offering_amount REAL DEFAULT 0,
-      donation_amount REAL DEFAULT 0,
-      thanksgiving_amount REAL DEFAULT 0,
-      custom_types TEXT DEFAULT '{}',
-      total_amount REAL NOT NULL,
-      cash_amount REAL DEFAULT 0,
-      mobile_money_amount REAL DEFAULT 0,
-      card_amount REAL DEFAULT 0,
-      bank_transfer_amount REAL DEFAULT 0,
-      notes TEXT,
-      created_by TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_giving_date ON giving_records(service_date);
-
-    CREATE TABLE IF NOT EXISTS custom_giving_types (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      is_active INTEGER DEFAULT 1,
-      created_by TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS attendance_entries (
-      id TEXT PRIMARY KEY NOT NULL,
-      attendance_record_id TEXT NOT NULL,
-      member_id TEXT NOT NULL,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_attendance_record ON attendance_entries(attendance_record_id);
-
-    CREATE TABLE IF NOT EXISTS expenses (
-      id TEXT PRIMARY KEY NOT NULL,
-      form_id TEXT NOT NULL,
-      details TEXT NOT NULL,
-      amount REAL NOT NULL,
-      service_date TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      payment_method_id TEXT,
-      payment_method_name TEXT NOT NULL,
-      reference_number TEXT,
-      receipt_local_path TEXT,
-      requested_by_name TEXT,
-      recommended_by_name TEXT,
-      approved_by_name TEXT,
-      status TEXT DEFAULT 'approved',
-      created_by TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(service_date);
-
-    CREATE TABLE IF NOT EXISTS expense_payment_methods (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      is_active INTEGER DEFAULT 1,
-      created_at TEXT
-    );
-  `);
-
-  // Safe Column Migrations for Existing SQLite Databases
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN service_date TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN service_name TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN service_type TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN offering_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN donation_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN thanksgiving_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN custom_types TEXT DEFAULT '{}';`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN total_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN cash_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN mobile_money_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN card_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN bank_transfer_amount REAL DEFAULT 0;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN notes TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE giving_records ADD COLUMN created_by TEXT;`); } catch (e) {}
-
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN payment_method_id TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN reference_number TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN requested_by_name TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN recommended_by_name TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN approved_by_name TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE expenses ADD COLUMN created_by TEXT;`); } catch (e) {}
-
-  try { await dbInstance.runAsync(`ALTER TABLE activity_logs ADD COLUMN user_name TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE activity_logs ADD COLUMN user_role TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE activity_logs ADD COLUMN entity_type TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE activity_logs ADD COLUMN description TEXT;`); } catch (e) {}
-  try { await dbInstance.runAsync(`ALTER TABLE activity_logs ADD COLUMN metadata TEXT;`); } catch (e) {}
-
-  await dbInstance.execAsync(`
-
-    CREATE TABLE IF NOT EXISTS custom_services (
-      id TEXT PRIMARY KEY NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT,
-      start_date TEXT NOT NULL,
-      end_date TEXT NOT NULL,
-      start_time TEXT NOT NULL,
-      end_time TEXT NOT NULL,
-      days_of_week TEXT NOT NULL,
-      is_active INTEGER DEFAULT 1,
-      created_by TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_cs_name ON custom_services(name);
-
-    CREATE TABLE IF NOT EXISTS attendance_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      date TEXT NOT NULL,
-      service_type TEXT NOT NULL,
-      start_time TEXT,
-      end_time TEXT,
-      total_count INTEGER DEFAULT 0,
-      is_custom_service INTEGER DEFAULT 0,
-      custom_service_id TEXT,
-      status TEXT DEFAULT 'finalized',
-      attendance_type TEXT DEFAULT 'individual',
-      men_count INTEGER DEFAULT 0,
-      women_count INTEGER DEFAULT 0,
-      children_count INTEGER DEFAULT 0,
-      visitors_count INTEGER DEFAULT 0,
-      created_by TEXT,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_ar_date ON attendance_records(date);
-    CREATE INDEX IF NOT EXISTS idx_ar_status ON attendance_records(status);
-
-    CREATE TABLE IF NOT EXISTS absentee_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      attendance_record_id TEXT NOT NULL,
-      member_id TEXT NOT NULL,
-      requested_permission INTEGER DEFAULT 0,
-      reason TEXT,
-      reason_notes TEXT,
-      absence_start_date TEXT,
-      absence_end_date TEXT,
-      until_further_notice INTEGER DEFAULT 0,
-      created_at TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_absentee_rec ON absentee_records(attendance_record_id, member_id);
-
-    CREATE TABLE IF NOT EXISTS sync_queue (
-      id TEXT PRIMARY KEY NOT NULL,
-      action TEXT NOT NULL,
-      endpoint TEXT NOT NULL,
-      payload TEXT NOT NULL,
-      status TEXT DEFAULT 'pending',
-      created_at TEXT NOT NULL
-    );
-  `);
-
+  await db.execAsync('BEGIN IMMEDIATE');
   try {
-    await dbInstance.execAsync(`ALTER TABLE members ADD COLUMN raw_json TEXT;`);
-  } catch (e) {}
+    await db.execAsync(`DROP TABLE IF EXISTS ${q(tmp)}`);
+    await db.execAsync(createTableSql(tmp, def));
+    // Rows without an id can't be addressed by the app or the server; the next
+    // pull restores anything that matters.
+    if (oldCols.has('id')) {
+      await db.execAsync(
+        `INSERT OR IGNORE INTO ${q(tmp)} (${targetCols.map(q).join(', ')}) ` +
+        `SELECT ${exprs.join(', ')} FROM ${q(table)} WHERE ${q('id')} IS NOT NULL`
+      );
+    }
+    await db.execAsync(`DROP TABLE ${q(table)}`);
+    await db.execAsync(`ALTER TABLE ${q(tmp)} RENAME TO ${q(table)}`);
+    await db.execAsync('COMMIT');
+  } catch (e) {
+    await db.execAsync('ROLLBACK').catch(() => {});
+    throw e;
+  }
+}
 
-  try {
-    await dbInstance.execAsync(`ALTER TABLE members ADD COLUMN zone_number TEXT;`);
-  } catch (e) {}
+/** Brings every table in line with SCHEMA. Returns the tables that were rebuilt. */
+async function reconcileSchema(db: SQLite.SQLiteDatabase): Promise<string[]> {
+  const rebuilt: string[] = [];
+  for (const [table, def] of Object.entries(SCHEMA)) {
+    const info = await db.getAllAsync<{ name: string; type: string; notnull: number; dflt_value: string | null; pk: number }>(
+      `PRAGMA table_info(${q(table)})`
+    );
+    if (info.length === 0) {
+      await db.execAsync(createTableSql(table, def));
+    } else if (!tableMatches(def, info)) {
+      try {
+        await rebuildTable(db, table, def, new Set(info.map(i => i.name)));
+        rebuilt.push(table);
+      } catch (e) {
+        // Leave the old table in place; the app keeps working on it and the
+        // rebuild is retried on the next launch.
+        console.warn(`[db] Failed to migrate table ${table}:`, e);
+      }
+    }
+    for (const index of def.indexes ?? []) {
+      await db.execAsync(index);
+    }
+  }
+  if (rebuilt.length) console.log('[db] Migrated tables to current schema:', rebuilt.join(', '));
+  return rebuilt;
+}
 
-  return dbInstance;
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+export function getLocalDb(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    // Shared promise so concurrent callers wait for the migration to finish
+    // instead of querying a half-migrated database.
+    dbPromise = (async () => {
+      const db = await SQLite.openDatabaseAsync('cocm_local.db');
+      await db.execAsync('PRAGMA journal_mode = WAL;');
+      await reconcileSchema(db);
+      return db;
+    })().catch(e => {
+      dbPromise = null;
+      throw e;
+    });
+  }
+  return dbPromise;
 }
 
 // ============================================================================
@@ -620,7 +575,7 @@ export async function getLocalStats() {
 
   const membersRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM members');
   const newMembersRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM members WHERE created_at >= ?', [firstDayOfMonth]);
-  const givingRes = await db.getFirstAsync<{ total: number }>('SELECT SUM(amount) as total FROM giving_records WHERE date >= ?', [firstDayOfMonth.split('T')[0]]);
+  const givingRes = await db.getFirstAsync<{ total: number }>('SELECT SUM(total_amount) as total FROM giving_records WHERE service_date >= ?', [firstDayOfMonth.split('T')[0]]);
   const attendanceRes = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM attendance_entries WHERE created_at >= ?', [firstDayOfWeekIso]);
 
   return {
@@ -988,16 +943,39 @@ export async function upsertLocalGivingRecord(rec: any): Promise<void> {
   const createdBy = rec.created_by || rec.createdBy || null;
   const createdAt = rec.created_at || rec.createdAt || new Date().toISOString();
 
+  const columns = [
+    'id', 'service_name', 'service_date', 'service_type', 'offering_amount', 'donation_amount', 'thanksgiving_amount',
+    'custom_types', 'total_amount', 'cash_amount', 'mobile_money_amount', 'card_amount', 'bank_transfer_amount',
+    'notes', 'created_by', 'created_at',
+  ];
+  const values: any[] = [
+    id, serviceName, serviceDate, serviceType, offeringAmount, donationAmount, thanksgivingAmount,
+    customTypes, totalAmount, cashAmount, mobileMoneyAmount, cardAmount, bankTransferAmount,
+    notes, createdBy, createdAt,
+  ];
+
+  // Devices that installed an earlier build still have the original table with
+  // NOT NULL `amount` / `date` columns (ALTER TABLE can't relax them). Keep those filled.
+  const legacy = await getGivingLegacyColumns();
+  if (legacy.has('amount')) { columns.push('amount'); values.push(totalAmount); }
+  if (legacy.has('date')) { columns.push('date'); values.push(serviceDate); }
+
   await db.runAsync(
-    `INSERT OR REPLACE INTO giving_records 
-      (id, service_name, service_date, service_type, offering_amount, donation_amount, thanksgiving_amount, custom_types, total_amount, cash_amount, mobile_money_amount, card_amount, bank_transfer_amount, notes, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id, serviceName, serviceDate, serviceType, offeringAmount, donationAmount, thanksgivingAmount,
-      customTypes, totalAmount, cashAmount, mobileMoneyAmount, cardAmount, bankTransferAmount,
-      notes, createdBy, createdAt
-    ]
+    `INSERT OR REPLACE INTO giving_records (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`,
+    values
   );
+}
+
+let givingLegacyColumns: Set<string> | null = null;
+
+/** Columns from the pre-redesign giving_records schema that still exist on this device. */
+async function getGivingLegacyColumns(): Promise<Set<string>> {
+  if (givingLegacyColumns) return givingLegacyColumns;
+  const db = await getLocalDb();
+  const info = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(giving_records)`);
+  const names = new Set(info.map(c => c.name));
+  givingLegacyColumns = new Set(['amount', 'date'].filter(c => names.has(c)));
+  return givingLegacyColumns;
 }
 
 export async function getLocalGivingRecords(): Promise<LocalGivingRecord[]> {
@@ -1177,7 +1155,44 @@ export async function deleteSyncQueueItem(id: string): Promise<void> {
 
 export async function retryFailedSyncItems(): Promise<void> {
   const db = await getLocalDb();
-  await db.runAsync(`UPDATE sync_queue SET status = 'pending' WHERE status = 'error'`);
+  await db.runAsync(`UPDATE sync_queue SET status = 'pending', attempts = 0 WHERE status = 'error'`);
+}
+
+const UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/**
+ * Every entity id referenced by an outstanding outbox item. Rows with these ids
+ * exist locally but may not have reached the server yet, so pruning must skip them.
+ */
+export async function getSyncQueueReferencedIds(): Promise<Set<string>> {
+  const db = await getLocalDb();
+  const rows = await db.getAllAsync<{ endpoint: string; payload: string }>(
+    `SELECT endpoint, payload FROM sync_queue`
+  );
+  const ids = new Set<string>();
+  for (const r of rows) {
+    for (const match of `${r.endpoint} ${r.payload}`.matchAll(UUID_PATTERN)) {
+      ids.add(match[0].toLowerCase());
+    }
+  }
+  return ids;
+}
+
+/**
+ * Deletes local rows whose ids are no longer on the server, keeping rows that
+ * still have pending outbox mutations.
+ */
+export async function pruneLocalTable(table: string, serverIds: string[]): Promise<void> {
+  const db = await getLocalDb();
+  const keep = new Set(serverIds.map(id => String(id).toLowerCase()));
+  const protectedIds = await getSyncQueueReferencedIds();
+  const localRows = await db.getAllAsync<{ id: string }>(`SELECT id FROM ${table}`);
+  for (const row of localRows) {
+    const id = String(row.id).toLowerCase();
+    if (!keep.has(id) && !protectedIds.has(id)) {
+      await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, [row.id]);
+    }
+  }
 }
 
 export async function clearAllSyncQueue(): Promise<void> {
