@@ -1,25 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, TextInput, Alert as RNAlert, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Spinner } from 'tamagui';
-import { ArrowLeft, Check } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CalendarDays, Pencil, Receipt, Save, UserCheck, Wallet } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
-import { 
-  getLocalCustomServices, 
-  getLocalExpensePaymentMethods, 
+import {
+  getLocalCustomServices,
+  getLocalExpensePaymentMethods,
   getLocalExpenses,
-  upsertLocalExpense, 
-  LocalExpensePaymentMethod 
+  getLocalMembers,
+  upsertLocalExpense,
+  LocalExpensePaymentMethod,
+  LocalMember
 } from '../../lib/db';
 import { generateUUID } from '../../lib/uuid';
 import { api } from '../../lib/api';
-import { useThemeContext } from '../../context/ThemeContext';
+import { pushOrQueue } from '../../lib/syncEngine';
+import { AppHeader } from '../../components/AppHeader';
+import { NativeDatePicker } from '../../components/NativeDatePicker';
+import { MemberNameField } from '../../components/MemberNameField';
+import { RequisitionForm } from '../../components/ExpenseRequisition';
+import { useAppColors } from '../../context/ThemeContext';
+import { AppText, Button, ChoiceChips, FieldGroup, FormSection, SaveBar, Screen, TextField, useToast } from '../../components/ui';
+import { space } from '../../theme/tokens';
 
 const SUNDAY_MAIN_SERVICE = 'Sunday Main Service';
 
 export default function RecordExpenseScreen() {
   const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
+  const toast = useToast();
+  const c = useAppColors();
+  const insets = useSafeAreaInsets();
+  const [errors, setErrors] = useState<{ details?: string; amount?: string }>({});
 
   const [formId, setFormId] = useState('EXP-0001');
   const [details, setDetails] = useState('');
@@ -33,11 +44,24 @@ export default function RecordExpenseScreen() {
   const [paymentMethodId, setPaymentMethodId] = useState<string | undefined>(undefined);
   const [referenceNumber, setReferenceNumber] = useState('');
 
-  const [requestedByName, setRequestedByName] = useState('');
-  const [recommendedByName, setRecommendedByName] = useState('');
-  const [approvedByName, setApprovedByName] = useState('');
+  const [members, setMembers] = useState<LocalMember[]>([]);
+  const [requestedBy, setRequestedBy] = useState<{ id?: string; name: string }>({ name: '' });
+  const [recommendedBy, setRecommendedBy] = useState<{ id?: string; name: string }>({ name: '' });
+  const [approvedBy, setApprovedBy] = useState<{ id?: string; name: string }>({ name: '' });
 
   const [saving, setSaving] = useState(false);
+  // Like the web: the form is checked on the requisition preview before saving.
+  const [previewing, setPreviewing] = useState(false);
+  const [expenseDate] = useState(() => new Date().toISOString());
+
+  useEffect(() => {
+    if (!previewing) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!saving) setPreviewing(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [previewing, saving]);
 
   useEffect(() => {
     async function initForm() {
@@ -61,11 +85,13 @@ export default function RecordExpenseScreen() {
           setFormId(`EXP-${String(maxNum + 1).padStart(4, '0')}`);
         }
 
-        // 2. Custom services & payment methods
-        const [customSvcs, pms] = await Promise.all([
+        // 2. Custom services, payment methods & members (for sign-off names)
+        const [customSvcs, pms, localMembers] = await Promise.all([
           getLocalCustomServices(),
-          getLocalExpensePaymentMethods()
+          getLocalExpensePaymentMethods(),
+          getLocalMembers()
         ]);
+        setMembers(localMembers);
 
         const activeServiceNames = customSvcs.filter(s => s.is_active === 1).map(s => s.name);
         setAvailableServices(Array.from(new Set(['General', SUNDAY_MAIN_SERVICE, ...activeServiceNames])));
@@ -89,17 +115,26 @@ export default function RecordExpenseScreen() {
     initForm();
   }, []);
 
+  const requestedByName = requestedBy.name.trim();
+  const recommendedByName = recommendedBy.name.trim();
+  const approvedByName = approvedBy.name.trim();
+
+  const handlePreview = () => {
+    const numAmount = parseFloat(amount);
+    const nextErrors = {
+      details: details.trim() ? undefined : 'Describe what the money was spent on.',
+      amount: !isNaN(numAmount) && numAmount > 0 ? undefined : 'Enter an amount greater than zero.',
+    };
+    setErrors(nextErrors);
+    if (nextErrors.details || nextErrors.amount) {
+      toast.show({ title: 'Check the highlighted fields', tone: 'warning' });
+      return;
+    }
+    setPreviewing(true);
+  };
+
   const handleSave = async () => {
     const numAmount = parseFloat(amount);
-    if (!details.trim()) {
-      RNAlert.alert('Validation Error', 'Expense details/description is required.');
-      return;
-    }
-    if (isNaN(numAmount) || numAmount <= 0) {
-      RNAlert.alert('Validation Error', 'Please enter a valid expense amount.');
-      return;
-    }
-
     setSaving(true);
     try {
       const recordId = generateUUID();
@@ -114,11 +149,14 @@ export default function RecordExpenseScreen() {
         paymentMethodId,
         paymentMethodName,
         referenceNumber: referenceNumber.trim() || undefined,
-        requestedByName: requestedByName.trim() || undefined,
-        recommendedByName: recommendedByName.trim() || undefined,
-        approvedByName: approvedByName.trim() || undefined,
+        requestedById: requestedByName ? requestedBy.id : undefined,
+        requestedByName: requestedByName || undefined,
+        recommendedById: recommendedByName ? recommendedBy.id : undefined,
+        recommendedByName: recommendedByName || undefined,
+        approvedById: approvedByName ? approvedBy.id : undefined,
+        approvedByName: approvedByName || undefined,
         status: 'approved',
-        createdAt: new Date().toISOString()
+        createdAt: expenseDate
       };
 
       // 1. Save locally to SQLite immediately (0ms)
@@ -132,245 +170,119 @@ export default function RecordExpenseScreen() {
         payment_method_id: paymentMethodId,
         payment_method_name: paymentMethodName,
         reference_number: referenceNumber.trim() || undefined,
-        requested_by_name: requestedByName.trim() || undefined,
-        recommended_by_name: recommendedByName.trim() || undefined,
-        approved_by_name: approvedByName.trim() || undefined,
+        requested_by_name: requestedByName || undefined,
+        recommended_by_name: recommendedByName || undefined,
+        approved_by_name: approvedByName || undefined,
         status: 'approved',
-        created_at: new Date().toISOString()
+        created_at: expenseDate
       });
 
-      // 2. Post to backend API
-      try {
-        await api.expenses.create(payload);
-      } catch (e) {
-        console.warn('Backend expense create warning (cached locally):', e);
-      }
+      // 2. Server push; queued in the outbox only if the server can't be reached
+      //    (a swallowed failure used to lose offline expenses on the next sync)
+      await pushOrQueue('POST', '/expenses', payload);
 
-      router.back();
+      toast.show({ title: 'Requisition saved', message: `${formId} · GH₵ ${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` });
+      // Open the saved requisition so it can be shared or printed straight away.
+      router.replace(`/expenses/receipt?id=${recordId}` as any);
     } catch (err) {
       console.error('Failed to save expense record:', err);
-      RNAlert.alert('Error', 'Failed to record expense.');
+      toast.show({ title: 'Couldn’t record expense', tone: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
-  const inputStyle = {
-    color: themeColors.text,
-    backgroundColor: themeColors.cardBackground,
-    borderWidth: 1,
-    borderColor: themeColors.borderColor,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-  };
+  if (previewing) {
+    return (
+      <Screen>
+        <AppHeader title="Requisition preview" subtitle={formId} showBack onBack={() => !saving && setPreviewing(false)} />
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl, gap: space.sm }}>
+          <AppText variant="caption" tone="muted" align="center">Check the form before saving. You can share or print it afterwards.</AppText>
+          <RequisitionForm
+            data={{
+              formId,
+              details: details.trim(),
+              amount: parseFloat(amount) || 0,
+              expenseDate,
+              requestedByName,
+              recommendedByName,
+              approvedByName,
+            }}
+          />
+        </ScrollView>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: space.sm,
+            paddingHorizontal: space.md,
+            paddingTop: space.sm,
+            paddingBottom: Math.max(insets.bottom, space.sm),
+            backgroundColor: c.surface,
+            borderTopWidth: 1,
+            borderTopColor: c.border,
+          }}
+        >
+          <Button label="Edit" icon={Pencil} variant="secondary" flex={1} disabled={saving} onPress={() => setPreviewing(false)} />
+          <Button label={saving ? 'Saving…' : 'Save requisition'} icon={Save} flex={1.6} loading={saving} onPress={handleSave} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Navigation Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center">
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Record Expense</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>Form Voucher {formId}</Text>
-            </YStack>
-          </XStack>
-        </XStack>
+    <Screen>
+      <AppHeader title="Record expense" subtitle={`Requisition ${formId}`} showBack />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl, gap: space.md }} keyboardShouldPersistTaps="handled">
+          <FormSection title="Expense" icon={Receipt} description={`Form ${formId}`} state={details.trim() && parseFloat(amount) > 0 ? 'done' : 'needed'}>
+            <TextField
+              label="What was it for? *"
+              value={details}
+              onChangeText={t => { setDetails(t); if (errors.details) setErrors(e => ({ ...e, details: undefined })); }}
+              placeholder="e.g. Generator fuel, sound system cables"
+              multiline
+              error={errors.details}
+            />
+            <TextField
+              label="Amount *"
+              prefix="GH₵"
+              value={amount}
+              onChangeText={t => { setAmount(t.replace(/[^0-9.]/g, '')); if (errors.amount) setErrors(e => ({ ...e, amount: undefined })); }}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              error={errors.amount}
+            />
+          </FormSection>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          <YStack space="$4">
+          <FormSection title="Service account" icon={CalendarDays} state="done">
+            <NativeDatePicker label="Service date" value={serviceDate} onChange={setServiceDate} maxDate={new Date()} />
+            <FieldGroup label="Service">
+              <ChoiceChips options={availableServices} value={serviceType} onChange={setServiceType} />
+            </FieldGroup>
+          </FormSection>
 
-            {/* Form Voucher ID Badge Banner */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="rgba(255, 59, 48, 0.4)" backgroundColor="rgba(255, 59, 48, 0.08)" alignItems="center">
-              <Text color={themeColors.textMuted} fontSize={11} fontWeight="800" textTransform="uppercase">OFFICIAL EXPENSE FORM ID</Text>
-              <Text color="#FF3B30" fontSize={26} fontWeight="900" mt="$1">
-                {formId}
-              </Text>
-            </Card>
+          <FormSection title="Payment" icon={Wallet} state="done">
+            <FieldGroup label="Method">
+              <ChoiceChips
+                options={paymentMethods.map(pm => ({ value: pm.id, label: pm.name }))}
+                value={paymentMethodId ?? paymentMethods.find(pm => pm.name === paymentMethodName)?.id ?? ''}
+                onChange={id => {
+                  const pm = paymentMethods.find(x => x.id === id);
+                  if (pm) { setPaymentMethodName(pm.name); setPaymentMethodId(pm.id); }
+                }}
+              />
+            </FieldGroup>
+            <TextField label="Reference number" value={referenceNumber} onChangeText={setReferenceNumber} placeholder="Transaction ref, cheque no. (optional)" />
+          </FormSection>
 
-            {/* General Expense Details */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">1. Expense Details</Text>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">PURPOSE / DETAILS *</Text>
-                  <TextInput
-                    value={details}
-                    onChangeText={setDetails}
-                    placeholder="e.g. Purchase of Media Sound System Cables, Generator Fuel..."
-                    placeholderTextColor={themeColors.textMuted}
-                    multiline
-                    style={{ ...inputStyle, minHeight: 60 }}
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">AMOUNT (GH₵) *</Text>
-                  <TextInput
-                    value={amount}
-                    onChangeText={setAmount}
-                    keyboardType="numeric"
-                    placeholder="0.00"
-                    placeholderTextColor={themeColors.textMuted}
-                    style={{ ...inputStyle, fontSize: 16, fontWeight: '800' }}
-                  />
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Service & Date Info */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">2. Service Account Info</Text>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">SERVICE DATE (YYYY-MM-DD)</Text>
-                  <TextInput
-                    value={serviceDate}
-                    onChangeText={setServiceDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">SERVICE TYPE</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {availableServices.map((name) => {
-                      const isSelected = serviceType === name;
-                      return (
-                        <TouchableOpacity
-                          key={name}
-                          onPress={() => setServiceType(name)}
-                        >
-                          <YStack
-                            px="$3"
-                            py="$1.5"
-                            borderRadius="$3"
-                            borderWidth={1}
-                            borderColor={isSelected ? '#FF3B30' : themeColors.borderColor}
-                            backgroundColor={isSelected ? 'rgba(255, 59, 48, 0.15)' : themeColors.background}
-                          >
-                            <Text color={isSelected ? '#FF3B30' : themeColors.textMuted} fontSize={12} fontWeight={isSelected ? '800' : '600'}>
-                              {name}
-                            </Text>
-                          </YStack>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Payment Method Selector */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">3. Payment Method</Text>
-
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                  {paymentMethods.map((pm) => {
-                    const isSelected = paymentMethodName === pm.name;
-                    return (
-                      <TouchableOpacity
-                        key={pm.id}
-                        onPress={() => {
-                          setPaymentMethodName(pm.name);
-                          setPaymentMethodId(pm.id);
-                        }}
-                      >
-                        <YStack
-                          px="$3"
-                          py="$1.5"
-                          borderRadius="$3"
-                          borderWidth={1}
-                          borderColor={isSelected ? '#FF9500' : themeColors.borderColor}
-                          backgroundColor={isSelected ? 'rgba(255, 149, 0, 0.15)' : themeColors.background}
-                        >
-                          <Text color={isSelected ? '#FF9500' : themeColors.textMuted} fontSize={12} fontWeight={isSelected ? '800' : '600'}>
-                            {pm.name}
-                          </Text>
-                        </YStack>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">REFERENCE NUMBER (OPTIONAL)</Text>
-                  <TextInput
-                    value={referenceNumber}
-                    onChangeText={setReferenceNumber}
-                    placeholder="e.g. Transaction Ref, Cheque No..."
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Personnel Signatures */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">4. Personnel Authorization Tags (Optional)</Text>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">REQUESTED BY</Text>
-                  <TextInput
-                    value={requestedByName}
-                    onChangeText={setRequestedByName}
-                    placeholder="Name of person requesting expense..."
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">RECOMMENDED BY</Text>
-                  <TextInput
-                    value={recommendedByName}
-                    onChangeText={setRecommendedByName}
-                    placeholder="Name of recommender..."
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">APPROVED BY</Text>
-                  <TextInput
-                    value={approvedByName}
-                    onChangeText={setApprovedByName}
-                    placeholder="Name of approver..."
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Save Button */}
-            <Button backgroundColor="#FF3B30" size="$4" onPress={handleSave} disabled={saving}>
-              {saving ? <Spinner color="white" /> : (
-                <XStack space="$2" alignItems="center">
-                  <Check size={18} color="white" />
-                  <Text color="white" fontWeight="800" fontSize={14}>Save Expense Record</Text>
-                </XStack>
-              )}
-            </Button>
-
-          </YStack>
+          <FormSection title="Authorization" icon={UserCheck} description="Sign-off names from the member list" state={requestedByName || recommendedByName || approvedByName ? 'done' : 'optional'}>
+            <MemberNameField label="Requested by" value={requestedBy.name} memberId={requestedBy.id} members={members} onChange={(id, name) => setRequestedBy({ id, name })} />
+            <MemberNameField label="Recommended by" value={recommendedBy.name} memberId={recommendedBy.id} members={members} onChange={(id, name) => setRecommendedBy({ id, name })} />
+            <MemberNameField label="Approved by" value={approvedBy.name} memberId={approvedBy.id} members={members} onChange={(id, name) => setApprovedBy({ id, name })} />
+          </FormSection>
         </ScrollView>
-      </YStack>
-    </SafeAreaView>
+        <SaveBar label={`Preview requisition${parseFloat(amount) > 0 ? ` · GH₵ ${parseFloat(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : ''}`} onPress={handlePreview} />
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }

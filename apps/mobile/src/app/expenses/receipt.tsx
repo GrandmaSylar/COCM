@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Spinner } from 'tamagui';
-import { ArrowLeft, CheckCircle } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CheckCircle, Printer, Receipt, Share2 } from '@tamagui/lucide-icons';
+import { useLocalSearchParams } from 'expo-router';
 import { getLocalExpenses, LocalExpense } from '../../lib/db';
-import { useThemeContext } from '../../context/ThemeContext';
+import { useAppColors } from '../../context/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
+import { SkeletonCard } from '../../components/Skeleton';
+import { printRequisition, RequisitionForm, shareRequisitionPdf, toRequisitionData } from '../../components/ExpenseRequisition';
+import { AppText, Badge, Button, DetailRow, EmptyState, Screen, Surface, useToast } from '../../components/ui';
+import { space } from '../../theme/tokens';
 
 export default function ExpenseReceiptScreen() {
-  const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
+  const c = useAppColors();
+  const toast = useToast();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [expense, setExpense] = useState<LocalExpense | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<'share' | 'print' | null>(null);
 
   useEffect(() => {
     async function loadExpense() {
@@ -31,128 +37,66 @@ export default function ExpenseReceiptScreen() {
     loadExpense();
   }, [id]);
 
-  const formatGHS = (val?: number) => {
-    if (val === undefined || val === null) return 'GH₵ 0.00';
-    return `GH₵ ${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const run = async (kind: 'share' | 'print') => {
+    if (!expense) return;
+    setBusy(kind);
+    try {
+      const data = toRequisitionData(expense);
+      if (kind === 'share') await shareRequisitionPdf(data);
+      else await printRequisition(data);
+    } catch (err) {
+      console.error('Requisition export failed:', err);
+      toast.show({ title: kind === 'share' ? 'Couldn’t create the PDF' : 'Couldn’t open printing', tone: 'error' });
+    } finally {
+      setBusy(null);
+    }
   };
 
+  const status = (expense?.status || 'approved').toLowerCase();
+  const statusTone = status === 'approved' ? 'success' : status === 'rejected' ? 'danger' : 'warning';
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Navigation Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center">
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Expense Voucher</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>{expense?.form_id || 'Receipt Details'}</Text>
-            </YStack>
-          </XStack>
-        </XStack>
+    <Screen>
+      <AppHeader title="Expense requisition" subtitle={expense?.form_id || 'Requisition form'} showBack />
 
-        {loading ? (
-          <Spinner size="large" color="#FF3B30" py="$6" />
-        ) : !expense ? (
-          <YStack flex={1} p="$4" justifyContent="center" alignItems="center">
-            <Text color={themeColors.textMuted} fontSize={14}>Expense record not found.</Text>
-          </YStack>
-        ) : (
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
-            <YStack space="$4">
+      {loading ? (
+        <View style={{ padding: space.md }}><SkeletonCard lines={5} hasAvatar={false} /></View>
+      ) : !expense ? (
+        <EmptyState icon={Receipt} title="Requisition not found" message="This expense may have been removed." />
+      ) : (
+        <>
+          <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl, gap: space.md }}>
+            <RequisitionForm data={toRequisitionData(expense)} />
 
-              {/* Official Voucher Card */}
-              <Card p="$5" borderRadius="$4" borderWidth={2} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-                <YStack space="$4">
-
-                  {/* Church Header Badge */}
-                  <YStack alignItems="center" space="$1" borderBottomWidth={1} borderColor={themeColors.borderColor} pb="$3">
-                    <Text color={themeColors.text} fontSize={18} fontWeight="900" textTransform="uppercase" letterSpacing={1}>
-                      CITY OF DREAMS CHAPEL
-                    </Text>
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">OFFICIAL EXPENSE DISBURSEMENT VOUCHER</Text>
-                    <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$3" py="$1" borderRadius="$2" mt="$1">
-                      <XStack space="$1" alignItems="center">
-                        <CheckCircle size={12} color="#34C759" />
-                        <Text color="#34C759" fontSize={10} fontWeight="800">STATUS: APPROVED</Text>
-                      </XStack>
-                    </XStack>
-                  </YStack>
-
-                  {/* Form ID & Date Header */}
-                  <XStack justifyContent="space-between" alignItems="center" backgroundColor={themeColors.borderColor} p="$3" borderRadius="$3">
-                    <YStack>
-                      <Text color={themeColors.textMuted} fontSize={10} fontWeight="700">FORM ID</Text>
-                      <Text color="#FF3B30" fontSize={16} fontWeight="900">{expense.form_id}</Text>
-                    </YStack>
-                    <YStack alignItems="flex-end">
-                      <Text color={themeColors.textMuted} fontSize={10} fontWeight="700">SERVICE DATE</Text>
-                      <Text color={themeColors.text} fontSize={14} fontWeight="800">{expense.service_date}</Text>
-                    </YStack>
-                  </XStack>
-
-                  {/* Details & Amount */}
-                  <YStack space="$2" py="$2">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">PURPOSE / DETAILS</Text>
-                    <Text color={themeColors.text} fontSize={15} fontWeight="700" lineHeight={20}>
-                      {expense.details}
-                    </Text>
-
-                    <YStack mt="$2" p="$3" borderRadius="$3" backgroundColor="rgba(255, 59, 48, 0.08)" borderWidth={1} borderColor="rgba(255, 59, 48, 0.3)" alignItems="center">
-                      <Text color={themeColors.textMuted} fontSize={10} fontWeight="800">DISBURSED AMOUNT</Text>
-                      <Text color="#FF3B30" fontSize={26} fontWeight="900" mt="$1">
-                        {formatGHS(expense.amount)}
-                      </Text>
-                    </YStack>
-                  </YStack>
-
-                  {/* Payment Details */}
-                  <YStack space="$2" pt="$2" borderTopWidth={1} borderColor={themeColors.borderColor}>
-                    <XStack justifyContent="space-between">
-                      <Text color={themeColors.textMuted} fontSize={12}>Payment Method:</Text>
-                      <Text color={themeColors.text} fontSize={12} fontWeight="800">{expense.payment_method_name}</Text>
-                    </XStack>
-                    <XStack justifyContent="space-between">
-                      <Text color={themeColors.textMuted} fontSize={12}>Service Type Account:</Text>
-                      <Text color={themeColors.text} fontSize={12} fontWeight="800">{expense.service_type}</Text>
-                    </XStack>
-                    {expense.reference_number && (
-                      <XStack justifyContent="space-between">
-                        <Text color={themeColors.textMuted} fontSize={12}>Transaction Ref:</Text>
-                        <Text color={themeColors.text} fontSize={12} fontWeight="800">{expense.reference_number}</Text>
-                      </XStack>
-                    )}
-                  </YStack>
-
-                  {/* Authorization Personnel Tags */}
-                  <YStack space="$2" pt="$3" borderTopWidth={1} borderColor={themeColors.borderColor}>
-                    <Text color={themeColors.textMuted} fontSize={10} fontWeight="800" textTransform="uppercase">Authorization Personnel</Text>
-
-                    <XStack justifyContent="space-between">
-                      <Text color={themeColors.textMuted} fontSize={11}>Requested By:</Text>
-                      <Text color={themeColors.text} fontSize={11} fontWeight="700">{expense.requested_by_name || 'Church Treasury'}</Text>
-                    </XStack>
-                    <XStack justifyContent="space-between">
-                      <Text color={themeColors.textMuted} fontSize={11}>Recommended By:</Text>
-                      <Text color={themeColors.text} fontSize={11} fontWeight="700">{expense.recommended_by_name || 'Senior Pastor / Executive'}</Text>
-                    </XStack>
-                    <XStack justifyContent="space-between">
-                      <Text color={themeColors.textMuted} fontSize={11}>Approved By:</Text>
-                      <Text color={themeColors.text} fontSize={11} fontWeight="700">{expense.approved_by_name || 'Finance Administrator'}</Text>
-                    </XStack>
-                  </YStack>
-
-                </YStack>
-              </Card>
-
-            </YStack>
+            <Surface style={{ gap: space.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.md, paddingTop: space.xs }}>
+                <AppText variant="micro" tone="muted">Record details</AppText>
+                <Badge label={status.charAt(0).toUpperCase() + status.slice(1)} tone={statusTone} icon={status === 'approved' ? CheckCircle : undefined} />
+              </View>
+              <DetailRow label="Service account" value={expense.service_type} />
+              <DetailRow label="Service date" value={expense.service_date} />
+              <DetailRow label="Payment method" value={expense.payment_method_name} />
+              {expense.reference_number ? <DetailRow label="Reference" value={expense.reference_number} /> : null}
+            </Surface>
           </ScrollView>
-        )}
-      </YStack>
-    </SafeAreaView>
+
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: space.sm,
+              paddingHorizontal: space.md,
+              paddingTop: space.sm,
+              paddingBottom: Math.max(insets.bottom, space.sm),
+              backgroundColor: c.surface,
+              borderTopWidth: 1,
+              borderTopColor: c.border,
+            }}
+          >
+            <Button label="Print" icon={Printer} variant="secondary" flex={1} loading={busy === 'print'} disabled={!!busy} onPress={() => run('print')} />
+            <Button label="Share PDF" icon={Share2} flex={1.4} loading={busy === 'share'} disabled={!!busy} onPress={() => run('share')} />
+          </View>
+        </>
+      )}
+    </Screen>
   );
 }
