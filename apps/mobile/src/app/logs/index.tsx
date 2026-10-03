@@ -1,24 +1,63 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ScrollView, TouchableOpacity, TextInput, RefreshControl, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Spinner } from 'tamagui';
-import { ArrowLeft, Search, RefreshCw, X, Plus, Pencil, Trash2, LogIn, LogOut, CheckCircle, Shield, Activity } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Alert, RefreshControl, SectionList, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import {
+  RefreshCw, Plus, Pencil, Trash2, LogIn, LogOut, Activity, Download, Trash, ClipboardList,
+} from '@tamagui/lucide-icons';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getLocalActivityLogs, LocalActivityLog } from '../../lib/db';
 import { syncActivityLogs } from '../../lib/syncEngine';
 import { useThemeContext } from '../../context/ThemeContext';
+import { useAccess } from '../../lib/access';
+import { SkeletonList } from '../../components/Skeleton';
 import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
+import { AppHeader } from '../../components/AppHeader';
+import {
+  AppText, Badge, EmptyState, FilterChips, IconButton, IconWell, Screen, SearchField, SegmentedControl, Tone, useToast,
+} from '../../components/ui';
+import { radius, space } from '../../theme/tokens';
+
+type ActionFilter = 'all' | 'create' | 'update' | 'delete' | 'login' | 'logout';
+
+const ACTION_STYLE: Record<string, { tone: Tone; icon: React.ComponentType<any>; label: string }> = {
+  create: { tone: 'success', icon: Plus, label: 'Created' },
+  update: { tone: 'info', icon: Pencil, label: 'Updated' },
+  delete: { tone: 'danger', icon: Trash2, label: 'Deleted' },
+  login: { tone: 'primary', icon: LogIn, label: 'Signed in' },
+  logout: { tone: 'neutral', icon: LogOut, label: 'Signed out' },
+};
+
+function actionStyle(action: string) {
+  const act = (action || '').toLowerCase();
+  return ACTION_STYLE[act] ?? { tone: 'warning' as Tone, icon: Activity, label: act ? act[0].toUpperCase() + act.slice(1) : 'Action' };
+}
+
+function dayLabel(d: Date) {
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86400000);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+}
 
 export default function ActivityLogsScreen() {
-  const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
+  const toast = useToast();
+  const { colors: c } = useThemeContext();
+  const { isDev, profile } = useAccess();
+  const isAdmin = isDev || profile?.role === 'admin' || profile?.role === 'dev';
 
   const [logs, setLogs] = useState<LocalActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedAction, setSelectedAction] = useState('all');
-  const [selectedEntity, setSelectedEntity] = useState('all');
+  const [selectedAction, setSelectedAction] = useState<ActionFilter>('all');
+  const [selectedEntity] = useState('all');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<'all' | 'today' | 'week' | 'month'>('all');
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -26,7 +65,9 @@ export default function ActivityLogsScreen() {
       const cached = await getLocalActivityLogs({ action: selectedAction, entityType: selectedEntity });
       setLogs(cached);
 
-      syncActivityLogs().then(() => getLocalActivityLogs({ action: selectedAction, entityType: selectedEntity }).then(setLogs)).catch(() => {});
+      syncActivityLogs()
+        .then(() => getLocalActivityLogs({ action: selectedAction, entityType: selectedEntity }).then(setLogs))
+        .catch(() => {});
     } catch (err) {
       console.error('Failed to load activity logs:', err);
     } finally {
@@ -38,7 +79,7 @@ export default function ActivityLogsScreen() {
     loadData();
   }, [loadData]);
 
-  // Realtime Supabase Subscription
+  // Realtime Supabase subscription
   useEffect(() => {
     const channel = supabase.channel('mobile-activity-logs')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, () => {
@@ -62,156 +103,202 @@ export default function ActivityLogsScreen() {
     }
   };
 
+  const handleClearLogs = () => {
+    Alert.alert(
+      'Clear all activity logs?',
+      'Every recorded action is permanently deleted for all users. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear all logs',
+          style: 'destructive',
+          onPress: async () => {
+            setClearing(true);
+            try {
+              await api.activityLog.clear();
+              await syncActivityLogs();
+              setLogs([]);
+              toast.show({ title: 'Activity logs cleared' });
+            } catch (err: any) {
+              toast.show({ title: 'Couldn’t clear logs', message: err?.message, tone: 'error' });
+            } finally {
+              setClearing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const filteredLogs = useMemo(() => {
     const s = searchTerm.toLowerCase();
+    const now = new Date();
+
     return logs.filter(l => {
-      return (
+      const matchSearch = (
         (l.description || '').toLowerCase().includes(s) ||
         (l.user_name || '').toLowerCase().includes(s) ||
         (l.action || '').toLowerCase().includes(s) ||
         (l.entity_type || '').toLowerCase().includes(s)
       );
+      if (!matchSearch) return false;
+
+      if (selectedTimeRange !== 'all') {
+        const logDate = new Date(l.created_at);
+        if (selectedTimeRange === 'today') {
+          if (logDate.toDateString() !== now.toDateString()) return false;
+        } else if (selectedTimeRange === 'week') {
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          if (logDate < weekAgo) return false;
+        } else if (selectedTimeRange === 'month') {
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          if (logDate < monthAgo) return false;
+        }
+      }
+      return true;
     });
-  }, [logs, searchTerm]);
+  }, [logs, searchTerm, selectedTimeRange]);
 
-  const getActionBadge = (action: string) => {
-    const act = (action || '').toLowerCase();
-    if (act === 'create') return { color: '#34C759', bg: 'rgba(52, 199, 89, 0.15)', icon: Plus, label: 'CREATE' };
-    if (act === 'update') return { color: '#007AFF', bg: 'rgba(0, 122, 255, 0.15)', icon: Pencil, label: 'UPDATE' };
-    if (act === 'delete') return { color: '#FF3B30', bg: 'rgba(255, 59, 48, 0.15)', icon: Trash2, label: 'DELETE' };
-    if (act === 'login') return { color: '#AF52DE', bg: 'rgba(175, 82, 222, 0.15)', icon: LogIn, label: 'LOGIN' };
-    return { color: '#FF9500', bg: 'rgba(255, 149, 0, 0.15)', icon: Activity, label: act.toUpperCase() };
-  };
-
-  const formatDate = (isoStr: string) => {
+  const handleExportCSV = async () => {
+    setExporting(true);
     try {
-      const d = new Date(isoStr);
-      const isToday = d.toDateString() === new Date().toDateString();
-      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      return isToday ? `Today ${timeStr}` : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${timeStr}`;
-    } catch {
-      return isoStr;
+      const header = 'ID,User,Action,Entity,Description,Timestamp\n';
+      const rows = filteredLogs.map(l =>
+        `"${l.id}","${l.user_name || ''}","${l.action || ''}","${l.entity_type || ''}","${(l.description || '').replace(/"/g, '""')}","${l.created_at}"`
+      ).join('\n');
+
+      const fileUri = `${FileSystem.documentDirectory}activity_logs_${Date.now()}.csv`;
+      await FileSystem.writeAsStringAsync(fileUri, header + rows, { encoding: FileSystem.EncodingType.UTF8 });
+      toast.show({ title: `Exported ${filteredLogs.length} entries`, message: fileUri, duration: 5000 });
+    } catch (err: any) {
+      toast.show({ title: 'Export failed', message: err?.message, tone: 'error' });
+    } finally {
+      setExporting(false);
     }
   };
 
+  // Group by calendar day for sticky date headers
+  const sections = useMemo(() => {
+    const groups: { title: string; data: LocalActivityLog[] }[] = [];
+    let current: { title: string; data: LocalActivityLog[] } | null = null;
+    for (const log of filteredLogs) {
+      const title = dayLabel(new Date(log.created_at));
+      if (!current || current.title !== title) {
+        current = { title, data: [] };
+        groups.push(current);
+      }
+      current.data.push(log);
+    }
+    return groups;
+  }, [filteredLogs]);
+
+  const hasFilters = !!searchTerm || selectedAction !== 'all' || selectedTimeRange !== 'all';
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center" flex={1}>
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack flex={1}>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Activity Logs</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>{logs.length} Recorded System Actions</Text>
-            </YStack>
-          </XStack>
+    <Screen>
+      <AppHeader
+        title="Activity log"
+        subtitle={loading ? 'Loading…' : `${filteredLogs.length} ${filteredLogs.length === 1 ? 'entry' : 'entries'}`}
+        showBack
+        rightElement={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton icon={RefreshCw} label="Refresh" spinning={refreshing} onPress={handleRefresh} />
+            <IconButton icon={Download} label="Export as CSV" busy={exporting} onPress={handleExportCSV} />
+            {isAdmin ? <IconButton icon={Trash} label="Clear all logs" tone="danger" busy={clearing} onPress={handleClearLogs} /> : null}
+          </View>
+        }
+      />
 
-          <TouchableOpacity onPress={handleRefresh}>
-            <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-              <RefreshCw size={18} color={themeColors.text} className={refreshing ? 'animate-spin' : ''} />
-            </YStack>
-          </TouchableOpacity>
-        </XStack>
+      <View style={{ paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xs, gap: space.sm, backgroundColor: c.background }}>
+        <SearchField value={searchTerm} onChangeText={setSearchTerm} placeholder="Search by user, action or description" />
+        <FilterChips
+          value={selectedAction}
+          onChange={setSelectedAction}
+          options={[
+            { value: 'all', label: 'All actions' },
+            { value: 'create', label: 'Created', icon: Plus },
+            { value: 'update', label: 'Updated', icon: Pencil },
+            { value: 'delete', label: 'Deleted', icon: Trash2 },
+            { value: 'login', label: 'Sign-ins', icon: LogIn },
+            { value: 'logout', label: 'Sign-outs', icon: LogOut },
+          ]}
+        />
+        <SegmentedControl
+          accessibilityLabel="Time range"
+          value={selectedTimeRange}
+          onChange={setSelectedTimeRange}
+          options={[
+            { value: 'all', label: 'All time' },
+            { value: 'today', label: 'Today' },
+            { value: 'week', label: '7 days' },
+            { value: 'month', label: '30 days' },
+          ]}
+        />
+      </View>
 
-        <YStack flex={1} p="$4" space="$3">
-
-          {/* Search Bar */}
-          <XStack px="$3" py="$2" borderRadius="$3" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground} alignItems="center" space="$2">
-            <Search size={16} color={themeColors.textMuted} />
-            <TextInput
-              placeholder="Search by action, user, description..."
-              placeholderTextColor={themeColors.textMuted}
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-              style={{ flex: 1, color: themeColors.text, fontSize: 13 }}
+      {loading ? (
+        <View style={{ padding: space.md }}>
+          <SkeletonList count={6} hasAvatar={false} />
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={item => item.id}
+          stickySectionHeadersEnabled
+          contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: space.xxl, flexGrow: 1 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
+          ListEmptyComponent={
+            <EmptyState
+              icon={ClipboardList}
+              title={hasFilters ? 'No matching activity' : 'No activity yet'}
+              message={hasFilters ? 'Try a different search, action or time range.' : 'Actions taken in the web or mobile app appear here.'}
+              action={hasFilters ? { label: 'Clear filters', onPress: () => { setSearchTerm(''); setSelectedAction('all'); setSelectedTimeRange('all'); } } : undefined}
             />
-            {searchTerm.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchTerm('')}>
-                <X size={14} color={themeColors.textMuted} />
-              </TouchableOpacity>
-            )}
-          </XStack>
-
-          {/* Action Filter Chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {(['all', 'create', 'update', 'delete', 'login'] as const).map(act => {
-              const isSelected = selectedAction === act;
-              return (
-                <TouchableOpacity key={act} onPress={() => setSelectedAction(act)}>
-                  <YStack
-                    px="$3"
-                    py="$1.5"
-                    borderRadius="$3"
-                    borderWidth={1}
-                    borderColor={isSelected ? '#34C759' : themeColors.borderColor}
-                    backgroundColor={isSelected ? 'rgba(52, 199, 89, 0.15)' : themeColors.cardBackground}
-                  >
-                    <Text color={isSelected ? '#34C759' : themeColors.textMuted} fontSize={12} fontWeight={isSelected ? '800' : '600'}>
-                      {act.toUpperCase()}
-                    </Text>
-                  </YStack>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Logs List */}
-          {loading ? (
-            <Spinner size="large" color="#34C759" py="$8" />
-          ) : filteredLogs.length === 0 ? (
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground} alignItems="center">
-              <Text color={themeColors.textMuted} fontSize={13}>No activity log records found.</Text>
-            </Card>
-          ) : (
-            <ScrollView
-              contentContainerStyle={{ paddingBottom: 60 }}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#34C759" />
-              }
-            >
-              <YStack space="$2.5">
-                {filteredLogs.map(item => {
-                  const badge = getActionBadge(item.action);
-                  const Icon = badge.icon;
-
-                  return (
-                    <Card key={item.id} p="$3.5" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-                      <YStack space="$2">
-                        <XStack justifyContent="space-between" alignItems="center">
-                          <XStack space="$2" alignItems="center">
-                            <XStack backgroundColor={badge.bg} px="$2" py="$0.5" borderRadius="$2" alignItems="center" space="$1">
-                              <Icon size={12} color={badge.color} />
-                              <Text color={badge.color} fontSize={10} fontWeight="800">{badge.label}</Text>
-                            </XStack>
-                            <Text color={themeColors.text} fontSize={13} fontWeight="800">
-                              {item.user_name || 'System User'}
-                            </Text>
-                          </XStack>
-
-                          <Text color={themeColors.textMuted} fontSize={11}>
-                            {formatDate(item.created_at)}
-                          </Text>
-                        </XStack>
-
-                        <Text color={themeColors.text} fontSize={14} fontWeight="600" lineHeight={18}>
-                          {item.description}
-                        </Text>
-                      </YStack>
-                    </Card>
-                  );
-                })}
-              </YStack>
-            </ScrollView>
+          }
+          renderSectionHeader={({ section }) => (
+            <View style={{ backgroundColor: c.background, paddingTop: space.md, paddingBottom: space.xs }}>
+              <AppText variant="captionStrong" tone="muted">{section.title}</AppText>
+            </View>
           )}
-
-        </YStack>
-      </YStack>
-    </SafeAreaView>
+          renderItem={({ item, index, section }) => {
+            const style = actionStyle(item.action);
+            const first = index === 0;
+            const last = index === section.data.length - 1;
+            const time = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return (
+              <Animated.View
+                entering={index < 12 ? FadeIn.duration(200).delay(index * 25) : undefined}
+                style={{
+                  flexDirection: 'row',
+                  gap: space.sm,
+                  padding: space.md,
+                  backgroundColor: c.surface,
+                  borderColor: c.border,
+                  borderLeftWidth: 1,
+                  borderRightWidth: 1,
+                  borderTopWidth: first ? 1 : 0,
+                  borderBottomWidth: 1,
+                  borderTopLeftRadius: first ? radius.lg : 0,
+                  borderTopRightRadius: first ? radius.lg : 0,
+                  borderBottomLeftRadius: last ? radius.lg : 0,
+                  borderBottomRightRadius: last ? radius.lg : 0,
+                }}
+              >
+                <IconWell icon={style.icon} tone={style.tone} size={34} />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <AppText variant="bodyMedium">{item.description || style.label}</AppText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Badge label={style.label} tone={style.tone} />
+                    <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+                      {item.user_name || 'System user'} · {time}
+                    </AppText>
+                  </View>
+                </View>
+              </Animated.View>
+            );
+          }}
+        />
+      )}
+    </Screen>
   );
 }

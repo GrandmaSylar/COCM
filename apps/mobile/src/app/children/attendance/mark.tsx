@@ -1,43 +1,27 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { TouchableOpacity, Alert, FlatList } from 'react-native';
+import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  Input, 
-  Button, 
-  Separator, 
-  Spinner, 
-  ScrollView 
-} from 'tamagui';
-import { 
-  ArrowLeft, 
-  Save, 
-  Search, 
-  Users, 
-  Calendar, 
-  Clock, 
-  Check, 
-  X, 
-  UserCheck, 
-  Baby 
-} from '@tamagui/lucide-icons';
-import { 
-  LocalChild, 
-  getLocalChildren, 
-  saveLocalChildrenAttendanceRecord 
+import { Baby, Check, UserCheck, X } from '@tamagui/lucide-icons';
+import {
+  LocalChild,
+  getLocalChildren,
+  saveLocalChildrenAttendanceRecord
 } from '../../../lib/db';
-import { api } from '../../../lib/api';
-import { enqueueSyncTask } from '../../../lib/syncEngine';
+import { pushOrQueue } from '../../../lib/syncEngine';
 import { generateUUID } from '../../../lib/uuid';
+import { useAppColors } from '../../../context/ThemeContext';
 import { NativeDatePicker } from '../../../components/NativeDatePicker';
 import { AppHeader } from '../../../components/AppHeader';
+import { SkeletonList } from '../../../components/Skeleton';
+import {
+  AppText, Avatar, Button, Chip, EmptyState, PressableScale, SaveBar, Screen, SearchField, Surface, TextField, useToast,
+} from '../../../components/ui';
+import { radius, space } from '../../../theme/tokens';
 
 export default function ChildrenMarkAttendanceScreen() {
   const router = useRouter();
+  const toast = useToast();
+  const c = useAppColors();
 
   const [serviceType, setServiceType] = useState('Sunday Main Service');
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
@@ -132,7 +116,7 @@ export default function ChildrenMarkAttendanceScreen() {
       .map(([id]) => id);
 
     if (presentIds.length === 0 && absentIds.length === 0) {
-      Alert.alert('Validation Error', 'Please mark at least one child as present or absent before saving.');
+      toast.show({ title: 'Nothing marked yet', message: 'Mark at least one child present or absent.', tone: 'warning' });
       return;
     }
 
@@ -152,8 +136,8 @@ export default function ChildrenMarkAttendanceScreen() {
         created_at: now
       });
 
-      // 2. Enqueue sync task
-      await enqueueSyncTask('child_attendance_create', '/children/attendance', {
+      // 2. Server push; queued in the outbox only if the server can't be reached
+      await pushOrQueue('POST', '/children/attendance', {
         id: newRecordId,
         date: serviceDate,
         serviceType,
@@ -162,256 +146,131 @@ export default function ChildrenMarkAttendanceScreen() {
         visitorsCount: 0
       });
 
-      // 3. Background server push
-      try {
-        await api.children.attendance.create({
-          date: serviceDate,
-          serviceType,
-          childMemberIds: presentIds,
-          visitorsCount: 0
-        });
-      } catch (e) {
-        console.warn('Attendance server API failed, offline queue preserved:', e);
-      }
-
-      Alert.alert(
-        'Success',
-        `Attendance recorded! ${presentIds.length} present, ${absentIds.length} absent out of ${children.length} children.`,
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      toast.show({
+        title: 'Attendance saved',
+        message: `${presentIds.length} present, ${absentIds.length} absent of ${children.length}`,
+      });
+      router.back();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save attendance');
+      toast.show({ title: 'Couldn’t save attendance', message: err.message, tone: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
+  const markedPct = children.length ? Math.round((totalMarked / children.length) * 100) : 0;
+
   return (
-    <YStack flex={1} backgroundColor="$background">
-      <AppHeader
-        title="Mark Attendance Roster"
-        subtitle="Children Ministry Session Register"
-        showBack
-        backTitle="Children"
-        rightElement={
-          <Button 
-            size="$3" 
-            backgroundColor="#FF9500" 
-            borderRadius="$3"
-            onPress={handleSave}
-            disabled={saving}
-            icon={saving ? <Spinner size="small" color="#FFFFFF" /> : <Save size={14} color="#FFFFFF" />}
-            pressStyle={{ scale: 0.98 }}
-          >
-            <Text color="#FFFFFF" fontWeight="700" fontSize={13}>{saving ? 'Saving...' : 'Save'}</Text>
-          </Button>
-        }
-      />
+    <Screen>
+      <AppHeader title="Children’s attendance" subtitle={serviceType} showBack />
 
-      <YStack flex={1} backgroundColor="$background">
-        {/* Service Meta Card */}
-        <Card m="$3" p="$3.5" borderRadius="$5" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" elevate>
-          <YStack space="$2">
-            <XStack space="$2" alignItems="center">
-              <Clock size={16} color="#FF9500" />
-              <Text color="$color" fontSize={14} fontWeight="700">Service Details</Text>
-            </XStack>
-            <XStack space="$2">
-              <YStack flex={1}>
-                <Text color="$colorPress" fontSize={11} fontWeight="600">Service Type</Text>
-                <Input
-                  value={serviceType}
-                  onChangeText={setServiceType}
-                  backgroundColor="$background"
-                  borderColor="$borderColor"
-                  fontSize={12}
-                  height={38}
-                />
-              </YStack>
-              <YStack flex={1}>
-                <NativeDatePicker
-                  label="Date (YYYY-MM-DD)"
-                  value={serviceDate}
-                  onChange={setServiceDate}
-                  accentColor="#FF9500"
-                />
-              </YStack>
-            </XStack>
-          </YStack>
-        </Card>
+      <View style={{ paddingHorizontal: space.md, paddingTop: space.sm, gap: space.sm }}>
+        <Surface style={{ gap: space.sm }}>
+          <TextField label="Service" value={serviceType} onChangeText={setServiceType} />
+          <NativeDatePicker label="Date" value={serviceDate} onChange={setServiceDate} maxDate={new Date()} />
+        </Surface>
 
-        {/* Counter Summary Pills */}
-        <XStack px="$3" space="$2" marginBottom="$2">
-          <Card flex={1} p="$2" borderRadius="$4" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" alignItems="center">
-            <Text color="#34C759" fontSize={18} fontWeight="800">{totalPresent}</Text>
-            <Text color="$colorPress" fontSize={11}>Present</Text>
-          </Card>
-          <Card flex={1} p="$2" borderRadius="$4" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" alignItems="center">
-            <Text color="#FF3B30" fontSize={18} fontWeight="800">{totalAbsent}</Text>
-            <Text color="$colorPress" fontSize={11}>Absent</Text>
-          </Card>
-          <Card flex={1} p="$2" borderRadius="$4" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" alignItems="center">
-            <Text color="#8E8E93" fontSize={18} fontWeight="800">{totalUnmarked}</Text>
-            <Text color="$colorPress" fontSize={11}>Unmarked</Text>
-          </Card>
-          <Card flex={1} p="$2" borderRadius="$4" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" alignItems="center">
-            <Text color="$color" fontSize={18} fontWeight="800">{children.length}</Text>
-            <Text color="$colorPress" fontSize={11}>Total</Text>
-          </Card>
-        </XStack>
+        <View style={{ flexDirection: 'row', borderRadius: radius.md, backgroundColor: c.surfaceMuted, paddingVertical: space.xs }}>
+          {[
+            { label: 'Present', value: totalPresent, tone: 'success' as const },
+            { label: 'Absent', value: totalAbsent, tone: 'danger' as const },
+            { label: 'Unmarked', value: totalUnmarked, tone: 'subtle' as const },
+            { label: 'Total', value: children.length, tone: 'default' as const },
+          ].map((m, i) => (
+            <View key={m.label} style={{ flex: 1, alignItems: 'center', borderLeftWidth: i ? 1 : 0, borderLeftColor: c.border }}>
+              <AppText variant="headline" tone={m.tone} numeric>{m.value}</AppText>
+              <AppText variant="micro" tone="muted">{m.label}</AppText>
+            </View>
+          ))}
+        </View>
 
-        {/* Action Controls & Search */}
-        <YStack px="$3" space="$2" marginBottom="$2">
-          <XStack 
-            alignItems="center" 
-            backgroundColor="$cardBackground" 
-            borderRadius="$4" 
-            px="$3" 
-            borderWidth={1} 
-            borderColor="$borderColor"
-          >
-            <Search size={15} color="$colorPress" />
-            <Input
-              flex={1}
-              placeholder="Search children roster..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              backgroundColor="transparent"
-              borderWidth={0}
-              fontSize={13}
-              height={38}
+        <SearchField value={searchQuery} onChangeText={setSearchQuery} placeholder="Search children" />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.xs }}>
+          <Button label="All present" icon={UserCheck} size="sm" variant="soft" onPress={handleMarkAllPresent} />
+          <Button label="Clear" icon={X} size="sm" variant="secondary" onPress={handleClearAll} />
+          <View style={{ flex: 1 }} />
+          <Chip label="Unmarked only" selected={showOnlyUnmarked} onPress={() => setShowOnlyUnmarked(prev => !prev)} />
+        </View>
+      </View>
+
+      {loading ? (
+        <View style={{ padding: space.md }}><SkeletonList count={6} hasAvatar /></View>
+      ) : (
+        <FlatList
+          data={filteredChildren}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: space.md, paddingBottom: space.lg, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          ListEmptyComponent={
+            <EmptyState
+              icon={Baby}
+              title={children.length ? 'No children match' : 'No children registered'}
+              message={children.length ? 'Try a different search or show all.' : 'Add children to the registry before marking attendance.'}
             />
-          </XStack>
-
-          <XStack justifyContent="space-between" alignItems="center">
-            <XStack space="$2">
-              <Button
-                size="$2.5"
-                backgroundColor="rgba(52, 199, 89, 0.12)"
-                borderWidth={1}
-                borderColor="#34C759"
-                onPress={handleMarkAllPresent}
-                icon={<UserCheck size={12} color="#34C759" />}
+          }
+          renderItem={({ item, index }) => {
+            const status = attendanceStatus[item.id] || 'unmarked';
+            const age = calculateAge(item.date_of_birth);
+            const meta = [
+              age !== null ? `${age} yrs` : null,
+              item.gender ? (item.gender.toLowerCase() === 'male' ? 'Boy' : 'Girl') : null,
+              item.zone ? `Zone ${item.zone}` : null,
+            ].filter(Boolean).join(' · ');
+            const first = index === 0;
+            const last = index === filteredChildren.length - 1;
+            return (
+              <View
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: space.sm,
+                  paddingHorizontal: space.md, paddingVertical: 10, minHeight: 64,
+                  backgroundColor: status === 'present' ? c.success.soft : status === 'absent' ? c.danger.soft : c.surface,
+                  borderColor: c.border, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderTopWidth: first ? 1 : 0,
+                  borderTopLeftRadius: first ? radius.lg : 0, borderTopRightRadius: first ? radius.lg : 0,
+                  borderBottomLeftRadius: last ? radius.lg : 0, borderBottomRightRadius: last ? radius.lg : 0,
+                }}
               >
-                <Text color="#34C759" fontSize={11} fontWeight="700">All Present</Text>
-              </Button>
+                <Avatar name={item.name} size={40} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>{item.name}</AppText>
+                  {meta ? <AppText variant="caption" tone="muted" numberOfLines={1}>{meta}</AppText> : null}
+                </View>
+                <MarkToggle icon={Check} tone="success" selected={status === 'present'} label={`Mark ${item.name} present`} onPress={() => handleToggle(item.id, 'present')} />
+                <MarkToggle icon={X} tone="danger" selected={status === 'absent'} label={`Mark ${item.name} absent`} onPress={() => handleToggle(item.id, 'absent')} />
+              </View>
+            );
+          }}
+        />
+      )}
 
-              <Button
-                size="$2.5"
-                backgroundColor="rgba(142, 142, 147, 0.12)"
-                borderWidth={1}
-                borderColor="$borderColor"
-                onPress={handleClearAll}
-                icon={<X size={12} color="$colorPress" />}
-              >
-                <Text color="$colorPress" fontSize={11} fontWeight="700">Clear</Text>
-              </Button>
-            </XStack>
+      <SaveBar
+        label={saving ? 'Saving…' : `Save · ${totalPresent} present, ${totalAbsent} absent`}
+        loading={saving}
+        onPress={handleSave}
+        progress={markedPct}
+        hint={`${totalMarked} of ${children.length} marked`}
+      />
+    </Screen>
+  );
+}
 
-            <TouchableOpacity
-              onPress={() => setShowOnlyUnmarked(prev => !prev)}
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                borderRadius: 6,
-                backgroundColor: showOnlyUnmarked ? '#FF9500' : 'rgba(142,142,147,0.12)'
-              }}
-            >
-              <Text color={showOnlyUnmarked ? '#FFFFFF' : '$color'} fontSize={11} fontWeight="700">
-                {showOnlyUnmarked ? '✓ Unmarked Only' : 'Show All'}
-              </Text>
-            </TouchableOpacity>
-          </XStack>
-        </YStack>
-
-        {/* Children Roster List */}
-        {loading ? (
-          <YStack flex={1} justifyContent="center" alignItems="center">
-            <Spinner size="large" color="#FF9500" />
-            <Text color="$colorPress" marginTop="$2" fontSize={13}>Loading children roster...</Text>
-          </YStack>
-        ) : filteredChildren.length > 0 ? (
-          <FlatList
-            data={filteredChildren}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 40 }}
-            renderItem={({ item }) => {
-              const status = attendanceStatus[item.id] || 'unmarked';
-              const age = calculateAge(item.date_of_birth);
-              const isBoy = item.gender?.toLowerCase() === 'male';
-
-              return (
-                <Card
-                  marginBottom="$2"
-                  p="$3"
-                  borderRadius="$4"
-                  backgroundColor="$cardBackground"
-                  borderWidth={1}
-                  borderColor="$borderColor"
-                >
-                  <XStack justifyContent="space-between" alignItems="center">
-                    <XStack space="$2.5" alignItems="center" flex={1}>
-                      <YStack
-                        width={36}
-                        height={36}
-                        borderRadius={18}
-                        backgroundColor={isBoy ? 'rgba(0,122,255,0.15)' : 'rgba(255,45,85,0.15)'}
-                        alignItems="center"
-                        justifyContent="center"
-                      >
-                        <Baby size={18} color={isBoy ? '#007AFF' : '#FF2D55'} />
-                      </YStack>
-
-                      <YStack flex={1}>
-                        <Text color="$color" fontSize={14} fontWeight="700" numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text color="$colorPress" fontSize={11}>
-                          {age !== null ? `${age} yrs` : 'Age N/A'} • {item.gender ? item.gender.charAt(0).toUpperCase() + item.gender.slice(1) : 'Child'}
-                          {item.zone ? ` • Zone ${item.zone}` : ''}
-                        </Text>
-                      </YStack>
-                    </XStack>
-
-                    {/* Present / Absent Toggle Buttons */}
-                    <XStack space="$1.5" alignItems="center">
-                      <Button
-                        size="$2.5"
-                        width={38}
-                        height={34}
-                        backgroundColor={status === 'present' ? '#34C759' : 'rgba(142,142,147,0.12)'}
-                        borderWidth={1}
-                        borderColor={status === 'present' ? '#34C759' : '$borderColor'}
-                        onPress={() => handleToggle(item.id, 'present')}
-                      >
-                        <Check size={16} color={status === 'present' ? '#FFFFFF' : '#34C759'} />
-                      </Button>
-
-                      <Button
-                        size="$2.5"
-                        width={38}
-                        height={34}
-                        backgroundColor={status === 'absent' ? '#FF3B30' : 'rgba(142,142,147,0.12)'}
-                        borderWidth={1}
-                        borderColor={status === 'absent' ? '#FF3B30' : '$borderColor'}
-                        onPress={() => handleToggle(item.id, 'absent')}
-                      >
-                        <X size={16} color={status === 'absent' ? '#FFFFFF' : '#FF3B30'} />
-                      </Button>
-                    </XStack>
-                  </XStack>
-                </Card>
-              );
-            }}
-          />
-        ) : (
-          <YStack flex={1} justifyContent="center" alignItems="center" p="$6">
-            <Baby size={40} color="#8E8E93" />
-            <Text color="$color" fontSize={15} fontWeight="700" marginTop="$2">No children found</Text>
-            <Text color="$colorPress" fontSize={12}>Try adjusting your search or filters.</Text>
-          </YStack>
-        )}
-      </YStack>
-    </YStack>
+function MarkToggle({ icon: Icon, tone, selected, label, onPress }: { icon: any; tone: 'success' | 'danger'; selected: boolean; label: string; onPress: () => void }) {
+  const c = useAppColors();
+  const t = tone === 'success' ? c.success : c.danger;
+  return (
+    <PressableScale
+      onPress={onPress}
+      haptics="selection"
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      accessibilityLabel={label}
+      style={{
+        width: 44, height: 44, borderRadius: 14,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: selected ? t.base : c.surface,
+        borderWidth: selected ? 0 : 1, borderColor: c.borderStrong,
+      }}
+    >
+      <Icon size={20} color={selected ? t.on : t.text} />
+    </PressableScale>
   );
 }

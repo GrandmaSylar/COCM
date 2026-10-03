@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { XStack, Text } from 'tamagui';
-import { CheckCircle2, RefreshCw, AlertTriangle, CloudOff } from '@tamagui/lucide-icons';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming, cancelAnimation } from 'react-native-reanimated';
+import { RefreshCw, AlertTriangle, CloudOff } from '@tamagui/lucide-icons';
 import { getSyncQueueStats } from '../lib/db';
 import { subscribeSyncQueue } from '../lib/syncEngine';
+import { AppText, PressableScale, useToneColors } from './ui';
 
 export function SyncStatusBadge() {
   const router = useRouter();
@@ -28,58 +28,59 @@ export function SyncStatusBadge() {
     return () => unsubscribe();
   }, []);
 
-  if (loading) return null;
-
-  const hasPending = stats.pending > 0;
-  const hasSyncing = stats.syncing > 0;
   const hasError = stats.error > 0;
+  const hasSyncing = stats.syncing > 0;
+  const hasPending = stats.pending > 0;
 
-  // When completely synced, don't clutter top header (diagnostics is accessible in System tab & when items are pending)
-  if (!hasPending && !hasSyncing && !hasError) {
-    return null;
-  }
+  const state = hasError
+    ? { tone: 'danger' as const, label: `${stats.error} failed`, icon: AlertTriangle }
+    : hasSyncing
+      ? { tone: 'info' as const, label: 'Syncing', icon: RefreshCw }
+      : { tone: 'warning' as const, label: `${stats.pending} waiting`, icon: CloudOff };
+  const t = useToneColors(state.tone);
 
-  let badgeBg = 'rgba(255, 149, 0, 0.12)';
-  let badgeBorder = 'rgba(255, 149, 0, 0.3)';
-  let iconColor = '#FF9500';
-  let label = `${stats.pending} Outbox`;
-  let Icon = CloudOff;
+  // Soft pulse while uploading
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    if (hasSyncing) {
+      opacity.value = withRepeat(withTiming(0.55, { duration: 700 }), -1, true);
+    } else {
+      cancelAnimation(opacity);
+      opacity.value = withTiming(1, { duration: 150 });
+    }
+  }, [hasSyncing]);
+  const pulse = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
-  if (hasError) {
-    badgeBg = 'rgba(255, 59, 48, 0.12)';
-    badgeBorder = 'rgba(255, 59, 48, 0.3)';
-    iconColor = '#FF3B30';
-    label = `${stats.error} Error`;
-    Icon = AlertTriangle;
-  } else if (hasSyncing) {
-    badgeBg = 'rgba(0, 122, 255, 0.12)';
-    badgeBorder = 'rgba(0, 122, 255, 0.3)';
-    iconColor = '#007AFF';
-    label = 'Syncing...';
-    Icon = RefreshCw;
-  }
+  if (loading) return null;
+  // Completely synced: keep the header clean (status lives in System → Sync status)
+  if (!hasPending && !hasSyncing && !hasError) return null;
 
+  const Icon = state.icon;
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={() => router.push('/sync-diagnostics' as any)}
-      activeOpacity={0.7}
-      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      accessibilityRole="button"
+      accessibilityLabel={`Sync status: ${state.label}. Open outbox.`}
+      hitSlop={8}
+      style={{ borderRadius: 999 }}
     >
-      <XStack
-        alignItems="center"
-        space="$1"
-        px="$2"
-        py="$0.5"
-        borderRadius="$4"
-        backgroundColor={badgeBg}
-        borderWidth={1}
-        borderColor={badgeBorder}
+      <Animated.View
+        style={[
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            height: 30,
+            paddingHorizontal: 10,
+            borderRadius: 999,
+            backgroundColor: t.soft,
+          },
+          pulse,
+        ]}
       >
-        <Icon size={12} color={iconColor} />
-        <Text color={iconColor} fontSize={10} fontWeight="700">
-          {label}
-        </Text>
-      </XStack>
-    </TouchableOpacity>
+        <Icon size={14} color={t.text} />
+        <AppText variant="micro" color={t.text}>{state.label}</AppText>
+      </Animated.View>
+    </PressableScale>
   );
 }

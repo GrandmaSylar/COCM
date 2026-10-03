@@ -1,24 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, TextInput, Alert as RNAlert, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Spinner } from 'tamagui';
-import { ArrowLeft, Check } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { AlertTriangle, Banknote, CalendarDays, FileText, Wallet } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
-import { 
-  getLocalCustomGivingTypes, 
-  getLocalCustomServices, 
-  upsertLocalGivingRecord, 
-  LocalCustomGivingType 
+import {
+  getLocalCustomGivingTypes,
+  getLocalCustomServices,
+  upsertLocalGivingRecord,
+  LocalCustomGivingType
 } from '../../lib/db';
 import { generateUUID } from '../../lib/uuid';
-import { api } from '../../lib/api';
-import { useThemeContext } from '../../context/ThemeContext';
+import { pushOrQueue } from '../../lib/syncEngine';
+import { useAppColors } from '../../context/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
+import { NativeDatePicker } from '../../components/NativeDatePicker';
+import { AppText, ChoiceChips, FieldGroup, FormSection, SaveBar, Screen, Surface, TextField, useToast } from '../../components/ui';
+import { radius, space } from '../../theme/tokens';
 
 const SUNDAY_MAIN_SERVICE = 'Sunday Main Service';
 
 export default function RecordGivingScreen() {
   const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
+  const c = useAppColors();
+  const toast = useToast();
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [serviceType, setServiceType] = useState('sunday_morning');
@@ -74,9 +78,11 @@ export default function RecordGivingScreen() {
 
   const handleSave = async () => {
     if (calculatedTotal <= 0) {
-      RNAlert.alert('Invalid Amount', 'Please enter at least one offering amount.');
+      setAmountError('Enter at least one offering amount.');
+      toast.show({ title: 'Nothing to save yet', message: 'Enter at least one offering amount.', tone: 'warning' });
       return;
     }
+    setAmountError(null);
 
     setSaving(true);
     try {
@@ -127,266 +133,99 @@ export default function RecordGivingScreen() {
         created_at: new Date().toISOString()
       });
 
-      // 2. Post to backend API
-      try {
-        await api.giving.create(payload);
-      } catch (e) {
-        console.warn('Backend giving create warning (cached locally):', e);
-      }
+      // 2. Server push; queued in the outbox only if the server can't be reached
+      await pushOrQueue('POST', '/giving', payload);
 
+      toast.show({ title: 'Giving recorded', message: `${serviceName} · GH₵ ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}` });
       router.back();
     } catch (err) {
       console.error('Failed to save giving record:', err);
-      RNAlert.alert('Error', 'Failed to record giving.');
+      toast.show({ title: 'Couldn’t record giving', tone: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
-  const inputStyle = {
-    color: themeColors.text,
-    backgroundColor: themeColors.cardBackground,
-    borderWidth: 1,
-    borderColor: themeColors.borderColor,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-  };
+  const ghs = (n: number) => `GH₵ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const paymentSum = parseVal(cashAmount) + parseVal(mobileMoneyAmount) + parseVal(cardAmount) + parseVal(bankTransferAmount);
+  const paymentMismatch = paymentSum > 0 && Math.abs(paymentSum - calculatedTotal) > 0.009;
+  const money = (label: string, value: string, set: (v: string) => void) => (
+    <View style={{ flex: 1 }}>
+      <TextField
+        label={label}
+        prefix="GH₵"
+        value={value}
+        onChangeText={v => { set(v.replace(/[^0-9.]/g, '')); if (amountError) setAmountError(null); }}
+        keyboardType="decimal-pad"
+        placeholder="0.00"
+        selectTextOnFocus
+      />
+    </View>
+  );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Navigation Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center">
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Record Giving</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>Enter service offerings & payment breakdown</Text>
-            </YStack>
-          </XStack>
-        </XStack>
+    <Screen>
+      <AppHeader title="Record giving" subtitle="Offerings and payment breakdown" showBack />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl, gap: space.md }} keyboardShouldPersistTaps="handled">
+          <Surface style={{ alignItems: 'center', gap: 4, backgroundColor: c.success.soft, borderColor: c.success.base }}>
+            <AppText variant="captionStrong" tone="muted">Total giving</AppText>
+            <AppText variant="display" tone="success" numeric>{ghs(calculatedTotal)}</AppText>
+            {amountError ? <AppText variant="caption" tone="danger">{amountError}</AppText> : null}
+          </Surface>
 
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-          <YStack space="$4">
+          <FormSection title="Service" icon={CalendarDays} state="done">
+            <NativeDatePicker label="Service date" value={serviceDate} onChange={setServiceDate} maxDate={new Date()} />
+            <FieldGroup label="Service">
+              <ChoiceChips
+                options={availableServices}
+                value={serviceName}
+                onChange={name => { setServiceName(name); setServiceType(name === SUNDAY_MAIN_SERVICE ? 'sunday_morning' : 'other'); }}
+              />
+            </FieldGroup>
+          </FormSection>
 
-            {/* Total Amount Summary Banner */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="rgba(52, 199, 89, 0.4)" backgroundColor="rgba(52, 199, 89, 0.08)" alignItems="center">
-              <Text color={themeColors.textMuted} fontSize={11} fontWeight="800" textTransform="uppercase">TOTAL CALCULATED GIVING</Text>
-              <Text color="#34C759" fontSize={30} fontWeight="900" mt="$1">
-                GH₵ {calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Text>
-            </Card>
+          <FormSection title="Offerings" icon={Banknote} description="The total adds these up" state={calculatedTotal > 0 ? 'done' : 'needed'}>
+            <View style={{ flexDirection: 'row', gap: space.xs }}>
+              {money('Offertory', offeringAmount, setOfferingAmount)}
+              {money('Thanksgiving', thanksgivingAmount, setThanksgivingAmount)}
+            </View>
+            {money('Donations / seed', donationAmount, setDonationAmount)}
+            {customGivingTypes.length > 0 ? (
+              <>
+                <AppText variant="label" tone="muted">Other categories</AppText>
+                {customGivingTypes.map(t => (
+                  <View key={t.id}>{money(t.name, customAmounts[t.id] || '', v => handleCustomAmountChange(t.id, v))}</View>
+                ))}
+              </>
+            ) : null}
+          </FormSection>
 
-            {/* Service & Date Selection */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">1. Service & Date Info</Text>
+          <FormSection title="Payment methods" icon={Wallet} description="How the money was received" state={paymentSum > 0 ? (paymentMismatch ? 'needed' : 'done') : 'optional'}>
+            <View style={{ flexDirection: 'row', gap: space.xs }}>
+              {money('Cash', cashAmount, setCashAmount)}
+              {money('Mobile money', mobileMoneyAmount, setMobileMoneyAmount)}
+            </View>
+            <View style={{ flexDirection: 'row', gap: space.xs }}>
+              {money('Bank transfer', bankTransferAmount, setBankTransferAmount)}
+              {money('Card', cardAmount, setCardAmount)}
+            </View>
+            {paymentMismatch ? (
+              <View style={{ flexDirection: 'row', gap: 10, padding: space.sm, borderRadius: radius.md, backgroundColor: c.warning.soft }}>
+                <AlertTriangle size={18} color={c.warning.text} />
+                <AppText variant="caption" tone="warning" style={{ flex: 1 }}>
+                  Payment methods add up to {ghs(paymentSum)}, but the offerings total {ghs(calculatedTotal)}.
+                </AppText>
+              </View>
+            ) : null}
+          </FormSection>
 
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">SERVICE DATE (YYYY-MM-DD)</Text>
-                  <TextInput
-                    value={serviceDate}
-                    onChangeText={setServiceDate}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">SELECT SERVICE TYPE</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {availableServices.map((name) => {
-                      const isSelected = serviceName === name;
-                      return (
-                        <TouchableOpacity
-                          key={name}
-                          onPress={() => {
-                            setServiceName(name);
-                            setServiceType(name === SUNDAY_MAIN_SERVICE ? 'sunday_morning' : 'other');
-                          }}
-                        >
-                          <YStack
-                            px="$3"
-                            py="$1.5"
-                            borderRadius="$3"
-                            borderWidth={1}
-                            borderColor={isSelected ? '#34C759' : themeColors.borderColor}
-                            backgroundColor={isSelected ? 'rgba(52, 199, 89, 0.15)' : themeColors.background}
-                          >
-                            <Text color={isSelected ? '#34C759' : themeColors.textMuted} fontSize={12} fontWeight={isSelected ? '800' : '600'}>
-                              {name}
-                            </Text>
-                          </YStack>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Standard Offerings Breakdown */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">2. Standard Offering Categories (GH₵)</Text>
-
-                <XStack space="$2">
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">OFFERTORY</Text>
-                    <TextInput
-                      value={offeringAmount}
-                      onChangeText={setOfferingAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">THANKSGIVING</Text>
-                    <TextInput
-                      value={thanksgivingAmount}
-                      onChangeText={setThanksgivingAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-                </XStack>
-
-                <YStack space="$1">
-                  <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">DONATIONS / SEED</Text>
-                  <TextInput
-                    value={donationAmount}
-                    onChangeText={setDonationAmount}
-                    keyboardType="numeric"
-                    placeholder="0.00"
-                    placeholderTextColor={themeColors.textMuted}
-                    style={inputStyle}
-                  />
-                </YStack>
-              </YStack>
-            </Card>
-
-            {/* Custom Giving Categories Breakdown */}
-            {customGivingTypes.length > 0 && (
-              <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-                <YStack space="$3">
-                  <Text color={themeColors.text} fontSize={14} fontWeight="800">3. Custom Giving Categories (GH₵)</Text>
-
-                  {customGivingTypes.map(t => (
-                    <YStack key={t.id} space="$1">
-                      <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">{t.name.toUpperCase()}</Text>
-                      <TextInput
-                        value={customAmounts[t.id] || ''}
-                        onChangeText={(val) => handleCustomAmountChange(t.id, val)}
-                        keyboardType="numeric"
-                        placeholder="0.00"
-                        placeholderTextColor={themeColors.textMuted}
-                        style={inputStyle}
-                      />
-                    </YStack>
-                  ))}
-                </YStack>
-              </Card>
-            )}
-
-            {/* Payment Method Breakdown */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$3">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">4. Payment Method Breakdown (GH₵)</Text>
-
-                <XStack space="$2">
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">CASH</Text>
-                    <TextInput
-                      value={cashAmount}
-                      onChangeText={setCashAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">MOBILE MONEY</Text>
-                    <TextInput
-                      value={mobileMoneyAmount}
-                      onChangeText={setMobileMoneyAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-                </XStack>
-
-                <XStack space="$2">
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">BANK TRANSFER</Text>
-                    <TextInput
-                      value={bankTransferAmount}
-                      onChangeText={setBankTransferAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-
-                  <YStack flex={1} space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">CARD</Text>
-                    <TextInput
-                      value={cardAmount}
-                      onChangeText={setCardAmount}
-                      keyboardType="numeric"
-                      placeholder="0.00"
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-                </XStack>
-              </YStack>
-            </Card>
-
-            {/* Notes */}
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-              <YStack space="$2">
-                <Text color={themeColors.text} fontSize={14} fontWeight="800">5. Additional Notes</Text>
-                <TextInput
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Optional details or special instructions..."
-                  placeholderTextColor={themeColors.textMuted}
-                  multiline
-                  style={{ ...inputStyle, minHeight: 60 }}
-                />
-              </YStack>
-            </Card>
-
-            {/* Save Button */}
-            <Button backgroundColor="#34C759" size="$4" onPress={handleSave} disabled={saving}>
-              {saving ? <Spinner color="white" /> : (
-                <XStack space="$2" alignItems="center">
-                  <Check size={18} color="white" />
-                  <Text color="white" fontWeight="800" fontSize={14}>Save Giving Record</Text>
-                </XStack>
-              )}
-            </Button>
-
-          </YStack>
+          <FormSection title="Notes" icon={FileText} state={notes ? 'done' : 'optional'} defaultOpen={false}>
+            <TextField value={notes} onChangeText={setNotes} placeholder="Optional details" multiline accessibilityLabel="Notes" />
+          </FormSection>
         </ScrollView>
-      </YStack>
-    </SafeAreaView>
+        <SaveBar label={saving ? 'Saving…' : `Save · ${ghs(calculatedTotal)}`} loading={saving} onPress={handleSave} />
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }

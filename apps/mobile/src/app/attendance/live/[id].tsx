@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, Alert as RNAlert, TextInput } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Spinner } from 'tamagui';
-import { ArrowLeft, Search, UserCheck, UserX, Check, Lock, X, Users, AlertTriangle } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Alert as RNAlert, FlatList, View } from 'react-native';
+import { Check, SearchX, UserCheck, X } from '@tamagui/lucide-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   getLocalDb,
@@ -13,10 +11,17 @@ import {
   LocalMember,
   LocalAttendanceRecord
 } from '../../../lib/db';
-import { enqueueSyncTask } from '../../../lib/syncEngine';
 import { supabase } from '../../../lib/supabase';
 import { generateUUID } from '../../../lib/uuid';
 import { api } from '../../../lib/api';
+import { getChurchZones } from '../../../lib/options';
+import { useAppColors } from '../../../context/ThemeContext';
+import { AppHeader } from '../../../components/AppHeader';
+import { SkeletonList } from '../../../components/Skeleton';
+import {
+  AppText, Avatar, EmptyState, FilterChips, IconButton, PressableScale, SaveBar, Screen, SearchField, SegmentedControl, useToast,
+} from '../../../components/ui';
+import { radius, space } from '../../../theme/tokens';
 
 export default function LiveAttendanceScreen() {
   const router = useRouter();
@@ -33,6 +38,14 @@ export default function LiveAttendanceScreen() {
   const [selectedZone, setSelectedZone] = useState<string>('all');
 
   const [finalizing, setFinalizing] = useState(false);
+  const c = useAppColors();
+  const toast = useToast();
+
+  // Configured church zones (falls back to the previous fixed list)
+  const [zones, setZones] = useState<string[]>(['A', 'B', 'F', 'K', 'M', 'R']);
+  useEffect(() => {
+    getChurchZones().then(z => { if (z.length) setZones(z); }).catch(() => {});
+  }, []);
 
   // Load session data & members
   const loadData = useCallback(async () => {
@@ -251,7 +264,7 @@ export default function LiveAttendanceScreen() {
       router.push(`/attendance/absentee-review/${id}` as any);
     } catch (err) {
       console.error('Failed to finalize session:', err);
-      RNAlert.alert('Error', 'Failed to finalize session.');
+      toast.show({ title: 'Couldn’t finalize session', tone: 'error' });
     } finally {
       setFinalizing(false);
     }
@@ -261,8 +274,8 @@ export default function LiveAttendanceScreen() {
   const handleCancelSession = async () => {
     if (!id) return;
     RNAlert.alert(
-      'Cancel Live Session',
-      'Are you sure you want to cancel this live session? All recorded check-ins will be deleted.',
+      'Cancel this session?',
+      'All check-ins recorded in this session will be deleted on every device.',
       [
         { text: 'Keep Session', style: 'cancel' },
         {
@@ -301,204 +314,116 @@ export default function LiveAttendanceScreen() {
   const totalAbsent = members.length - totalPresent;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top', 'bottom', 'left', 'right']}>
-      <YStack flex={1} backgroundColor="$background">
-      {/* Navigation Header */}
-      <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor="$borderColor">
-        <XStack space="$2" alignItems="center" flex={1}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <YStack p="$2" borderRadius="$3" backgroundColor="$borderColor" opacity={0.8}>
-              <ArrowLeft size={18} color="$color" />
-            </YStack>
-          </TouchableOpacity>
-          <YStack flex={1}>
-            <XStack space="$2" alignItems="center">
-              <Text color="$color" fontSize={16} fontWeight="800" numberOfLines={1}>
-                {sessionRecord?.service_type || 'Live Service'}
-              </Text>
-              <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$2" py="$0.5" borderRadius="$2">
-                <Text color="#34C759" fontSize={10} fontWeight="800">LIVE</Text>
-              </XStack>
-            </XStack>
-            <Text color="$colorPress" fontSize={11}>{totalPresent} Present • {totalAbsent} Absent</Text>
-          </YStack>
-        </XStack>
+    <Screen>
+      <AppHeader
+        title={sessionRecord?.service_type || 'Live service'}
+        subtitle={`Live check-in · ${totalPresent} present`}
+        showBack
+        rightElement={<IconButton icon={X} label="Cancel session" tone="danger" onPress={handleCancelSession} />}
+      />
 
-        <TouchableOpacity onPress={handleCancelSession}>
-          <YStack p="$2" borderRadius="$3" backgroundColor="rgba(255, 59, 48, 0.1)">
-            <X size={18} color="#FF3B30" />
-          </YStack>
-        </TouchableOpacity>
-      </XStack>
+      <View style={{ paddingHorizontal: space.md, paddingTop: space.sm, gap: space.sm, backgroundColor: c.background }}>
+        <View style={{ flexDirection: 'row', borderRadius: radius.md, backgroundColor: c.surfaceMuted, paddingVertical: space.sm }}>
+          {[
+            { label: 'Present', value: totalPresent, tone: 'success' as const },
+            { label: 'Not yet', value: totalAbsent, tone: 'muted' as const },
+            { label: 'Total', value: members.length, tone: 'default' as const },
+          ].map((m, i) => (
+            <View key={m.label} style={{ flex: 1, alignItems: 'center', gap: 2, borderLeftWidth: i ? 1 : 0, borderLeftColor: c.border }}>
+              <AppText variant="title" tone={m.tone} numeric>{m.value}</AppText>
+              <AppText variant="caption" tone="muted">{m.label}</AppText>
+            </View>
+          ))}
+        </View>
 
-      {/* Main Container */}
-      <YStack flex={1} p="$3" space="$3">
+        <SearchField
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+          placeholder="Name or zone number (Enter checks in a single match)"
+          onSubmitEditing={() => {
+            if (filteredMembers.length === 1) {
+              toggleCheckIn(filteredMembers[0].id);
+              setSearchTerm('');
+            }
+          }}
+        />
+        <SegmentedControl
+          accessibilityLabel="Show"
+          value={selectedTab}
+          onChange={setSelectedTab}
+          options={[
+            { value: 'all', label: `All · ${members.length}` },
+            { value: 'present', label: `Present · ${totalPresent}` },
+            { value: 'absent', label: `Not yet · ${totalAbsent}` },
+          ]}
+        />
+        <FilterChips
+          value={selectedZone}
+          onChange={setSelectedZone}
+          options={['all', ...zones].map(z => ({ value: z, label: z === 'all' ? 'All zones' : `Zone ${z}` }))}
+        />
+      </View>
 
-        {/* Counter Summary Banner */}
-        <Card p="$3" borderRadius="$4" borderWidth={1} borderColor="rgba(52, 199, 89, 0.3)" backgroundColor="rgba(52, 199, 89, 0.05)">
-          <XStack justifyContent="space-around" alignItems="center">
-            <YStack alignItems="center">
-              <Text color="#34C759" fontSize={22} fontWeight="900">{totalPresent}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">PRESENT</Text>
-            </YStack>
+      {loading ? (
+        <View style={{ padding: space.md }}><SkeletonList count={6} hasAvatar /></View>
+      ) : (
+        <FlatList
+          data={filteredMembers}
+          keyExtractor={m => m.id}
+          extraData={presentIds}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: space.md, paddingBottom: space.lg, flexGrow: 1 }}
+          ListEmptyComponent={<EmptyState icon={SearchX} title="No members match" message="Try a different name, zone or filter." />}
+          renderItem={({ item: m, index }) => {
+            const isPresent = presentIds.has(m.id);
+            const first = index === 0;
+            const last = index === filteredMembers.length - 1;
+            return (
+              <PressableScale
+                onPress={() => toggleCheckIn(m.id)}
+                haptics={isPresent ? 'light' : 'success'}
+                scaleTo={0.985}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isPresent }}
+                accessibilityLabel={`${m.name}, ${isPresent ? 'present' : 'not checked in'}`}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: space.sm,
+                  paddingHorizontal: space.md, paddingVertical: 10, minHeight: 64,
+                  backgroundColor: isPresent ? c.success.soft : c.surface,
+                  borderColor: c.border, borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderTopWidth: first ? 1 : 0,
+                  borderTopLeftRadius: first ? radius.lg : 0, borderTopRightRadius: first ? radius.lg : 0,
+                  borderBottomLeftRadius: last ? radius.lg : 0, borderBottomRightRadius: last ? radius.lg : 0,
+                }}
+              >
+                <Avatar name={m.name} uri={m.local_photo_path || m.photo_url} size={40} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>{m.name}</AppText>
+                  <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    {m.zone ? `Zone ${m.zone}` : 'No zone'}{m.zone_number ? ` · ${m.zone_number}` : ''}
+                  </AppText>
+                </View>
+                <View
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6, height: 36, paddingHorizontal: 12, borderRadius: radius.pill,
+                    backgroundColor: isPresent ? c.success.base : c.surfaceMuted,
+                  }}
+                >
+                  {isPresent ? <Check size={16} color={c.success.on} /> : <UserCheck size={16} color={c.textMuted} />}
+                  <AppText variant="captionStrong" color={isPresent ? c.success.on : c.text}>{isPresent ? 'Present' : 'Check in'}</AppText>
+                </View>
+              </PressableScale>
+            );
+          }}
+        />
+      )}
 
-            <YStack height={30} width={1} backgroundColor="$borderColor" />
-
-            <YStack alignItems="center">
-              <Text color="#FF3B30" fontSize={22} fontWeight="900">{totalAbsent}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">ABSENT</Text>
-            </YStack>
-
-            <YStack height={30} width={1} backgroundColor="$borderColor" />
-
-            <YStack alignItems="center">
-              <Text color="$color" fontSize={22} fontWeight="900">{members.length}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">TOTAL</Text>
-            </YStack>
-          </XStack>
-        </Card>
-
-        {/* Search Input */}
-        <XStack px="$3" py="$2" borderRadius="$3" borderWidth={1} borderColor="$borderColor" backgroundColor="$background" alignItems="center" space="$2">
-          <Search size={16} color="#8E8E93" />
-          <TextInput
-            placeholder="Search member by name or zone number..."
-            placeholderTextColor="#8E8E93"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            onSubmitEditing={() => {
-              if (filteredMembers.length === 1) {
-                toggleCheckIn(filteredMembers[0].id);
-                setSearchTerm('');
-              }
-            }}
-            style={{ flex: 1, color: '#FFFFFF', fontSize: 13 }}
-          />
-          {searchTerm.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchTerm('')}>
-              <X size={14} color="#8E8E93" />
-            </TouchableOpacity>
-          )}
-        </XStack>
-
-        {/* Tab & Zone Filters */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <XStack space="$1">
-            {(['all', 'present', 'absent'] as const).map(tab => {
-              const isSelected = selectedTab === tab;
-              return (
-                <TouchableOpacity key={tab} onPress={() => setSelectedTab(tab)}>
-                  <YStack
-                    px="$2.5"
-                    py="$1"
-                    borderRadius="$3"
-                    borderWidth={1}
-                    borderColor={isSelected ? '#FF9500' : '$borderColor'}
-                    backgroundColor={isSelected ? 'rgba(255, 149, 0, 0.15)' : '$background'}
-                  >
-                    <Text color={isSelected ? '#FF9500' : '$colorPress'} fontSize={11} fontWeight={isSelected ? '800' : '600'} textTransform="uppercase">
-                      {tab} ({tab === 'all' ? members.length : tab === 'present' ? totalPresent : totalAbsent})
-                    </Text>
-                  </YStack>
-                </TouchableOpacity>
-              );
-            })}
-          </XStack>
-
-          {/* Zone Selector Pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
-            {['all', 'A', 'B', 'F', 'K', 'M', 'R'].map(z => {
-              const isSelected = selectedZone === z;
-              return (
-                <TouchableOpacity key={z} onPress={() => setSelectedZone(z)}>
-                  <YStack
-                    px="$2"
-                    py="$1"
-                    borderRadius="$2"
-                    backgroundColor={isSelected ? '#AF52DE' : 'rgba(142, 142, 147, 0.1)'}
-                  >
-                    <Text color={isSelected ? 'white' : '$colorPress'} fontSize={10} fontWeight="800">
-                      {z === 'all' ? 'All Zones' : `Zone ${z}`}
-                    </Text>
-                  </YStack>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </XStack>
-
-        {/* Member Roster List */}
-        {loading ? (
-          <Spinner size="large" color="#FF9500" py="$6" />
-        ) : (
-          <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
-            <YStack space="$2">
-              {filteredMembers.length === 0 ? (
-                <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="$borderColor" alignItems="center">
-                  <Text color="$colorPress" fontSize={12}>No members match your search filter.</Text>
-                </Card>
-              ) : (
-                filteredMembers.map(m => {
-                  const isPresent = presentIds.has(m.id);
-
-                  return (
-                    <TouchableOpacity key={m.id} onPress={() => toggleCheckIn(m.id)}>
-                      <Card
-                        p="$3"
-                        borderRadius="$4"
-                        borderWidth={1.5}
-                        borderColor={isPresent ? '#34C759' : '$borderColor'}
-                        backgroundColor={isPresent ? 'rgba(52, 199, 89, 0.08)' : '$background'}
-                      >
-                        <XStack justifyContent="space-between" alignItems="center">
-                          <XStack space="$2.5" alignItems="center" flex={1}>
-                            <YStack
-                              p="$2"
-                              borderRadius="$3"
-                              backgroundColor={isPresent ? '#34C759' : 'rgba(142, 142, 147, 0.15)'}
-                            >
-                              {isPresent ? <Check size={18} color="white" /> : <UserCheck size={18} color="#8E8E93" />}
-                            </YStack>
-
-                            <YStack flex={1}>
-                              <Text color="$color" fontSize={14} fontWeight="800">{m.name}</Text>
-                              <Text color="$colorPress" fontSize={11}>
-                                Zone: {m.zone || 'N/A'} ({m.zone_number || 'N/A'})
-                              </Text>
-                            </YStack>
-                          </XStack>
-
-                          <XStack backgroundColor={isPresent ? '#34C759' : 'rgba(142, 142, 147, 0.2)'} px="$3" py="$1.5" borderRadius="$3">
-                            <Text color={isPresent ? 'white' : '$color'} fontSize={11} fontWeight="800">
-                              {isPresent ? 'PRESENT' : 'MARK'}
-                            </Text>
-                          </XStack>
-                        </XStack>
-                      </Card>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </YStack>
-          </ScrollView>
-        )}
-
-      </YStack>
-
-      {/* Floating Finalize Bar */}
-      <YStack px="$4" py="$3" borderTopWidth={1} borderColor="$borderColor" backgroundColor="$background">
-        <Button backgroundColor="#FF9500" size="$4" onPress={handleFinalize} disabled={finalizing}>
-          {finalizing ? <Spinner color="white" /> : (
-            <XStack space="$2" alignItems="center">
-              <Check size={18} color="white" />
-              <Text color="white" fontWeight="800" fontSize={14}>
-                Finalize Attendance ({totalPresent} Present)
-              </Text>
-            </XStack>
-          )}
-        </Button>
-      </YStack>
-    </YStack>
-    </SafeAreaView>
+      <SaveBar
+        label={finalizing ? 'Finalizing…' : `Finalize · ${totalPresent} present`}
+        loading={finalizing}
+        onPress={handleFinalize}
+        progress={members.length ? Math.round((totalPresent / members.length) * 100) : 0}
+        hint={`${totalPresent} of ${members.length}`}
+      />
+    </Screen>
   );
 }

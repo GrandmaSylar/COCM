@@ -1,35 +1,30 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  H2, 
-  Paragraph, 
-  Button, 
-  Separator, 
-  Spinner,
-  ScrollView
-} from 'tamagui';
-import { 
-  Users, 
-  Calendar, 
-  Banknote, 
-  ChevronRight, 
-  Activity, 
-  RefreshCw, 
-  TrendingUp, 
-  UserPlus, 
-  CalendarCheck, 
+import {
+  Users,
+  Calendar,
+  Banknote,
+  Activity,
+  RefreshCw,
+  UserPlus,
+  CalendarCheck,
   UserCheck,
-  PlusCircle,
-  Inbox
+  Inbox,
 } from '@tamagui/lucide-icons';
 import { supabase } from '../../lib/supabase';
-import { getLocalStats, upsertLocalMember, upsertLocalGiving, upsertLocalAttendanceEntry } from '../../lib/db';
+import { getLocalStats } from '../../lib/db';
+import { syncMembers } from '../../lib/syncEngine';
+import { useAccess } from '../../lib/access';
+import { useAppColors } from '../../context/ThemeContext';
+import { SkeletonDashboard } from '../../components/Skeleton';
+import {
+  AppText, Button, EmptyState, IconButton, IconWell, ListRow, PressableScale, Section, StatTile,
+} from '../../components/ui';
+import { enterUp } from '../../theme/animations';
+import { radius, space } from '../../theme/tokens';
 
 const STATS_CACHE_KEY = '@cocm_mobile_dashboard_stats';
 const ACTIVITY_CACHE_KEY = '@cocm_mobile_dashboard_activities';
@@ -49,6 +44,8 @@ interface ActivityItem {
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const c = useAppColors();
+  const { can, canRoute } = useAccess();
   const [userName, setUserName] = useState('Leader');
   const [stats, setStats] = useState<Stats>({
     totalMembers: 0,
@@ -126,22 +123,10 @@ export default function DashboardScreen() {
       setStats(newStats);
       AsyncStorage.setItem(STATS_CACHE_KEY, JSON.stringify(newStats)).catch(() => {});
 
-      // Sync into local SQLite database
+      // Seed the local SQLite roster on first run (normally done by the startup sync)
       const sqliteStats = await getLocalStats();
       if (sqliteStats.totalMembers === 0 && membersCountRes.count) {
-        const { data: membersList } = await supabase.from('members').select('*').limit(50);
-        if (membersList) {
-          for (const m of membersList) {
-            await upsertLocalMember({
-              id: m.id,
-              name: m.name || `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Member',
-              phone: m.phone,
-              email: m.email,
-              photo_url: m.photo_url,
-              created_at: m.created_at || new Date().toISOString()
-            });
-          }
-        }
+        await syncMembers();
       }
 
       // Process Activity Logs
@@ -200,252 +185,142 @@ export default function DashboardScreen() {
     return `GH₵ ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Full 5 Quick Actions matching the Web Application
-  const quickActions = [
-    {
-      id: 'add-member',
-      label: 'Add New Member',
-      description: 'Register a new church member',
-      icon: UserPlus,
-      color: '#007AFF',
-      route: '/members',
-    },
-    {
-      id: 'record-attendance',
-      label: 'Record Attendance',
-      description: "Mark attendance for today's service",
-      icon: Calendar,
-      color: '#FF9500',
-      route: '/attendance',
-    },
-    {
-      id: 'record-giving',
-      label: 'Record Giving',
-      description: 'Add offering or tithe record',
-      icon: Banknote,
-      color: '#34C759',
-      route: '/giving',
-    },
-    {
-      id: 'add-visitor',
-      label: 'Add Visitor',
-      description: 'Register a new church visitor',
-      icon: UserCheck,
-      color: '#5856D6',
-      route: '/visitors',
-    },
-    {
-      id: 'mark-attendance',
-      label: 'Mark Individual Attendance',
-      description: 'Quick check-in for a member',
-      icon: CalendarCheck,
-      color: '#AF52DE',
-      route: '/attendance',
-    },
+  // Same 5 quick actions as the web app; each opens the screen that does the job
+  const allQuickActions = [
+    { id: 'add-member', label: 'Add member', icon: UserPlus, route: '/members/add' },
+    { id: 'record-attendance', label: 'Record attendance', icon: Calendar, route: '/attendance' },
+    { id: 'record-giving', label: 'Record giving', icon: Banknote, route: '/giving/record' },
+    { id: 'add-visitor', label: 'Add visitor', icon: UserCheck, route: '/visitors/add' },
+    { id: 'mark-attendance', label: 'Check in a member', icon: CalendarCheck, route: '/attendance' },
   ];
+  const quickActions = allQuickActions.filter(action => canRoute(action.route));
 
   if (loading && !refreshing && stats.totalMembers === 0) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="$background">
-        <Spinner size="large" color="#007AFF" />
-        <Text color="$colorPress" marginTop="$3" fontSize={13}>Loading dashboard...</Text>
-      </YStack>
+      <View style={{ flex: 1, backgroundColor: c.background }}>
+        <SkeletonDashboard />
+      </View>
     );
   }
 
+  const today = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+
   return (
-    <ScrollView 
-      style={{ flex: 1 }}
-      contentContainerStyle={{ padding: 16 }}
-      backgroundColor="$background"
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#007AFF']} />
-      }
+    <ScrollView
+      style={{ flex: 1, backgroundColor: c.background }}
+      contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
     >
-      <YStack space="$5">
-        {/* Welcome Header */}
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack flex={1}>
-            <H2 color="$color" fontWeight="800" fontSize={24}>
-              {getGreeting()}, {userName}
-            </H2>
-            <Paragraph color="$colorPress" fontSize={13}>
-              Here's an overview of your church's activity today.
-            </Paragraph>
-          </YStack>
+      {/* Greeting */}
+      <Animated.View entering={enterUp()} style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="caption" tone="muted">{getGreeting()} · {today}</AppText>
+          <AppText variant="display" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} accessibilityRole="header">
+            {userName}
+          </AppText>
+        </View>
+        <IconButton icon={RefreshCw} label="Refresh dashboard" spinning={refreshing} onPress={onRefresh} />
+      </Animated.View>
 
-          <TouchableOpacity 
-            onPress={onRefresh} 
-            disabled={refreshing}
-            style={{ padding: 8, borderRadius: 20, backgroundColor: 'rgba(0, 122, 255, 0.1)' }}
-          >
-            <RefreshCw size={18} color="#007AFF" style={refreshing ? { transform: [{ rotate: '45deg' }] } : {}} />
-          </TouchableOpacity>
-        </XStack>
-
-        {/* Stats Metrics Cards */}
-        <YStack space="$3">
-          {/* Members Metric Card */}
-          <Card 
-            padding="$4" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            elevate
-            pressStyle={{ scale: 0.98 }}
-            onPress={() => router.push('/people' as any)}
-          >
-            <XStack space="$3" alignItems="center" justifyContent="space-between">
-              <XStack space="$3" alignItems="center" flex={1}>
-                <YStack backgroundColor="rgba(0, 122, 255, 0.12)" p="$2.5" borderRadius="$4">
-                  <Users size={24} color="#007AFF" />
-                </YStack>
-                <YStack>
-                  <Text color="$colorPress" fontSize={12} fontWeight="600">Total Members</Text>
-                  <Text color="$color" fontSize={22} fontWeight="800">{stats.totalMembers}</Text>
-                </YStack>
-              </XStack>
-              {stats.newMembersThisMonth > 0 ? (
-                <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$2" py="$1" borderRadius="$3" alignItems="center" space="$1">
-                  <TrendingUp size={12} color="#34C759" />
-                  <Text color="#34C759" fontSize={11} fontWeight="700">+{stats.newMembersThisMonth} this month</Text>
-                </XStack>
+      {/* Key figures */}
+      {can('members') || can('attendance') || can('giving') ? (
+        <Animated.View entering={enterUp(40)} style={{ gap: space.xs }}>
+          {can('members') || can('attendance') ? (
+            <View style={{ flexDirection: 'row', gap: space.xs }}>
+              {can('members') ? (
+                <StatTile
+                  label="Members"
+                  value={stats.totalMembers.toLocaleString()}
+                  icon={Users}
+                  footnote={stats.newMembersThisMonth > 0 ? `+${stats.newMembersThisMonth} this month` : 'No new members this month'}
+                  footnoteTone={stats.newMembersThisMonth > 0 ? 'success' : 'muted'}
+                  onPress={() => router.push('/people' as any)}
+                />
               ) : null}
-            </XStack>
-          </Card>
+              {can('attendance') ? (
+                <StatTile
+                  label="Attendance"
+                  value={stats.attendanceThisWeek.toLocaleString()}
+                  icon={Calendar}
+                  tone="warning"
+                  footnote="Check-ins this week"
+                  onPress={() => router.push('/operations' as any)}
+                />
+              ) : null}
+            </View>
+          ) : null}
+          {can('giving') ? (
+            <StatTile
+              label="Giving this month"
+              value={formatGhanaCedis(stats.givingThisMonth)}
+              icon={Banknote}
+              tone="success"
+              footnote={new Date().toLocaleDateString([], { month: 'long', year: 'numeric' })}
+              onPress={() => router.push('/finances' as any)}
+            />
+          ) : null}
+        </Animated.View>
+      ) : null}
 
-          {/* Attendance Metric Card */}
-          <Card 
-            padding="$4" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            elevate
-            pressStyle={{ scale: 0.98 }}
-            onPress={() => router.push('/operations' as any)}
-          >
-            <XStack space="$3" alignItems="center">
-              <YStack backgroundColor="rgba(255, 149, 0, 0.12)" p="$2.5" borderRadius="$4">
-                <Calendar size={24} color="#FF9500" />
-              </YStack>
-              <YStack>
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Attendance This Week</Text>
-                <Text color="$color" fontSize={22} fontWeight="800">{stats.attendanceThisWeek}</Text>
-              </YStack>
-            </XStack>
-          </Card>
+      {/* Quick actions */}
+      {quickActions.length > 0 ? (
+        <Animated.View entering={enterUp(80)}>
+          <Section title="Quick actions" bare>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
+              {quickActions.map((action, i) => {
+                const fullWidth = quickActions.length % 2 === 1 && i === quickActions.length - 1;
+                return (
+                  <PressableScale
+                    key={action.id}
+                    onPress={() => router.push(action.route as any)}
+                    accessibilityRole="button"
+                    accessibilityLabel={action.label}
+                    style={{
+                      width: fullWidth ? '100%' : '48.8%',
+                      flexDirection: fullWidth ? 'row' : 'column',
+                      alignItems: fullWidth ? 'center' : 'flex-start',
+                      gap: space.sm,
+                      padding: space.md,
+                      minHeight: fullWidth ? 64 : 100,
+                      borderRadius: radius.lg,
+                      backgroundColor: c.surface,
+                      borderWidth: 1,
+                      borderColor: c.border,
+                    }}
+                  >
+                    <IconWell icon={action.icon} tone="primary" size={38} />
+                    <AppText variant="bodyStrong" numberOfLines={2} style={fullWidth ? { flex: 1 } : undefined}>
+                      {action.label}
+                    </AppText>
+                  </PressableScale>
+                );
+              })}
+            </View>
+          </Section>
+        </Animated.View>
+      ) : null}
 
-          {/* Giving Metric Card */}
-          <Card 
-            padding="$4" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            elevate
-            pressStyle={{ scale: 0.98 }}
-            onPress={() => router.push('/finances' as any)}
-          >
-            <XStack space="$3" alignItems="center">
-              <YStack backgroundColor="rgba(52, 199, 89, 0.12)" p="$2.5" borderRadius="$4">
-                <Banknote size={24} color="#34C759" />
-              </YStack>
-              <YStack>
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Giving This Month</Text>
-                <Text color="$color" fontSize={22} fontWeight="800">{formatGhanaCedis(stats.givingThisMonth)}</Text>
-              </YStack>
-            </XStack>
-          </Card>
-        </YStack>
-
-        {/* Quick Actions (Full Web Parity Suite) */}
-        <YStack space="$3">
-          <Text color="$color" fontSize={16} fontWeight="700">Quick Actions</Text>
-          <YStack space="$2">
-            {quickActions.map((action) => {
-              const ActionIcon = action.icon;
-              return (
-                <Card 
-                  key={action.id}
-                  padding="$3.5" 
-                  borderRadius="$4" 
-                  backgroundColor="$cardBackground" 
-                  borderColor="$borderColor"
-                  borderWidth={1}
-                  elevate
-                  pressStyle={{ scale: 0.98 }}
-                  onPress={() => router.push(action.route as any)}
-                >
-                  <XStack space="$3" alignItems="center" justifyContent="space-between">
-                    <XStack space="$3" alignItems="center" flex={1}>
-                      <YStack backgroundColor={`${action.color}15`} p="$2" borderRadius="$3">
-                        <ActionIcon size={20} color={action.color} />
-                      </YStack>
-                      <YStack flex={1}>
-                        <Text color="$color" fontSize={14} fontWeight="700">{action.label}</Text>
-                        <Paragraph color="$colorPress" fontSize={12} numberOfLines={1}>
-                          {action.description}
-                        </Paragraph>
-                      </YStack>
-                    </XStack>
-                    <ChevronRight size={18} color="#8E8E93" />
-                  </XStack>
-                </Card>
-              );
-            })}
-          </YStack>
-        </YStack>
-
-        {/* Recent Activity */}
-        <YStack space="$3">
-          <Text color="$color" fontSize={16} fontWeight="700">Recent Activity</Text>
+      {/* Recent activity */}
+      <Animated.View entering={enterUp(120)}>
+        <Section
+          title="Recent activity"
+          action={canRoute('/logs') && activities.length > 0 ? (
+            <Button label="See all" variant="ghost" size="sm" onPress={() => router.push('/logs' as any)} />
+          ) : undefined}
+        >
           {activities.length > 0 ? (
-            <Card 
-              borderRadius="$5" 
-              backgroundColor="$cardBackground" 
-              borderColor="$borderColor"
-              borderWidth={1}
-              elevate
-            >
-              <YStack>
-                {activities.map((item, index) => (
-                  <YStack key={item.id}>
-                    {index > 0 ? <Separator borderColor="$borderColor" /> : null}
-                    <XStack padding="$4" space="$3" alignItems="center">
-                      <YStack backgroundColor="rgba(0, 122, 255, 0.1)" p="$2" borderRadius="$3">
-                        <Activity size={16} color="#007AFF" />
-                      </YStack>
-                      <YStack flex={1}>
-                        <Text color="$color" fontSize={13} fontWeight="600">{item.message}</Text>
-                        <Text color="$colorPress" fontSize={11}>{item.time}</Text>
-                      </YStack>
-                    </XStack>
-                  </YStack>
-                ))}
-              </YStack>
-            </Card>
+            activities.map(item => (
+              <ListRow key={item.id} icon={Activity} iconTone="neutral" title={item.message} subtitle={item.time} />
+            ))
           ) : (
-            <Card 
-              padding="$5" 
-              borderRadius="$5" 
-              backgroundColor="$cardBackground" 
-              borderColor="$borderColor"
-              borderWidth={1}
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Inbox size={32} color="#8E8E93" />
-              <Text color="$color" fontSize={14} fontWeight="700" marginTop="$2">No recent activity</Text>
-              <Paragraph color="$colorPress" fontSize={12} textAlign="center" marginTop="$1">
-                Recent actions performed by you or your team will appear here.
-              </Paragraph>
-            </Card>
+            <EmptyState
+              icon={Inbox}
+              title="No recent activity"
+              message="Actions taken by you or your team appear here."
+            />
           )}
-        </YStack>
-      </YStack>
+        </Section>
+      </Animated.View>
     </ScrollView>
   );
 }
-

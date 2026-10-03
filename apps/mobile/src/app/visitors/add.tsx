@@ -1,24 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Alert, ScrollView, TouchableOpacity } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  H2, 
-  Input, 
-  Button, 
-  Spinner 
-} from 'tamagui';
-import { Check, ArrowLeft, MapPin } from '@tamagui/lucide-icons';
-import { supabase } from '../../lib/supabase';
+import { FileText, MapPin, Phone, UserCheck } from '@tamagui/lucide-icons';
 import { upsertLocalVisitor } from '../../lib/db';
 import { getChurchZones } from '../../lib/options';
-import { enqueueSyncTask } from '../../lib/syncEngine';
+import { pushOrQueue } from '../../lib/syncEngine';
+import { toVisitorPayload } from '../../lib/syncPayloads';
 import { generateUUID } from '../../lib/uuid';
 import { NativeDatePicker } from '../../components/NativeDatePicker';
 import { AppHeader } from '../../components/AppHeader';
+import { ChoiceChips, FieldGroup, FormSection, SaveBar, Screen, TextField, useToast } from '../../components/ui';
+import { space } from '../../theme/tokens';
 
 export default function AddVisitorScreen() {
   const router = useRouter();
@@ -31,6 +23,8 @@ export default function AddVisitorScreen() {
   const [zonesList, setZonesList] = useState<string[]>(['A', 'B', 'F', 'K', 'M', 'R']);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     getChurchZones().then(z => {
@@ -40,9 +34,10 @@ export default function AddVisitorScreen() {
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter the visitor name.');
+      setNameError('Enter the visitor’s name.');
       return;
     }
+    setNameError(null);
 
     setSubmitting(true);
     try {
@@ -64,191 +59,63 @@ export default function AddVisitorScreen() {
         created_at: now
       });
 
-      // 2. Outbox & Live Sync
-      const payload = {
+      // 2. Server push; queued in the outbox only if the server can't be reached
+      await pushOrQueue('POST', '/visitors', toVisitorPayload({
         id: newId,
         name: name.trim(),
-        phone: phone.trim() || undefined,
-        email: email.trim() || undefined,
-        residence: residence.trim() || undefined,
-        potential_zone: potentialZone,
+        phone: phone.trim(),
+        email: email.trim(),
         visit_date: visitDate || today,
-        created_at: now
-      };
+        potential_zone: potentialZone,
+        notes: notes.trim(),
+        residence: residence.trim(),
+      }));
 
-      try {
-        const { error } = await supabase.from('visitors').insert(payload);
-        if (error) {
-          console.warn('Supabase visitor insert failed, queuing to sync_queue:', error);
-          await enqueueSyncTask({
-            operation: 'INSERT',
-            table_name: 'visitors',
-            payload
-          });
-        }
-      } catch (netErr) {
-        await enqueueSyncTask({
-          operation: 'INSERT',
-          table_name: 'visitors',
-          payload
-        });
-      }
-
-      Alert.alert('Success', 'Visitor registered successfully!', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
-    } catch (err) {
+      toast.show({ title: 'Visitor added', message: name.trim() });
+      router.back();
+    } catch (err: any) {
       console.error('Failed adding visitor:', err);
-      Alert.alert('Error', 'Failed to save visitor record.');
+      toast.show({ title: 'Couldn’t save visitor', message: err?.message, tone: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <YStack flex={1} backgroundColor="$background">
-      <AppHeader
-        title="Add Visitor"
-        subtitle="Log First-Time Church Guest"
-        showBack
-        backTitle="Visitors"
-        rightElement={
-          <Button 
-            size="$3" 
-            backgroundColor="#34C759" 
-            borderRadius="$3"
-            onPress={handleSubmit}
-            disabled={submitting}
-            icon={submitting ? <Spinner size="small" color="#FFFFFF" /> : <Check size={14} color="#FFFFFF" />}
-            pressStyle={{ scale: 0.98 }}
-          >
-            <Text color="#FFFFFF" fontWeight="700" fontSize={13}>{submitting ? 'Saving...' : 'Save'}</Text>
-          </Button>
-        }
-      />
+    <Screen>
+      <AppHeader title="New visitor" subtitle="Log a first-time guest" showBack />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl, gap: space.md }} keyboardShouldPersistTaps="handled">
+          <FormSection title="Visitor" icon={UserCheck} description="Who visited and when" state={name.trim() ? 'done' : 'needed'}>
+            <TextField
+              label="Full name *"
+              value={name}
+              onChangeText={t => { setName(t); if (nameError) setNameError(null); }}
+              placeholder="e.g. Mary Mensah"
+              autoCapitalize="words"
+              error={nameError}
+            />
+            <NativeDatePicker label="Visit date" value={visitDate} onChange={setVisitDate} maxDate={new Date()} />
+          </FormSection>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
-        <YStack space="$4">
-          <Card 
-            padding="$4" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            elevate
-          >
-            <YStack space="$4">
-              <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Visitor Full Name *</Text>
-              <Input
-                placeholder="e.g. Mary Mensah"
-                value={name}
-                onChangeText={setName}
-                backgroundColor="$background"
-                borderColor="$borderColor"
-                borderRadius="$4"
-              />
-            </YStack>
+          <FormSection title="Contact" icon={Phone} description="How to follow up" state={phone || email ? 'done' : 'optional'}>
+            <TextField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder="e.g. 0551 234 567" />
+            <TextField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholder="name@example.com" />
+          </FormSection>
 
-            <YStack space="$1.5">
-              <NativeDatePicker
-                label="Visit Date (YYYY-MM-DD)"
-                value={visitDate}
-                onChange={setVisitDate}
-                accentColor="#34C759"
-              />
-            </YStack>
+          <FormSection title="Location" icon={MapPin} description="Where they live" state={residence ? 'done' : 'optional'}>
+            <TextField label="Residence" value={residence} onChangeText={setResidence} placeholder="e.g. Mataheko, Accra" />
+            <FieldGroup label="Potential zone">
+              <ChoiceChips options={zonesList.map(z => ({ value: z, label: `Zone ${z}` }))} value={potentialZone} onChange={setPotentialZone} />
+            </FieldGroup>
+          </FormSection>
 
-            <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Phone Number</Text>
-              <Input
-                placeholder="e.g. 0551234567"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                backgroundColor="$background"
-                borderColor="$borderColor"
-                borderRadius="$4"
-              />
-            </YStack>
-
-            <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Email Address</Text>
-              <Input
-                placeholder="e.g. visitor@example.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                backgroundColor="$background"
-                borderColor="$borderColor"
-                borderRadius="$4"
-              />
-            </YStack>
-
-            <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Residence / Location</Text>
-              <Input
-                placeholder="e.g. Mataheko, Accra"
-                value={residence}
-                onChangeText={setResidence}
-                backgroundColor="$background"
-                borderColor="$borderColor"
-                borderRadius="$4"
-              />
-            </YStack>
-
-            <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Potential Zone</Text>
-              <XStack space="$2" flexWrap="wrap">
-                {zonesList.map(z => (
-                  <TouchableOpacity
-                    key={z}
-                    onPress={() => setPotentialZone(z)}
-                    style={{
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      backgroundColor: potentialZone === z ? '#34C759' : 'rgba(142,142,147,0.12)',
-                      marginBottom: 6
-                    }}
-                  >
-                    <Text color={potentialZone === z ? '#FFFFFF' : '$color'} fontSize={13} fontWeight="700">
-                      Zone {z}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </XStack>
-            </YStack>
-
-            <YStack space="$1.5">
-              <Text color="$color" fontSize={13} fontWeight="700">Follow-up Notes</Text>
-              <Input
-                placeholder="e.g. First time visitor, invited by Deacon Kwame"
-                value={notes}
-                onChangeText={setNotes}
-                backgroundColor="$background"
-                borderColor="$borderColor"
-                borderRadius="$4"
-              />
-            </YStack>
-
-            <Button
-              marginTop="$2"
-              height={48}
-              backgroundColor="#34C759"
-              borderRadius="$4"
-              onPress={handleSubmit}
-              disabled={submitting}
-              icon={submitting ? <Spinner color="#FFFFFF" /> : <Check size={18} color="#FFFFFF" />}
-            >
-              <Text color="#FFFFFF" fontWeight="800" fontSize={15}>
-                {submitting ? 'Saving...' : 'Save Visitor'}
-              </Text>
-            </Button>
-          </YStack>
-        </Card>
-      </YStack>
-    </ScrollView>
-  </YStack>
-);
+          <FormSection title="Follow-up notes" icon={FileText} state={notes ? 'done' : 'optional'}>
+            <TextField value={notes} onChangeText={setNotes} placeholder="e.g. First visit, invited by Deacon Kwame" multiline accessibilityLabel="Follow-up notes" />
+          </FormSection>
+        </ScrollView>
+        <SaveBar label={submitting ? 'Saving…' : 'Save visitor'} loading={submitting} onPress={handleSubmit} />
+      </KeyboardAvoidingView>
+    </Screen>
+  );
 }

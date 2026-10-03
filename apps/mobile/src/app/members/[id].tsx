@@ -1,44 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Linking, TouchableOpacity, Alert, Modal, Dimensions } from 'react-native';
+import { Image, Linking, Alert, Modal, Dimensions, Pressable, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  H2, 
-  H3, 
-  Paragraph, 
-  Button, 
-  Separator, 
-  Spinner,
-  ScrollView
-} from 'tamagui';
-import { 
-  ArrowLeft, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Calendar, 
-  Church, 
-  User, 
-  ShieldCheck, 
-  Edit3,
-  Trash2,
-  Users,
-  CreditCard,
-  FileText,
-  ExternalLink,
-  CheckCircle,
-  X
-} from '@tamagui/lucide-icons';
+import Animated from 'react-native-reanimated';
+import { Phone, Mail, Edit3, Trash2, Users, UserX, X } from '@tamagui/lucide-icons';
 import { getLocalDb, LocalMember, upsertLocalMember, getMemberAttendanceHistory } from '../../lib/db';
 import { getOrCacheProfilePhoto } from '../../lib/photoCache';
 import { supabase } from '../../lib/supabase';
 import { resolveMemberFamily, FamilyMember } from '../../lib/family';
 import { api } from '../../lib/api';
+import { useAppColors } from '../../context/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
+import { SkeletonProfile } from '../../components/Skeleton';
+import {
+  AppText, Avatar, Badge, Button, DetailRow, EmptyState, IconButton, ListRow, QuickAction, Screen, Section, Surface, useToast,
+} from '../../components/ui';
+import { enterUp } from '../../theme/animations';
+import { memberStatusTone, statusLabel } from '../../theme/status';
+import { radius, space } from '../../theme/tokens';
 
 
 interface FullMemberData {
@@ -85,6 +63,8 @@ interface FullMemberData {
 export default function MemberProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const toast = useToast();
+  const c = useAppColors();
 
   const [memberData, setMemberData] = useState<FullMemberData | null>(null);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -197,6 +177,7 @@ export default function MemberProfileScreen() {
               email: currentBase.email,
               role: currentBase.positionHeld?.[0] || 'Member',
               zone: currentBase.zone,
+              zone_number: currentBase.zoneNumber,
               ministry: currentBase.ministries?.[0],
               photo_url: currentBase.photo,
               status: currentBase.status || 'active',
@@ -259,8 +240,8 @@ export default function MemberProfileScreen() {
   const handleDeleteMember = () => {
     if (!memberData) return;
     Alert.alert(
-      'Delete Member',
-      `Are you sure you want to delete ${memberData.firstName} ${memberData.lastName}? This action cannot be undone.`,
+      'Delete member?',
+      `${memberData.firstName} ${memberData.lastName} will be permanently removed. This can’t be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -271,10 +252,10 @@ export default function MemberProfileScreen() {
               const db = await getLocalDb();
               await db.runAsync('DELETE FROM members WHERE id = ?', [memberData.id]);
               await supabase.from('members').delete().eq('id', memberData.id);
-              Alert.alert('Success', 'Member has been deleted');
+              toast.show({ title: 'Member deleted', message: `${memberData.firstName} ${memberData.lastName}` });
               router.back();
             } catch (err) {
-              Alert.alert('Error', 'Failed to delete member');
+              toast.show({ title: 'Couldn’t delete member', tone: 'error' });
             }
           }
         }
@@ -291,27 +272,24 @@ export default function MemberProfileScreen() {
 
   if (loading) {
     return (
-      <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="$background">
-        <Spinner size="large" color="#007AFF" />
-        <Text color="$colorPress" marginTop="$2" fontSize={13}>Loading member profile...</Text>
-      </YStack>
+      <Screen>
+        <AppHeader title="Member" showBack />
+        <SkeletonProfile />
+      </Screen>
     );
   }
 
   if (!memberData) {
     return (
-      <YStack flex={1} backgroundColor="$background">
-        <AppHeader title="Member Details" showBack backTitle="Members" />
-        <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
-          <Text color="$color" fontSize={16} fontWeight="700">Member not found</Text>
-          <Paragraph color="$colorPress" fontSize={13} textAlign="center" marginTop="$1">
-            The requested member record could not be found or has been removed.
-          </Paragraph>
-          <Button marginTop="$4" backgroundColor="#007AFF" borderRadius="$3" onPress={() => router.back()}>
-            <Text color="#FFFFFF" fontWeight="700">Go Back to Members</Text>
-          </Button>
-        </YStack>
-      </YStack>
+      <Screen>
+        <AppHeader title="Member" showBack />
+        <EmptyState
+          icon={UserX}
+          title="Member not found"
+          message="This member record couldn’t be found or has been removed."
+          action={{ label: 'Back to members', onPress: () => router.back() }}
+        />
+      </Screen>
     );
   }
 
@@ -321,748 +299,278 @@ export default function MemberProfileScreen() {
   const siblings = (memberData.familyMembers || []).filter(f => f.relationship === 'sibling');
   const spouses = (memberData.familyMembers || []).filter(f => f.relationship === 'spouse');
   const children = (memberData.familyMembers || []).filter(f => f.relationship === 'child');
+  const hasFamily = parents.length + siblings.length + spouses.length + children.length > 0;
+
+  const fullName = `${memberData.firstName} ${memberData.otherNames ? `${memberData.otherNames} ` : ''}${memberData.lastName}`;
+  const zoneText = memberData.zone ? `Zone ${memberData.zone}${memberData.zoneNumber ? ` · ${memberData.zoneNumber}` : ''}` : null;
+  const metaLine = [
+    memberData.gender ? memberData.gender.charAt(0).toUpperCase() + memberData.gender.slice(1) : null,
+    age !== null ? `${age} yrs` : null,
+  ].filter(Boolean).join(' · ');
+
+  const isClickable = (fm: FamilyMember) => !!(fm.isLinked && (fm.linkedMemberId || fm.childMemberId || fm.linkedChildMemberId));
+
+  const FamilyNode = ({ fm, label, size = 48 }: { fm: FamilyMember; label: string; size?: number }) => {
+    const clickable = isClickable(fm);
+    return (
+      <Pressable
+        disabled={!clickable}
+        onPress={() => clickable && handleFamilyNavigate(fm)}
+        accessibilityRole={clickable ? 'button' : undefined}
+        accessibilityLabel={`${fm.firstName} ${fm.lastName}, ${label}${clickable ? ', view profile' : ''}`}
+        style={{ alignItems: 'center', width: 84, gap: 4 }}
+      >
+        <View style={{ padding: 2, borderRadius: Math.round(size * 0.36), borderWidth: 2, borderColor: clickable ? c.primary.base : 'transparent' }}>
+          <Avatar name={`${fm.firstName} ${fm.lastName}`} uri={fm.photo} size={size} />
+        </View>
+        <AppText variant="captionStrong" align="center" numberOfLines={1}>{fm.firstName}</AppText>
+        <AppText variant="micro" tone={clickable ? 'primary' : 'subtle'} align="center">{label}</AppText>
+      </Pressable>
+    );
+  };
+
+  const connector = (h = 16) => <View style={{ width: 2, height: h, backgroundColor: c.borderStrong, alignSelf: 'center' }} />;
 
   return (
-    <YStack flex={1} backgroundColor="$background">
+    <Screen>
       <AppHeader
         title={`${memberData.firstName} ${memberData.lastName}`}
-        subtitle="Member Profile Details"
+        subtitle="Member profile"
         showBack
-        backTitle="Members"
         rightElement={
-          <TouchableOpacity
-            onPress={() => router.push(`/members/edit/${memberData.id}` as any)}
-            style={{
-              padding: 8,
-              borderRadius: 8,
-              backgroundColor: 'rgba(0, 122, 255, 0.12)',
-            }}
-          >
-            <Edit3 size={18} color="#007AFF" />
-          </TouchableOpacity>
+          <IconButton icon={Edit3} label="Edit member" tone="primary" onPress={() => router.push(`/members/edit/${memberData.id}` as any)} />
         }
       />
 
-      <ScrollView style={{ flex: 1 }} backgroundColor="$background" contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        <YStack space="$4">
-
-          {/* Hero Header Card */}
-          <Card 
-            padding="$4" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            alignItems="center"
-            elevate
+      <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}>
+        {/* Hero */}
+        <Animated.View entering={enterUp()} style={{ alignItems: 'center', gap: space.sm, paddingTop: space.xs }}>
+          <Pressable
+            onPress={() => avatarUri && setPhotoModalVisible(true)}
+            disabled={!avatarUri}
+            accessibilityRole={avatarUri ? 'imagebutton' : undefined}
+            accessibilityLabel={avatarUri ? 'View photo' : undefined}
           >
-            <TouchableOpacity onPress={() => avatarUri && setPhotoModalVisible(true)} activeOpacity={0.8}>
-              {avatarUri ? (
-                <Image
-                  source={{ uri: avatarUri }}
-                  style={{ width: 96, height: 96, borderRadius: 48, marginBottom: 12, borderWidth: 3, borderColor: '#007AFF' }}
-                />
-              ) : (
-                <YStack width={96} height={96} borderRadius={48} backgroundColor="rgba(0, 122, 255, 0.12)" justifyContent="center" alignItems="center" marginBottom="$3" borderWidth={3} borderColor="rgba(0, 122, 255, 0.3)">
-                  <Text color="#007AFF" fontSize={32} fontWeight="800">
-                    {memberData.firstName[0]}{memberData.lastName[0]}
-                  </Text>
-                </YStack>
-              )}
-            </TouchableOpacity>
+            <Avatar name={`${memberData.firstName} ${memberData.lastName}`} uri={avatarUri} size={96} />
+          </Pressable>
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <AppText variant="title" align="center" selectable>{fullName}</AppText>
+            {metaLine ? <AppText variant="caption" tone="muted">{metaLine}</AppText> : null}
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+            <Badge label={statusLabel(memberData.status)} tone={memberStatusTone(memberData.status)} />
+            {zoneText ? <Badge label={zoneText} tone="neutral" /> : null}
+          </View>
 
-            <H2 color="$color" fontWeight="800" fontSize={22} textAlign="center">
-              {memberData.firstName} {memberData.otherNames ? `${memberData.otherNames} ` : ''}{memberData.lastName}
-            </H2>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.lg, marginTop: space.sm }}>
+            {memberData.phone ? <QuickAction icon={Phone} label="Call" onPress={() => handleCall(memberData.phone)} /> : null}
+            {memberData.email ? <QuickAction icon={Mail} label="Email" onPress={() => handleEmail(memberData.email)} /> : null}
+            <QuickAction icon={Edit3} label="Edit" onPress={() => router.push(`/members/edit/${memberData.id}` as any)} />
+            <QuickAction icon={Trash2} label="Delete" tone="danger" onPress={handleDeleteMember} />
+          </View>
+        </Animated.View>
 
-            <XStack space="$2" marginTop="$2" alignItems="center" flexWrap="wrap" justifyContent="center">
-              <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$2.5" py="$1" borderRadius="$3">
-                <Text color="#34C759" fontSize={11} fontWeight="800">{memberData.status?.toUpperCase() || 'ACTIVE'}</Text>
-              </XStack>
-              {memberData.zone ? (
-                <XStack backgroundColor="rgba(0, 122, 255, 0.12)" px="$2.5" py="$1" borderRadius="$3">
-                  <Text color="#007AFF" fontSize={11} fontWeight="700">Zone {memberData.zone}</Text>
-                </XStack>
-              ) : null}
-              {memberData.gender ? (
-                <Text color="$colorPress" fontSize={12}>• {memberData.gender.toUpperCase()}</Text>
-              ) : null}
-              {age !== null ? (
-                <Text color="$colorPress" fontSize={12}>• {age} yrs</Text>
-              ) : null}
-            </XStack>
+        {/* Attendance */}
+        <Animated.View entering={enterUp(40)}>
+          <Section
+            title="Attendance"
+            action={<Button label="Attendance" variant="ghost" size="sm" onPress={() => router.push('/attendance' as any)} />}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md }}>
+              <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: c.success.soft, alignItems: 'center', justifyContent: 'center' }}>
+                <AppText variant="headline" tone="success" numeric>{attendanceStats.percentage}%</AppText>
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="bodyStrong">Attended {attendanceStats.presentCount} of {attendanceStats.totalServices}</AppText>
+                <AppText variant="caption" tone="muted">Recorded service sessions</AppText>
+              </View>
+            </View>
+            {(attendanceStats.history || []).slice(0, 4).map((item: any) => (
+              <ListRow
+                key={item.id}
+                title={item.serviceType}
+                subtitle={item.date}
+                right={<Badge label={item.isPresent ? 'Present' : 'Absent'} tone={item.isPresent ? 'success' : 'danger'} />}
+              />
+            ))}
+          </Section>
+        </Animated.View>
 
-            {/* Quick Action Dial / Email / Edit / Delete Row */}
-            <XStack space="$2" marginTop="$4" flexWrap="wrap" justifyContent="center">
-              {memberData.phone ? (
-                <Button size="$3" backgroundColor="#34C759" borderRadius="$4" onPress={() => handleCall(memberData.phone)}>
-                  <XStack space="$1.5" alignItems="center">
-                    <Phone size={14} color="#FFFFFF" />
-                    <Text color="#FFFFFF" fontWeight="700" fontSize={12}>Call</Text>
-                  </XStack>
-                </Button>
-              ) : null}
+        {/* Personal */}
+        <Animated.View entering={enterUp(80)} style={{ gap: space.xl }}>
+          <Section title="Personal">
+            <DetailRow label="Full name" value={fullName} />
+            <DetailRow label="Gender" value={memberData.gender ? memberData.gender.charAt(0).toUpperCase() + memberData.gender.slice(1) : undefined} fallback="N/A" />
+            {memberData.maritalStatus ? <DetailRow label="Marital status" value={memberData.maritalStatus.charAt(0).toUpperCase() + memberData.maritalStatus.slice(1)} /> : null}
+            {memberData.dateOfBirth ? <DetailRow label="Date of birth" value={`${formatDate(memberData.dateOfBirth)}${age !== null ? ` (${age})` : ''}`} /> : null}
+            {memberData.joinDate ? <DetailRow label="Joined" value={formatDate(memberData.joinDate)} /> : null}
+            {memberData.occupation ? <DetailRow label="Occupation" value={memberData.occupation} /> : null}
+            {memberData.hometown ? <DetailRow label="Hometown" value={memberData.hometown} /> : null}
+          </Section>
 
-              {memberData.email ? (
-                <Button size="$3" backgroundColor="#007AFF" borderRadius="$4" onPress={() => handleEmail(memberData.email)}>
-                  <XStack space="$1.5" alignItems="center">
-                    <Mail size={14} color="#FFFFFF" />
-                    <Text color="#FFFFFF" fontWeight="700" fontSize={12}>Email</Text>
-                  </XStack>
-                </Button>
-              ) : null}
+          <Section title="Contact">
+            <DetailRow label="Primary phone" value={memberData.phone} fallback="Not specified" onPress={() => handleCall(memberData.phone)} />
+            {memberData.secondPhone ? <DetailRow label="Second phone" value={memberData.secondPhone} onPress={() => handleCall(memberData.secondPhone)} /> : null}
+            {memberData.email ? <DetailRow label="Email" value={memberData.email} onPress={() => handleEmail(memberData.email)} /> : null}
+          </Section>
 
-              <Button size="$3" backgroundColor="#FF9500" borderRadius="$4" onPress={() => router.push(`/members/edit/${memberData.id}` as any)}>
-                <XStack space="$1.5" alignItems="center">
-                  <Edit3 size={14} color="#FFFFFF" />
-                  <Text color="#FFFFFF" fontWeight="700" fontSize={12}>Edit</Text>
-                </XStack>
-              </Button>
+          <Section title="Location">
+            <DetailRow label="Residence" value={memberData.residenceLocation} />
+            {memberData.digitalAddress ? <DetailRow label="Digital address" value={memberData.digitalAddress} /> : null}
+            <DetailRow label="Zone" value={memberData.zone ? `Zone ${memberData.zone}` : undefined} fallback="Unassigned" />
+            {memberData.zoneNumber ? <DetailRow label="Zone number" value={memberData.zoneNumber} valueTone="primary" /> : null}
+          </Section>
 
-              <Button size="$3" backgroundColor="#FF3B30" borderRadius="$4" onPress={handleDeleteMember}>
-                <XStack space="$1.5" alignItems="center">
-                  <Trash2 size={14} color="#FFFFFF" />
-                  <Text color="#FFFFFF" fontWeight="700" fontSize={12}>Delete</Text>
-                </XStack>
-              </Button>
-            </XStack>
-          </Card>
-
-          {/* Personal Information Card */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <User size={18} color="#007AFF" />
-                <Text color="$color" fontSize={16} fontWeight="700">Personal Information</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <XStack justifyContent="space-between">
-                  <Text color="$colorPress" fontSize={12}>Full Name</Text>
-                  <Text color="$color" fontSize={13} fontWeight="600">{memberData.firstName} {memberData.otherNames || ''} {memberData.lastName}</Text>
-                </XStack>
-                <XStack justifyContent="space-between">
-                  <Text color="$colorPress" fontSize={12}>Gender</Text>
-                  <Text color="$color" fontSize={13} fontWeight="600" textTransform="capitalize">{memberData.gender || 'N/A'}</Text>
-                </XStack>
-                {memberData.maritalStatus ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Marital Status</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600" textTransform="capitalize">{memberData.maritalStatus}</Text>
-                  </XStack>
-                ) : null}
-                {age !== null ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Age</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{age} years old</Text>
-                  </XStack>
-                ) : null}
-                {memberData.dateOfBirth ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Date of Birth</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{formatDate(memberData.dateOfBirth)}</Text>
-                  </XStack>
-                ) : null}
-                {memberData.joinDate ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Join Date</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{formatDate(memberData.joinDate)}</Text>
-                  </XStack>
-                ) : null}
-                {memberData.occupation ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Occupation</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{memberData.occupation}</Text>
-                  </XStack>
-                ) : null}
-                {memberData.hometown ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Hometown</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{memberData.hometown}</Text>
-                  </XStack>
-                ) : null}
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Contact Information Card */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <Phone size={18} color="#34C759" />
-                <Text color="$color" fontSize={16} fontWeight="700">Contact Information</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <XStack space="$3" alignItems="center">
-                <YStack backgroundColor="rgba(52, 199, 89, 0.1)" p="$2" borderRadius="$3">
-                  <Phone size={16} color="#34C759" />
-                </YStack>
-                <YStack flex={1}>
-                  <Text color="$colorPress" fontSize={11}>Primary Phone</Text>
-                  <Text color="$color" fontSize={14} fontWeight="600">{memberData.phone || 'Not specified'}</Text>
-                </YStack>
-              </XStack>
-
-              {memberData.secondPhone ? (
-                <XStack space="$3" alignItems="center">
-                  <YStack backgroundColor="rgba(52, 199, 89, 0.1)" p="$2" borderRadius="$3">
-                    <Phone size={16} color="#34C759" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <Text color="$colorPress" fontSize={11}>Secondary Phone</Text>
-                    <Text color="$color" fontSize={14} fontWeight="600">{memberData.secondPhone}</Text>
-                  </YStack>
-                </XStack>
-              ) : null}
-
-              {memberData.email ? (
-                <XStack space="$3" alignItems="center">
-                  <YStack backgroundColor="rgba(0, 122, 255, 0.1)" p="$2" borderRadius="$3">
-                    <Mail size={16} color="#007AFF" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <Text color="$colorPress" fontSize={11}>Email Address</Text>
-                    <Text color="$color" fontSize={14} fontWeight="600">{memberData.email}</Text>
-                  </YStack>
-                </XStack>
-              ) : null}
-            </YStack>
-          </Card>
-
-          {/* Location Information Card */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <MapPin size={18} color="#FF9500" />
-                <Text color="$color" fontSize={16} fontWeight="700">Location Information</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <XStack justifyContent="space-between">
-                  <Text color="$colorPress" fontSize={12}>Residence</Text>
-                  <Text color="$color" fontSize={13} fontWeight="600">{memberData.residenceLocation || 'Not recorded'}</Text>
-                </XStack>
-                {memberData.digitalAddress ? (
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Digital Address</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">{memberData.digitalAddress}</Text>
-                  </XStack>
-                ) : null}
-                <XStack justifyContent="space-between">
-                  <Text color="$colorPress" fontSize={12}>Zone</Text>
-                  <Text color="$color" fontSize={13} fontWeight="600">Zone {memberData.zone || 'Unassigned'}</Text>
-                </XStack>
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Baptism Information Card */}
           {memberData.baptismInfo ? (
-            <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-              <YStack space="$3">
-                <XStack space="$2" alignItems="center">
-                  <Church size={18} color="#5856D6" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Baptism Information</Text>
-                </XStack>
-                <Separator borderColor="$borderColor" />
-
-                <YStack space="$2">
-                  <XStack justifyContent="space-between">
-                    <Text color="$colorPress" fontSize={12}>Baptism Status</Text>
-                    <Text color="$color" fontSize={13} fontWeight="600">
-                      {memberData.baptismInfo.baptismStatus === 'not_baptised' ? 'Not Baptised' : 'Baptised'}
-                    </Text>
-                  </XStack>
-
-                  {memberData.baptismInfo.baptismStatus !== 'not_baptised' ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Baptism Date</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{formatBaptismDate(memberData.baptismInfo)}</Text>
-                    </XStack>
-                  ) : null}
-
-                  {memberData.baptismInfo.previousCongregation ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Previous Congregation</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{memberData.baptismInfo.previousCongregation}</Text>
-                    </XStack>
-                  ) : null}
-
-                  {memberData.baptismInfo.roleInPreviousCongregation ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Role in Previous Congregation</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{memberData.baptismInfo.roleInPreviousCongregation}</Text>
-                    </XStack>
-                  ) : null}
-                </YStack>
-              </YStack>
-            </Card>
-          ) : null}
-
-          {/* Ministries and Positions Card */}
-          {((memberData.ministries && memberData.ministries.length > 0) || (memberData.positionHeld && memberData.positionHeld.length > 0)) ? (
-            <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-              <YStack space="$3">
-                <XStack space="$2" alignItems="center">
-                  <ShieldCheck size={18} color="#AF52DE" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Ministries & Positions</Text>
-                </XStack>
-                <Separator borderColor="$borderColor" />
-
-                {memberData.ministries && memberData.ministries.length > 0 ? (
-                  <YStack space="$1.5">
-                    <Text color="$colorPress" fontSize={11} fontWeight="600">MINISTRIES</Text>
-                    <XStack space="$2" flexWrap="wrap">
-                      {memberData.ministries.map((m, idx) => (
-                        <XStack key={idx} backgroundColor="rgba(0, 122, 255, 0.12)" px="$3" py="$1" borderRadius="$3" marginBottom="$1">
-                          <Text color="#007AFF" fontSize={12} fontWeight="700">{m}</Text>
-                        </XStack>
-                      ))}
-                    </XStack>
-                  </YStack>
-                ) : null}
-
-                {memberData.positionHeld && memberData.positionHeld.length > 0 ? (
-                  <YStack space="$1.5" marginTop="$2">
-                    <Text color="$colorPress" fontSize={11} fontWeight="600">POSITIONS HELD</Text>
-                    <XStack space="$2" flexWrap="wrap">
-                      {memberData.positionHeld.map((p, idx) => (
-                        <XStack key={idx} backgroundColor="rgba(175, 82, 222, 0.12)" px="$3" py="$1" borderRadius="$3" marginBottom="$1">
-                          <Text color="#AF52DE" fontSize={12} fontWeight="700">{p}</Text>
-                        </XStack>
-                      ))}
-                    </XStack>
-                  </YStack>
-                ) : null}
-              </YStack>
-            </Card>
-          ) : null}
-
-          {/* Family Tree & Linkages Card */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <Users size={18} color="#007AFF" />
-                <Text color="$color" fontSize={16} fontWeight="700">Family Tree & Details</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              {/* VISUAL FAMILY TREE GRAPH */}
-              {(parents.length > 0 || siblings.length > 0 || spouses.length > 0 || children.length > 0) ? (
-                <YStack py="$3" px="$2" backgroundColor="rgba(0, 122, 255, 0.03)" borderRadius="$4" borderWidth={1} borderColor="rgba(0, 122, 255, 0.1)" marginBottom="$3" alignItems="center">
-                  {/* Parents Row */}
-                  {parents.length > 0 && (
-                    <XStack space="$4" justifyContent="center" marginBottom="$2" flexWrap="wrap">
-                      {parents.map((p) => {
-                        const isClickable = p.isLinked && (p.linkedMemberId || p.childMemberId);
-                        return (
-                          <TouchableOpacity 
-                            key={p.id} 
-                            disabled={!isClickable}
-                            onPress={() => isClickable && handleFamilyNavigate(p)}
-                            activeOpacity={0.7}
-                          >
-                            <YStack alignItems="center">
-                              <YStack 
-                                width={50} 
-                                height={50} 
-                                borderRadius={25} 
-                                backgroundColor={p.relationship === 'father' ? 'rgba(0, 122, 255, 0.15)' : 'rgba(255, 45, 85, 0.15)'} 
-                                justifyContent="center" 
-                                alignItems="center" 
-                                borderWidth={p.isLinked ? 2.5 : 0} 
-                                borderColor={p.relationship === 'father' ? '#007AFF' : '#FF2D55'}
-                                overflow="hidden"
-                              >
-                                {p.photo ? (
-                                  <Image source={{ uri: p.photo }} style={{ width: 46, height: 46, borderRadius: 23 }} />
-                                ) : (
-                                  <Text color={p.relationship === 'father' ? '#007AFF' : '#FF2D55'} fontWeight="800" fontSize={15}>
-                                    {p.firstName[0]}{p.lastName[0]}
-                                  </Text>
-                                )}
-                              </YStack>
-                              <Text color="$color" fontSize={11} fontWeight="700" marginTop="$1">{p.firstName} {p.lastName}</Text>
-                              <Text color="$colorPress" fontSize={10} textTransform="capitalize">{p.relationship}</Text>
-                              {isClickable ? (
-                                <XStack backgroundColor="rgba(0, 122, 255, 0.12)" px="$1.5" py="$0.5" borderRadius="$2" marginTop="$0.5">
-                                  <Text color="#007AFF" fontSize={8} fontWeight="700">View Profile</Text>
-                                </XStack>
-                              ) : null}
-                            </YStack>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </XStack>
-                  )}
-
-                  {parents.length > 0 && (
-                    <YStack width={2} height={16} backgroundColor="$borderColor" marginBottom="$2" />
-                  )}
-
-                  {/* Member & Spouse & Siblings Row */}
-                  <XStack space="$3" alignItems="center" justifyContent="center" marginBottom="$2" flexWrap="wrap">
-                    {siblings.map((sib) => {
-                      const isClickable = sib.isLinked && (sib.linkedMemberId || sib.childMemberId);
-                      return (
-                        <TouchableOpacity 
-                          key={sib.id} 
-                          disabled={!isClickable}
-                          onPress={() => isClickable && handleFamilyNavigate(sib)}
-                          activeOpacity={0.7}
-                        >
-                          <YStack alignItems="center">
-                            <YStack 
-                              width={44} 
-                              height={44} 
-                              borderRadius={22} 
-                              backgroundColor="rgba(142, 142, 147, 0.15)" 
-                              justifyContent="center" 
-                              alignItems="center" 
-                              borderWidth={sib.isLinked ? 2 : 0} 
-                              borderColor="#007AFF"
-                              overflow="hidden"
-                            >
-                              {sib.photo ? (
-                                <Image source={{ uri: sib.photo }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                              ) : (
-                                <Text color="$color" fontWeight="700" fontSize={13}>{sib.firstName[0]}{sib.lastName[0]}</Text>
-                              )}
-                            </YStack>
-                            <Text color="$color" fontSize={10} fontWeight="600" marginTop="$1">{sib.firstName}</Text>
-                            <Text color="$colorPress" fontSize={9}>Sibling</Text>
-                            {isClickable ? (
-                              <XStack backgroundColor="rgba(0, 122, 255, 0.12)" px="$1.5" py="$0.5" borderRadius="$2" marginTop="$0.5">
-                                <Text color="#007AFF" fontSize={8} fontWeight="700">View Profile</Text>
-                              </XStack>
-                            ) : null}
-                          </YStack>
-                        </TouchableOpacity>
-                      );
-                    })}
-
-                    {siblings.length > 0 && (
-                      <YStack width={12} height={2} backgroundColor="$borderColor" />
-                    )}
-
-                    {/* Center Node: The Member */}
-                    <YStack alignItems="center" px="$2">
-                      <YStack 
-                        width={62} 
-                        height={62} 
-                        borderRadius={31} 
-                        backgroundColor="rgba(0, 122, 255, 0.15)" 
-                        justifyContent="center" 
-                        alignItems="center" 
-                        borderWidth={3.5} 
-                        borderColor="#007AFF"
-                        overflow="hidden"
-                      >
-                        {avatarUri || memberData.photo ? (
-                          <Image source={{ uri: avatarUri || memberData.photo }} style={{ width: 55, height: 55, borderRadius: 27.5 }} />
-                        ) : (
-                          <Text color="#007AFF" fontWeight="800" fontSize={18}>{memberData.firstName[0]}{memberData.lastName[0]}</Text>
-                        )}
-                      </YStack>
-                      <Text color="$color" fontSize={12} fontWeight="800" marginTop="$1">{memberData.firstName}</Text>
-                      <XStack backgroundColor="#007AFF" px="$2" py="$0.5" borderRadius="$2" marginTop="$0.5">
-                        <Text color="#FFFFFF" fontSize={9} fontWeight="800">This Member</Text>
-                      </XStack>
-                    </YStack>
-
-                    {/* Spouse Node */}
-                    {spouses.map((sp) => {
-                      const isClickable = sp.isLinked && (sp.linkedMemberId || sp.childMemberId);
-                      return (
-                        <React.Fragment key={sp.id}>
-                          <XStack space="$1" alignItems="center">
-                            <YStack width={10} height={2} backgroundColor="#FF3B30" />
-                            <Text color="#FF3B30" fontSize={9} fontWeight="700">married</Text>
-                            <YStack width={10} height={2} backgroundColor="#FF3B30" />
-                          </XStack>
-                          <TouchableOpacity 
-                            disabled={!isClickable}
-                            onPress={() => isClickable && handleFamilyNavigate(sp)}
-                            activeOpacity={0.7}
-                          >
-                            <YStack alignItems="center">
-                              <YStack 
-                                width={50} 
-                                height={50} 
-                                borderRadius={25} 
-                                backgroundColor="rgba(255, 149, 0, 0.15)" 
-                                justifyContent="center" 
-                                alignItems="center" 
-                                borderWidth={sp.isLinked ? 2.5 : 0} 
-                                borderColor="#FF9500"
-                                overflow="hidden"
-                              >
-                                {sp.photo ? (
-                                  <Image source={{ uri: sp.photo }} style={{ width: 46, height: 46, borderRadius: 23 }} />
-                                ) : (
-                                  <Text color="#FF9500" fontWeight="800" fontSize={14}>{sp.firstName[0]}{sp.lastName[0]}</Text>
-                                )}
-                              </YStack>
-                              <Text color="$color" fontSize={11} fontWeight="700" marginTop="$1">{sp.firstName} {sp.lastName}</Text>
-                              <Text color="$colorPress" fontSize={10}>Spouse</Text>
-                              {isClickable ? (
-                                <XStack backgroundColor="rgba(255, 149, 0, 0.15)" px="$1.5" py="$0.5" borderRadius="$2" marginTop="$0.5">
-                                  <Text color="#FF9500" fontSize={8} fontWeight="700">View Profile</Text>
-                                </XStack>
-                              ) : null}
-                            </YStack>
-                          </TouchableOpacity>
-                        </React.Fragment>
-                      );
-                    })}
-                  </XStack>
-
-                  {children.length > 0 && (
-                    <YStack width={2} height={16} backgroundColor="$borderColor" marginBottom="$2" />
-                  )}
-
-                  {/* Children Row */}
-                  {children.length > 0 && (
-                    <XStack space="$3" justifyContent="center" flexWrap="wrap">
-                      {children.map((ch) => {
-                        const isClickable = ch.isLinked && (ch.linkedMemberId || ch.childMemberId || ch.linkedChildMemberId);
-                        return (
-                          <TouchableOpacity 
-                            key={ch.id} 
-                            disabled={!isClickable}
-                            onPress={() => isClickable && handleFamilyNavigate(ch)}
-                            activeOpacity={0.7}
-                          >
-                            <YStack alignItems="center">
-                              <YStack 
-                                width={44} 
-                                height={44} 
-                                borderRadius={22} 
-                                backgroundColor="rgba(52, 199, 89, 0.15)" 
-                                justifyContent="center" 
-                                alignItems="center" 
-                                borderWidth={ch.isLinked ? 2 : 0} 
-                                borderColor="#34C759"
-                                overflow="hidden"
-                              >
-                                {ch.photo ? (
-                                  <Image source={{ uri: ch.photo }} style={{ width: 40, height: 40, borderRadius: 20 }} />
-                                ) : (
-                                  <Text color="#34C759" fontWeight="800" fontSize={13}>{ch.firstName[0]}{ch.lastName[0]}</Text>
-                                )}
-                              </YStack>
-                              <Text color="$color" fontSize={10} fontWeight="700" marginTop="$1">{ch.firstName}</Text>
-                              <Text color="$colorPress" fontSize={9}>Child</Text>
-                              {isClickable ? (
-                                <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$1.5" py="$0.5" borderRadius="$2" marginTop="$0.5">
-                                  <Text color="#34C759" fontSize={8} fontWeight="700">View Profile</Text>
-                                </XStack>
-                              ) : null}
-                            </YStack>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </XStack>
-                  )}
-                </YStack>
-              ) : (
-                <YStack py="$4" px="$3" alignItems="center" backgroundColor="rgba(142, 142, 147, 0.05)" borderRadius="$4" borderWidth={1} borderColor="$borderColor" marginBottom="$3">
-                  <YStack width={48} height={48} borderRadius={24} backgroundColor="rgba(0, 122, 255, 0.1)" justifyContent="center" alignItems="center" marginBottom="$2">
-                    <Users size={24} color="#007AFF" />
-                  </YStack>
-                  <Text color="$color" fontSize={14} fontWeight="700">No Family Members Linked</Text>
-                  <Paragraph color="$colorPress" fontSize={12} textAlign="center" marginTop="$1" maxWidth={260}>
-                    No relatives (parents, spouse, siblings, or children) have been linked to this member profile yet.
-                  </Paragraph>
-                  <TouchableOpacity 
-                    onPress={() => router.push(`/members/edit/${memberData.id}` as any)}
-                    style={{ marginTop: 12, backgroundColor: '#007AFF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}
-                  >
-                    <Text color="#FFFFFF" fontSize={12} fontWeight="700">Link Family Members</Text>
-                  </TouchableOpacity>
-                </YStack>
-              )}
-
-              {/* Detailed Family Members List */}
-              {memberData.familyMembers && memberData.familyMembers.length > 0 ? (
-                <YStack space="$2">
-                  <Text color="$color" fontSize={13} fontWeight="700" marginBottom="$1">Family Details</Text>
-                  {memberData.familyMembers.map((fm) => {
-                    const isClickable = fm.isLinked && (fm.linkedMemberId || fm.childMemberId || fm.linkedChildMemberId);
-                    return (
-                      <TouchableOpacity 
-                        key={fm.id} 
-                        disabled={!isClickable}
-                        onPress={() => isClickable && handleFamilyNavigate(fm)}
-                        activeOpacity={0.7}
-                      >
-                        <XStack 
-                          p="$3" 
-                          borderRadius="$4" 
-                          backgroundColor="$background" 
-                          borderColor="$borderColor" 
-                          borderWidth={1}
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <YStack flex={1}>
-                            <XStack space="$2" alignItems="center">
-                              <Text color="$color" fontSize={14} fontWeight="700">{fm.firstName} {fm.lastName}</Text>
-                              {fm.isLinked ? (
-                                <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$2" py="$0.5" borderRadius="$2">
-                                  <Text color="#34C759" fontSize={10} fontWeight="800">Church Member</Text>
-                                </XStack>
-                              ) : null}
-                            </XStack>
-                            <Text color="$colorPress" fontSize={12} textTransform="capitalize" marginTop="$1">
-                              {fm.relationship} {fm.phone ? `• ${fm.phone}` : ''}
-                            </Text>
-                          </YStack>
-
-                          <XStack space="$2" alignItems="center">
-                            {fm.phone ? (
-                              <TouchableOpacity
-                                onPress={() => handleCall(fm.phone)}
-                                style={{
-                                  padding: 7,
-                                  borderRadius: 16,
-                                  backgroundColor: 'rgba(52, 199, 89, 0.12)'
-                                }}
-                              >
-                                <Phone size={13} color="#34C759" />
-                              </TouchableOpacity>
-                            ) : null}
-                            {isClickable ? (
-                              <ExternalLink size={16} color="#007AFF" />
-                            ) : null}
-                          </XStack>
-                        </XStack>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </YStack>
+            <Section title="Baptism">
+              <DetailRow label="Status" value={memberData.baptismInfo.baptismStatus === 'not_baptised' ? 'Not baptised' : 'Baptised'} />
+              {memberData.baptismInfo.baptismStatus !== 'not_baptised' ? (
+                <DetailRow label="Date" value={formatBaptismDate(memberData.baptismInfo)} />
               ) : null}
-            </YStack>
-          </Card>
-
-          {/* Legal Information Card */}
-          {memberData.legalInfo && (memberData.legalInfo.ghanaCardNumber || memberData.legalInfo.alternativeIdNumber) ? (
-            <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-              <YStack space="$3">
-                <XStack space="$2" alignItems="center">
-                  <CreditCard size={18} color="#FF2D55" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Legal Information</Text>
-                </XStack>
-                <Separator borderColor="$borderColor" />
-
-                <YStack space="$2">
-                  {memberData.legalInfo.ghanaCardNumber ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Ghana Card Number</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{memberData.legalInfo.ghanaCardNumber}</Text>
-                    </XStack>
-                  ) : null}
-                  {memberData.legalInfo.ghanaCardExpiryDate ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Ghana Card Expiry</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{formatDate(memberData.legalInfo.ghanaCardExpiryDate)}</Text>
-                    </XStack>
-                  ) : null}
-                  {memberData.legalInfo.alternativeIdNumber ? (
-                    <XStack justifyContent="space-between">
-                      <Text color="$colorPress" fontSize={12}>Alternative ID ({memberData.legalInfo.alternativeIdType || 'Other'})</Text>
-                      <Text color="$color" fontSize={13} fontWeight="600">{memberData.legalInfo.alternativeIdNumber}</Text>
-                    </XStack>
-                  ) : null}
-                </YStack>
-              </YStack>
-            </Card>
+              {memberData.baptismInfo.previousCongregation ? <DetailRow label="Previous congregation" value={memberData.baptismInfo.previousCongregation} /> : null}
+              {memberData.baptismInfo.roleInPreviousCongregation ? <DetailRow label="Role there" value={memberData.baptismInfo.roleInPreviousCongregation} /> : null}
+            </Section>
           ) : null}
 
-          {/* Notes Card */}
-          {memberData.notes ? (
-            <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-              <YStack space="$2">
-                <XStack space="$2" alignItems="center">
-                  <FileText size={18} color="#5AC8FA" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Notes</Text>
-                </XStack>
-                <Separator borderColor="$borderColor" />
-                <Paragraph color="$colorPress" fontSize={13}>{memberData.notes}</Paragraph>
-              </YStack>
-            </Card>
+          {(memberData.ministries?.length || memberData.positionHeld?.length) ? (
+            <Section title="Ministries & positions" bare>
+              <Surface style={{ gap: space.md }}>
+                {memberData.ministries?.length ? (
+                  <View style={{ gap: space.xs }}>
+                    <AppText variant="caption" tone="muted">Ministries</AppText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {memberData.ministries.map((m, idx) => <Badge key={idx} label={m} tone="primary" />)}
+                    </View>
+                  </View>
+                ) : null}
+                {memberData.positionHeld?.length ? (
+                  <View style={{ gap: space.xs }}>
+                    <AppText variant="caption" tone="muted">Positions held</AppText>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {memberData.positionHeld.map((p, idx) => <Badge key={idx} label={p} tone="neutral" />)}
+                    </View>
+                  </View>
+                ) : null}
+              </Surface>
+            </Section>
           ) : null}
 
-          {/* Attendance Stats Card */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack justifyContent="space-between" alignItems="center">
-                <XStack space="$2" alignItems="center">
-                  <Calendar size={18} color="#007AFF" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Attendance Statistics</Text>
-                </XStack>
-                <TouchableOpacity onPress={() => router.push('/attendance' as any)}>
-                  <Text color="#007AFF" fontSize={12} fontWeight="700">Attendance Module →</Text>
-                </TouchableOpacity>
-              </XStack>
+          {/* Family */}
+          <Section title="Family" bare>
+            {hasFamily ? (
+              <Surface style={{ gap: space.xs, alignItems: 'center' }}>
+                {parents.length > 0 ? (
+                  <>
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.sm, flexWrap: 'wrap' }}>
+                      {parents.map(p => <FamilyNode key={p.id} fm={p} label={p.relationship === 'father' ? 'Father' : 'Mother'} />)}
+                    </View>
+                    {connector()}
+                  </>
+                ) : null}
 
-              <Separator borderColor="$borderColor" />
-
-              <XStack alignItems="center" space="$4">
-                <YStack width={64} height={64} borderRadius={32} backgroundColor="rgba(52, 199, 89, 0.15)" justifyContent="center" alignItems="center" borderWidth={3} borderColor="#34C759">
-                  <Text color="#34C759" fontSize={16} fontWeight="800">{attendanceStats.percentage}%</Text>
-                </YStack>
-
-                <YStack flex={1} space="$1">
-                  <Text color="$color" fontSize={14} fontWeight="700">Individual Record</Text>
-                  <Text color="$colorPress" fontSize={12}>
-                    Attended {attendanceStats.presentCount} of {attendanceStats.totalServices} service sessions
-                  </Text>
-                </YStack>
-              </XStack>
-
-              {attendanceStats.history && attendanceStats.history.length > 0 && (
-                <YStack space="$1.5" marginTop="$2">
-                  <Text color="$colorPress" fontSize={11} fontWeight="700" textTransform="uppercase">Recent Individual Service Logs</Text>
-                  {attendanceStats.history.slice(0, 4).map((item: any) => (
-                    <XStack key={item.id} p="$2.5" borderRadius="$3" backgroundColor="$background" borderWidth={1} borderColor="$borderColor" justifyContent="space-between" alignItems="center">
-                      <YStack>
-                        <Text color="$color" fontSize={13} fontWeight="700">{item.serviceType}</Text>
-                        <Text color="$colorPress" fontSize={11}>{item.date}</Text>
-                      </YStack>
-                      <XStack backgroundColor={item.isPresent ? 'rgba(52, 199, 89, 0.15)' : 'rgba(255, 59, 48, 0.15)'} px="$2" py="$0.5" borderRadius="$2">
-                        <Text color={item.isPresent ? '#34C759' : '#FF3B30'} fontSize={10} fontWeight="800">
-                          {item.isPresent ? 'PRESENT' : 'ABSENT'}
-                        </Text>
-                      </XStack>
-                    </XStack>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs, flexWrap: 'wrap' }}>
+                  {siblings.map(sib => <FamilyNode key={sib.id} fm={sib} label="Sibling" size={42} />)}
+                  <View style={{ alignItems: 'center', width: 92, gap: 4 }}>
+                    <View style={{ padding: 2, borderRadius: 24, borderWidth: 2, borderColor: c.primary.base }}>
+                      <Avatar name={`${memberData.firstName} ${memberData.lastName}`} uri={avatarUri || memberData.photo} size={58} />
+                    </View>
+                    <AppText variant="captionStrong" align="center" numberOfLines={1}>{memberData.firstName}</AppText>
+                    <Badge label="This member" tone="primary" />
+                  </View>
+                  {spouses.map(sp => (
+                    <React.Fragment key={sp.id}>
+                      <AppText variant="micro" tone="subtle">married</AppText>
+                      <FamilyNode fm={sp} label="Spouse" />
+                    </React.Fragment>
                   ))}
-                </YStack>
-              )}
-            </YStack>
-          </Card>
+                </View>
 
-        </YStack>
+                {children.length > 0 ? (
+                  <>
+                    {connector()}
+                    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: space.sm, flexWrap: 'wrap' }}>
+                      {children.map(ch => <FamilyNode key={ch.id} fm={ch} label="Child" size={42} />)}
+                    </View>
+                  </>
+                ) : null}
+              </Surface>
+            ) : (
+              <Surface>
+                <EmptyState
+                  icon={Users}
+                  title="No family linked"
+                  message="Link parents, a spouse, siblings or children to see the family tree."
+                  action={{ label: 'Link family members', onPress: () => router.push(`/members/edit/${memberData.id}` as any) }}
+                />
+              </Surface>
+            )}
+
+            {memberData.familyMembers && memberData.familyMembers.length > 0 ? (
+              <Surface padded={false}>
+                {memberData.familyMembers.map((fm, i) => {
+                  const clickable = isClickable(fm);
+                  return (
+                    <View key={fm.id} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+                      <ListRow
+                        title={`${fm.firstName} ${fm.lastName}`}
+                        subtitle={`${fm.relationship.charAt(0).toUpperCase() + fm.relationship.slice(1)}${fm.phone ? ` · ${fm.phone}` : ''}`}
+                        onPress={clickable ? () => handleFamilyNavigate(fm) : undefined}
+                        right={
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            {fm.isLinked ? <Badge label="Member" tone="success" /> : null}
+                            {fm.phone ? <IconButton icon={Phone} label={`Call ${fm.firstName}`} tone="primary" size={36} onPress={() => handleCall(fm.phone)} /> : null}
+                          </View>
+                        }
+                        chevron={clickable}
+                      />
+                    </View>
+                  );
+                })}
+              </Surface>
+            ) : null}
+          </Section>
+
+          {memberData.legalInfo && (memberData.legalInfo.ghanaCardNumber || memberData.legalInfo.alternativeIdNumber) ? (
+            <Section title="Identification">
+              {memberData.legalInfo.ghanaCardNumber ? <DetailRow label="Ghana Card" value={memberData.legalInfo.ghanaCardNumber} /> : null}
+              {memberData.legalInfo.ghanaCardExpiryDate ? <DetailRow label="Ghana Card expiry" value={formatDate(memberData.legalInfo.ghanaCardExpiryDate)} /> : null}
+              {memberData.legalInfo.alternativeIdNumber ? (
+                <DetailRow label={`Other ID (${memberData.legalInfo.alternativeIdType || 'Other'})`} value={memberData.legalInfo.alternativeIdNumber} />
+              ) : null}
+            </Section>
+          ) : null}
+
+          {memberData.notes ? (
+            <Section title="Notes" bare>
+              <Surface>
+                <AppText variant="body" tone="muted" selectable>{memberData.notes}</AppText>
+              </Surface>
+            </Section>
+          ) : null}
+        </Animated.View>
       </ScrollView>
 
-      {/* Profile Photo Full Size Modal */}
+      {/* Full-size photo */}
       <Modal visible={photoModalVisible} transparent animationType="fade" onRequestClose={() => setPhotoModalVisible(false)}>
-        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} activeOpacity={1} onPress={() => setPhotoModalVisible(false)}>
-          <TouchableOpacity style={{ position: 'absolute', top: 50, right: 20, zIndex: 10 }} onPress={() => setPhotoModalVisible(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setPhotoModalVisible(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Close photo"
+        >
+          <View style={{ position: 'absolute', top: 56, right: 20 }}>
             <X size={28} color="#FFFFFF" />
-          </TouchableOpacity>
+          </View>
           {avatarUri ? (
             <Image
               source={{ uri: avatarUri }}
-              style={{ width: Dimensions.get('window').width * 0.9, height: Dimensions.get('window').width * 0.9, borderRadius: 16 }}
+              style={{ width: Dimensions.get('window').width * 0.9, height: Dimensions.get('window').width * 0.9, borderRadius: radius.lg }}
               resizeMode="contain"
             />
           ) : null}
-        </TouchableOpacity>
+        </Pressable>
       </Modal>
-    </YStack>
+    </Screen>
   );
 }
+

@@ -1,13 +1,22 @@
 import React, { useEffect, useState } from 'react';
+import { Alert, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { YStack, XStack, Text, Card, H2, Paragraph, Button, Spinner, Avatar, ScrollView } from 'tamagui';
+import Animated from 'react-native-reanimated';
+import { LogOut, Mail, Palette, ShieldCheck } from '@tamagui/lucide-icons';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
+import { clearAccessProfile, useAccess } from '../lib/access';
 import { AppHeader } from '../components/AppHeader';
+import { SkeletonProfile } from '../components/Skeleton';
+import { AppText, Avatar, Badge, ListRow, Screen, Section } from '../components/ui';
+import { enterUp } from '../theme/animations';
+import { space } from '../theme/tokens';
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { profile: access, canRoute } = useAccess();
   const [loading, setLoading] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
   const [profile, setProfile] = useState<{ name: string; email: string; role: string } | null>(null);
 
   useEffect(() => {
@@ -31,84 +40,81 @@ export default function ProfileScreen() {
   }, []);
 
   const handleSignOut = async () => {
+    setSigningOut(true);
     try {
       await api.auth.signOut();
       await supabase.auth.signOut();
+      await clearAccessProfile();
       router.replace('/');
     } catch (e) {
       console.error(e);
+    } finally {
+      setSigningOut(false);
     }
   };
 
-  if (loading) {
-    return (
-      <YStack flex={1} backgroundColor="$background">
-        <AppHeader title="Profile Settings" showBack />
-        <YStack flex={1} justifyContent="center" alignItems="center">
-          <Spinner size="large" color="#007AFF" />
-        </YStack>
-      </YStack>
-    );
-  }
+  const confirmSignOut = () => {
+    Alert.alert('Sign out?', 'Changes waiting to sync stay on this device and upload after you sign in again.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: handleSignOut },
+    ]);
+  };
+
+  // The server-side role (from access) is authoritative; metadata is only a fallback
+  const name = access?.name || profile?.name || 'Administrator';
+  const role = access?.role || profile?.role || 'Admin';
 
   return (
-    <YStack flex={1} backgroundColor="$background">
-      <AppHeader title="Profile Settings" subtitle="Account & Session Controls" showBack />
+    <Screen>
+      <AppHeader title="Profile" subtitle="Account and session" showBack />
 
-      <ScrollView flex={1} contentContainerStyle={{ padding: 20 }}>
-        <YStack space="$5">
-          {/* Header card with Avatar */}
-          <Card 
-            padding="$5" 
-            borderRadius="$5" 
-            backgroundColor="$cardBackground" 
-            borderColor="$borderColor"
-            borderWidth={1}
-            alignItems="center"
-            elevate
-          >
-            <Avatar circular size="$6" marginBottom="$3">
-              <Avatar.Image src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80" />
-              <Avatar.Fallback bc="$primary" />
-            </Avatar>
-            <H2 color="$color" fontWeight="800" fontSize={22}>{profile?.name}</H2>
-            <Paragraph color="$colorPress" fontSize={14}>{profile?.email}</Paragraph>
-            <YStack backgroundColor="rgba(0, 122, 255, 0.1)" px="$3" py="$1" borderRadius="$5" marginTop="$2">
-              <Text color="#007AFF" fontSize={12} fontWeight="700" textTransform="uppercase">
-                {profile?.role}
-              </Text>
-            </YStack>
-          </Card>
+      {loading ? (
+        <SkeletonProfile />
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}>
+          <Animated.View entering={enterUp()} style={{ alignItems: 'center', gap: space.sm, paddingTop: space.md }}>
+            <Avatar name={name} size={88} />
+            <View style={{ alignItems: 'center', gap: 4 }}>
+              <AppText variant="title" align="center">{name}</AppText>
+              {profile?.email ? <AppText variant="body" tone="muted" align="center">{profile.email}</AppText> : null}
+            </View>
+            <Badge label={role} tone="primary" />
+          </Animated.View>
 
-          {/* Settings list */}
-          <YStack space="$3">
-            <Text color="$color" fontSize={16} fontWeight="700" paddingLeft="$1">Account Actions</Text>
-            
-            {/* Logout Button */}
-            <Button 
-              backgroundColor="#FF3B30"
-              height={48}
-              borderRadius="$3"
-              onPress={handleSignOut}
-              pressStyle={{ scale: 0.98 }}
-            >
-              <Text color="#FFFFFF" fontWeight="700" fontSize={15}>Sign Out</Text>
-            </Button>
+          <Animated.View entering={enterUp(40)}>
+            <Section title="Account">
+              <ListRow icon={Mail} iconTone="neutral" title="Email" subtitle={profile?.email || 'Not set'} />
+              <ListRow icon={ShieldCheck} iconTone="neutral" title="Role" subtitle={role} />
+            </Section>
+          </Animated.View>
 
-            {/* Back Button */}
-            <Button 
-              variant="outlined"
-              height={48}
-              borderRadius="$3"
-              borderColor="$borderColor"
-              onPress={() => router.back()}
-              pressStyle={{ scale: 0.98 }}
-            >
-              <Text color="$color" fontWeight="600" fontSize={15}>Back to Dashboard</Text>
-            </Button>
-          </YStack>
-        </YStack>
-      </ScrollView>
-    </YStack>
+          {canRoute('/settings') ? (
+            <Animated.View entering={enterUp(80)}>
+              <Section title="Preferences">
+                <ListRow
+                  icon={Palette}
+                  title="Appearance"
+                  subtitle="Theme mode and colors"
+                  onPress={() => router.push('/settings?section=appearance' as any)}
+                />
+              </Section>
+            </Animated.View>
+          ) : null}
+
+          <Animated.View entering={enterUp(120)}>
+            <Section>
+              <ListRow
+                icon={LogOut}
+                title={signingOut ? 'Signing out…' : 'Sign out'}
+                destructive
+                disabled={signingOut}
+                onPress={confirmSignOut}
+                chevron={false}
+              />
+            </Section>
+          </Animated.View>
+        </ScrollView>
+      )}
+    </Screen>
   );
 }

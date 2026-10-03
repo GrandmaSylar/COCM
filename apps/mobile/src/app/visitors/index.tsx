@@ -1,21 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshControl, FlatList, TouchableOpacity, Linking } from 'react-native';
+import { RefreshControl, FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  H2, 
-  Paragraph, 
-  Button, 
-  Spinner 
-} from 'tamagui';
-import { UserCheck, Plus, Phone, Calendar, Inbox } from '@tamagui/lucide-icons';
-import { supabase } from '../../lib/supabase';
-import { getLocalVisitors, upsertLocalVisitor } from '../../lib/db';
-
+import { RefreshCw, SearchX, UserCheck, UserPlus } from '@tamagui/lucide-icons';
+import { getLocalVisitors } from '../../lib/db';
+import { syncVisitors } from '../../lib/syncEngine';
+import { useAppColors } from '../../context/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
+import { SkeletonList } from '../../components/Skeleton';
+import { Badge, EmptyState, IconButton, PersonRow, rowPosition, Screen, SearchField } from '../../components/ui';
+import { space } from '../../theme/tokens';
 
 interface Visitor {
   id: string;
@@ -28,6 +21,8 @@ interface Visitor {
 
 export default function VisitorsScreen() {
   const router = useRouter();
+  const c = useAppColors();
+  const [search, setSearch] = useState('');
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,7 +30,7 @@ export default function VisitorsScreen() {
   const loadLocalVisitors = async () => {
     try {
       const localRows = await getLocalVisitors();
-      if (localRows && localRows.length > 0) {
+      if (localRows) {
         const formatted = localRows.map((v) => {
           let residence = '';
           if (v.raw_json) {
@@ -63,38 +58,9 @@ export default function VisitorsScreen() {
 
   const fetchRemoteVisitors = async () => {
     try {
-      const { data, error } = await supabase
-        .from('visitors')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (data && !error) {
-        const formatted = data.map((v: any) => ({
-          id: v.id,
-          name: v.name || `${v.first_name || ''} ${v.last_name || ''}`.trim() || 'Visitor',
-          phone: v.phone || v.mobile,
-          residence: v.residence || v.location || (v.potential_zone ? `Zone ${v.potential_zone}` : undefined),
-          visit_date: v.visit_date || v.created_at || new Date().toISOString().split('T')[0],
-          status: v.status || v.follow_up_status || 'New'
-        }));
-        setVisitors(formatted);
-
-        // Cache to local SQLite in background
-        for (const remote of data) {
-          await upsertLocalVisitor({
-            id: remote.id,
-            name: remote.name || `${remote.first_name || ''} ${remote.last_name || ''}`.trim() || 'Visitor',
-            phone: remote.phone || remote.mobile,
-            email: remote.email,
-            visit_date: remote.visit_date || new Date().toISOString().split('T')[0],
-            potential_zone: remote.potential_zone,
-            follow_up_status: remote.status || remote.follow_up_status || 'pending',
-            notes: remote.notes,
-            raw_json: JSON.stringify({ residence: remote.residence || remote.location }),
-            created_at: remote.created_at || new Date().toISOString()
-          });
-        }
-      }
+      // Pull into SQLite (keeps visitors still waiting in the outbox), then render from SQLite
+      await syncVisitors();
+      await loadLocalVisitors();
     } catch (err) {
       console.warn('Error syncing remote visitors, using SQLite cache:', err);
     } finally {
@@ -113,87 +79,71 @@ export default function VisitorsScreen() {
     fetchRemoteVisitors();
   };
 
-  const handleCall = (phone?: string) => {
-    if (phone) Linking.openURL(`tel:${phone}`);
+  const q = search.trim().toLowerCase();
+  const shown = q
+    ? visitors.filter(v => v.name.toLowerCase().includes(q) || (v.phone || '').includes(q) || (v.residence || '').toLowerCase().includes(q))
+    : visitors;
+
+  const followUpTone = (status?: string) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'pending' || s === 'new') return 'warning' as const;
+    if (s.includes('contact') || s.includes('done') || s === 'completed') return 'success' as const;
+    return 'neutral' as const;
+  };
+
+  const formatVisit = (d: string) => {
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? d : date.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   return (
-    <YStack flex={1} backgroundColor="$background">
+    <Screen>
       <AppHeader
-        title="Visitors Registry"
-        subtitle="First-time church guests and follow-ups"
+        title="Visitors"
+        subtitle={`${visitors.length} recorded`}
         showBack
-        backTitle="People"
         rightElement={
-          <Button
-            size="$3"
-            backgroundColor="#34C759"
-            borderRadius="$3"
-            onPress={() => router.push('/visitors/add' as any)}
-            icon={<Plus size={16} color="#FFFFFF" />}
-            pressStyle={{ scale: 0.98 }}
-          >
-            <Text color="#FFFFFF" fontWeight="700" fontSize={13}>Add</Text>
-          </Button>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton icon={RefreshCw} label="Refresh" spinning={refreshing} onPress={onRefresh} />
+            <IconButton icon={UserPlus} label="Add visitor" tone="primary" onPress={() => router.push('/visitors/add' as any)} />
+          </View>
         }
       />
 
-      {loading ? (
-        <YStack flex={1} justifyContent="center" alignItems="center">
-          <Spinner size="large" color="#34C759" />
-          <Text color="$colorPress" marginTop="$2" fontSize={13}>Loading visitors registry...</Text>
-        </YStack>
-      ) : visitors.length > 0 ? (
-        <FlatList
-          data={visitors}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 16 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#34C759']} />}
-          renderItem={({ item }) => (
-            <Card
-              marginBottom="$3"
-              padding="$4"
-              borderRadius="$5"
-              backgroundColor="$cardBackground"
-              borderColor="$borderColor"
-              borderWidth={1}
-              elevate
-            >
-              <XStack space="$3" alignItems="center" justifyContent="space-between">
-                <XStack space="$3" alignItems="center" flex={1}>
-                  <YStack backgroundColor="rgba(52, 199, 89, 0.12)" p="$2.5" borderRadius="$4">
-                    <UserCheck size={24} color="#34C759" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <Text color="$color" fontSize={15} fontWeight="700">{item.name}</Text>
-                    <XStack space="$2" marginTop="$1" alignItems="center">
-                      <Calendar size={12} color="#8E8E93" />
-                      <Text color="$colorPress" fontSize={12}>{item.visit_date}</Text>
-                    </XStack>
-                  </YStack>
-                </XStack>
+      {visitors.length > 0 ? (
+        <View style={{ paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xs, backgroundColor: c.background }}>
+          <SearchField value={search} onChangeText={setSearch} placeholder="Search name, phone or area" />
+        </View>
+      ) : null}
 
-                {item.phone ? (
-                  <TouchableOpacity
-                    onPress={() => handleCall(item.phone)}
-                    style={{ padding: 8, borderRadius: 20, backgroundColor: 'rgba(52, 199, 89, 0.12)' }}
-                  >
-                    <Phone size={16} color="#34C759" />
-                  </TouchableOpacity>
-                ) : null}
-              </XStack>
-            </Card>
+      {loading ? (
+        <View style={{ padding: space.md }}>
+          <SkeletonList count={5} hasAvatar />
+        </View>
+      ) : (
+        <FlatList
+          data={shown}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: space.md, paddingTop: space.xs, paddingBottom: space.xxl, flexGrow: 1 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
+          ListEmptyComponent={
+            q ? (
+              <EmptyState icon={SearchX} title="No visitors match" message={`Nothing matches "${search}".`} action={{ label: 'Clear search', onPress: () => setSearch('') }} />
+            ) : (
+              <EmptyState icon={UserCheck} title="No visitors yet" message="Log first-time guests so they can be followed up." action={{ label: 'Add visitor', onPress: () => router.push('/visitors/add' as any) }} />
+            )
+          }
+          renderItem={({ item, index }) => (
+            <PersonRow
+              name={item.name}
+              position={rowPosition(index, shown.length)}
+              meta={<Badge label={item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'New'} tone={followUpTone(item.status)} />}
+              subtitle={[`Visited ${formatVisit(item.visit_date)}`, item.residence].filter(Boolean).join(' · ')}
+              phone={item.phone}
+            />
           )}
         />
-      ) : (
-        <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
-          <Inbox size={40} color="#8E8E93" />
-          <Text color="$color" fontSize={16} fontWeight="700" marginTop="$3">No visitors recorded</Text>
-          <Paragraph color="$colorPress" fontSize={13} textAlign="center" marginTop="$1">
-            Log first-time guests using the Add Visitor button above.
-          </Paragraph>
-        </YStack>
       )}
-    </YStack>
+    </Screen>
   );
 }

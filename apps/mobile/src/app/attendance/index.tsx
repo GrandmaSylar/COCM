@@ -1,24 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, Alert as RNAlert, Modal } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Input, Spinner } from 'tamagui';
-import {
-  Calendar,
-  Users,
-  Plus,
-  TrendingUp,
-  Search,
-  Clock,
-  Settings,
-  UserCheck,
-  Lock,
-  Unlock,
-  RefreshCw,
-  ArrowRight,
-  Eye,
-  Check,
-  X
-} from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { Calendar, Check, Hash, Lock, RefreshCw, Settings, Unlock, UserCheck } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import {
   getLocalAttendanceRecords,
@@ -30,11 +13,22 @@ import {
 import { syncCustomServices, syncAttendanceRecords } from '../../lib/syncEngine';
 import { generateUUID } from '../../lib/uuid';
 import { api } from '../../lib/api';
+import { useAppColors } from '../../context/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
+import { SkeletonList } from '../../components/Skeleton';
+import {
+  AppText, Badge, Button, EmptyState, IconButton, IconWell, ListRow, PressableScale, Screen, SearchField, Section,
+  SegmentedControl, Sheet, Surface,
+} from '../../components/ui';
+import { enterUp } from '../../theme/animations';
+import { haptic } from '../../theme/haptics';
+import { radius, space } from '../../theme/tokens';
 
 const SUNDAY_MAIN_SERVICE = 'Sunday Main Service';
 
 export default function AttendanceDashboardScreen() {
   const router = useRouter();
+  const c = useAppColors();
 
   const [records, setRecords] = useState<LocalAttendanceRecord[]>([]);
   const [customServices, setCustomServices] = useState<LocalCustomService[]>([]);
@@ -160,243 +154,189 @@ export default function AttendanceDashboardScreen() {
     ...customServices.filter(s => s.is_active === 1 && s.name !== SUNDAY_MAIN_SERVICE).map(s => s.name)
   ]));
 
+  const fmtDate = (d: string) => {
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? d : date.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top', 'left', 'right']}>
-      <YStack flex={1} backgroundColor="$background">
-      {/* Header Bar */}
-      <YStack px="$4" py="$3" borderBottomWidth={1} borderColor="$borderColor" space="$2">
-        <XStack justifyContent="space-between" alignItems="center">
-          <YStack>
-            <Text color="$color" fontSize={20} fontWeight="900">Attendance</Text>
-            <Text color="$colorPress" fontSize={12}>Track and manage service attendance</Text>
-          </YStack>
+    <Screen>
+      <AppHeader
+        title="Attendance"
+        subtitle="Service registers and live check-in"
+        showBack
+        rightElement={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton icon={RefreshCw} label="Refresh" spinning={refreshing} onPress={handleRefresh} />
+            <IconButton icon={Settings} label="Manage services" onPress={() => router.push('/attendance/services' as any)} />
+          </View>
+        }
+      />
 
-          <TouchableOpacity onPress={handleRefresh}>
-            <YStack p="$2" borderRadius="$3" backgroundColor="$borderColor" opacity={0.8}>
-              <RefreshCw size={16} color="$color" className={refreshing ? 'animate-spin' : ''} />
-            </YStack>
-          </TouchableOpacity>
-        </XStack>
+      <ScrollView
+        contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.lg }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Live sessions */}
+        {liveSessions.map(session => (
+          <Animated.View key={session.id} entering={enterUp()}>
+            <Surface style={{ gap: space.sm, borderColor: c.success.base, borderWidth: 1.5, backgroundColor: c.success.soft }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <LiveDot />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="bodyStrong" numberOfLines={1}>{session.service_type}</AppText>
+                  <AppText variant="caption" tone="muted">{session.total_count || 0} checked in so far</AppText>
+                </View>
+                <Badge label="Live" tone="success" />
+              </View>
+              <Button label="Join session" icon={UserCheck} fullWidth onPress={() => router.push(`/attendance/live/${session.id}` as any)} />
+            </Surface>
+          </Animated.View>
+        ))}
 
-        {/* Top Action Buttons (Single Row 3-Grid Fit) */}
-        <XStack space="$1.5" width="100%">
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push('/attendance/services' as any)}>
-            <XStack backgroundColor="$background" borderWidth={1} borderColor="$borderColor" px="$1.5" py="$2" borderRadius="$3" space="$1" alignItems="center" justifyContent="center">
-              <Settings size={13} color="$color" />
-              <Text color="$color" fontSize={11} fontWeight="800" numberOfLines={1}>Services</Text>
-            </XStack>
-          </TouchableOpacity>
+        {/* Ways to record */}
+        <Animated.View entering={enterUp(40)} style={{ flexDirection: 'row', gap: space.xs }}>
+          <ActionTile icon={UserCheck} title="Check in members" subtitle="Live, one by one" onPress={() => setShowLauncher(true)} />
+          <ActionTile icon={Hash} title="Record head count" subtitle="Men, women, children" onPress={() => router.push('/attendance/record-general' as any)} />
+        </Animated.View>
 
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => setShowLauncher(true)}>
-            <XStack backgroundColor="rgba(0, 122, 255, 0.15)" borderWidth={1} borderColor="rgba(0, 122, 255, 0.3)" px="$1.5" py="$2" borderRadius="$3" space="$1" alignItems="center" justifyContent="center">
-              <UserCheck size={13} color="#007AFF" />
-              <Text color="#007AFF" fontSize={11} fontWeight="800" numberOfLines={1}>Individual</Text>
-            </XStack>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push('/attendance/record-general' as any)}>
-            <XStack backgroundColor="#FF9500" px="$1.5" py="$2" borderRadius="$3" space="$1" alignItems="center" justifyContent="center">
-              <Plus size={13} color="white" />
-              <Text color="white" fontSize={11} fontWeight="800" numberOfLines={1}>Head Count</Text>
-            </XStack>
-          </TouchableOpacity>
-        </XStack>
-      </YStack>
-
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <YStack space="$4">
-
-          {/* Active Live Session Alert Banner */}
-          {liveSessions.map(session => (
-            <Card key={session.id} p="$4" borderRadius="$4" borderWidth={1.5} borderColor="#34C759" backgroundColor="rgba(52, 199, 89, 0.08)">
-              <XStack justifyContent="space-between" alignItems="center">
-                <XStack space="$3" alignItems="center" flex={1}>
-                  <YStack p="$2.5" borderRadius="$3" backgroundColor="rgba(52, 199, 89, 0.2)">
-                    <Users size={22} color="#34C759" />
-                  </YStack>
-                  <YStack flex={1}>
-                    <XStack space="$2" alignItems="center">
-                      <Text color="$color" fontSize={15} fontWeight="800">{session.service_type}</Text>
-                      <XStack backgroundColor="#34C759" px="$2" py="$0.5" borderRadius="$2">
-                        <Text color="white" fontSize={10} fontWeight="900">LIVE SESSION</Text>
-                      </XStack>
-                    </XStack>
-                    <Text color="$colorPress" fontSize={12}>{session.total_count || 0} marked present so far</Text>
-                  </YStack>
-                </XStack>
-
-                <Button backgroundColor="#34C759" size="$3" onPress={() => router.push(`/attendance/live/${session.id}` as any)}>
-                  <XStack space="$1" alignItems="center">
-                    <UserCheck size={14} color="white" />
-                    <Text color="white" fontWeight="800" fontSize={12}>Join Session</Text>
-                  </XStack>
-                </Button>
-              </XStack>
-            </Card>
+        {/* Stats */}
+        <Animated.View entering={enterUp(80)} style={{ flexDirection: 'row', borderRadius: radius.md, backgroundColor: c.surfaceMuted, paddingVertical: space.sm }}>
+          {[
+            { label: 'Services', value: totalServices },
+            { label: 'Average', value: averageAttendance },
+            { label: 'Last 7 days', value: thisWeekAttendance },
+          ].map((m, i) => (
+            <View key={m.label} style={{ flex: 1, alignItems: 'center', gap: 2, borderLeftWidth: i ? 1 : 0, borderLeftColor: c.border }}>
+              <AppText variant="headline" numeric>{m.value.toLocaleString()}</AppText>
+              <AppText variant="caption" tone="muted">{m.label}</AppText>
+            </View>
           ))}
+        </Animated.View>
 
-          {/* Stats Summary Cards */}
-          <XStack space="$2">
-            <Card flex={1} p="$3" borderRadius="$4" borderWidth={1} borderColor="rgba(0, 122, 255, 0.3)" backgroundColor="rgba(0, 122, 255, 0.08)">
-              <Calendar size={18} color="#007AFF" />
-              <Text color="$color" fontSize={22} fontWeight="900" marginTop="$1">{totalServices}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">Total Services</Text>
-            </Card>
+        {/* Registers */}
+        <View style={{ gap: space.sm }}>
+          <SearchField value={searchTerm} onChangeText={setSearchTerm} placeholder="Search by service" />
+          <SegmentedControl
+            accessibilityLabel="Attendance type"
+            value={selectedAttendanceType as 'all' | 'individual' | 'general'}
+            onChange={setSelectedAttendanceType}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'individual', label: 'Check-in' },
+              { value: 'general', label: 'Head count' },
+            ]}
+          />
+        </View>
 
-            <Card flex={1} p="$3" borderRadius="$4" borderWidth={1} borderColor="rgba(52, 199, 89, 0.3)" backgroundColor="rgba(52, 199, 89, 0.08)">
-              <Users size={18} color="#34C759" />
-              <Text color="$color" fontSize={22} fontWeight="900" marginTop="$1">{averageAttendance}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">Avg Attendance</Text>
-            </Card>
-
-            <Card flex={1} p="$3" borderRadius="$4" borderWidth={1} borderColor="rgba(255, 149, 0, 0.3)" backgroundColor="rgba(255, 149, 0, 0.08)">
-              <TrendingUp size={18} color="#FF9500" />
-              <Text color="$color" fontSize={22} fontWeight="900" marginTop="$1">{thisWeekAttendance}</Text>
-              <Text color="$colorPress" fontSize={11} fontWeight="700">This Week</Text>
-            </Card>
-          </XStack>
-
-          {/* Search & Mode Filters */}
-          <YStack space="$2">
-            <XStack px="$3" py="$2" borderRadius="$3" borderWidth={1} borderColor="$borderColor" backgroundColor="$background" alignItems="center" space="$2">
-              <Search size={16} color="#8E8E93" />
-              <Input
-                placeholder="Search service records..."
-                placeholderTextColor="#8E8E93"
-                value={searchTerm}
-                onChangeText={setSearchTerm}
-                backgroundColor="transparent"
-                borderWidth={0}
-                flex={1}
-                size="$2"
+        <Section title={`Registers · ${filteredRecords.length}`} bare>
+          {loading ? (
+            <SkeletonList count={4} hasAvatar={false} />
+          ) : filteredRecords.length === 0 ? (
+            <Surface>
+              <EmptyState
+                icon={Calendar}
+                title={records.length ? 'No registers match' : 'No registers yet'}
+                message={records.length ? 'Try a different search or type.' : 'Start a live check-in or record a head count after a service.'}
               />
-            </XStack>
-
-            <XStack space="$2">
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
-                {(['all', 'individual', 'general'] as const).map(type => {
-                  const isSelected = selectedAttendanceType === type;
-                  return (
-                    <TouchableOpacity key={type} onPress={() => setSelectedAttendanceType(type)}>
-                      <YStack
-                        px="$3"
-                        py="$1.5"
-                        borderRadius="$3"
-                        borderWidth={1}
-                        borderColor={isSelected ? '#FF9500' : '$borderColor'}
-                        backgroundColor={isSelected ? 'rgba(255, 149, 0, 0.15)' : '$background'}
-                      >
-                        <Text color={isSelected ? '#FF9500' : '$colorPress'} fontSize={11} fontWeight={isSelected ? '800' : '600'} textTransform="uppercase">
-                          {type === 'all' ? 'All Types' : type === 'individual' ? 'Individual' : 'Head Count'}
-                        </Text>
-                      </YStack>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </XStack>
-          </YStack>
-
-          {/* Historical Registers List */}
-          <YStack space="$2">
-            <Text color="$color" fontSize={14} fontWeight="800" textTransform="uppercase" letterSpacing={0.5}>
-              Recent Service Registers ({filteredRecords.length})
-            </Text>
-
-            {loading ? (
-              <Spinner size="large" color="#FF9500" py="$6" />
-            ) : filteredRecords.length === 0 ? (
-              <Card p="$5" borderRadius="$4" borderWidth={1} borderColor="$borderColor" alignItems="center">
-                <Calendar size={28} color="#8E8E93" />
-                <Text color="$color" fontSize={14} fontWeight="800" marginTop="$2">No Service Records Found</Text>
-                <Text color="$colorPress" fontSize={12} textAlign="center" marginTop="$1">
-                  Tap "Mark Individual" to start a live session or "Record Head Count" to enter aggregate figures.
-                </Text>
-              </Card>
-            ) : (
-              filteredRecords.map(record => {
+            </Surface>
+          ) : (
+            <Surface padded={false}>
+              {filteredRecords.map((record, i) => {
                 const editInfo = getEditWindowInfo(record.created_at);
                 const isGeneral = record.attendance_type === 'general';
-
                 return (
-                  <Card key={record.id} p="$3.5" borderRadius="$4" borderWidth={1} borderColor="$borderColor" backgroundColor="$background">
-                    <XStack justifyContent="space-between" alignItems="center">
-                      <XStack space="$3" alignItems="center" flex={1}>
-                        <YStack p="$2" borderRadius="$3" backgroundColor={isGeneral ? 'rgba(0, 122, 255, 0.15)' : 'rgba(255, 149, 0, 0.15)'}>
-                          <Calendar size={20} color={isGeneral ? '#007AFF' : '#FF9500'} />
-                        </YStack>
-                        <YStack flex={1}>
-                          <Text color="$color" fontSize={14} fontWeight="800">{record.service_type}</Text>
-                          <XStack space="$1.5" alignItems="center" marginTop="$0.5">
-                            <XStack backgroundColor={isGeneral ? 'rgba(0, 122, 255, 0.15)' : 'rgba(255, 149, 0, 0.15)'} px="$2" py="$0.5" borderRadius="$2">
-                              <Text color={isGeneral ? '#007AFF' : '#FF9500'} fontSize={10} fontWeight="800">
-                                {isGeneral ? 'Head Count' : 'Individual'}
-                              </Text>
-                            </XStack>
-
-                            <XStack backgroundColor="rgba(142, 142, 147, 0.15)" px="$2" py="$0.5" borderRadius="$2" space="$1" alignItems="center">
-                              {editInfo.canEdit ? <Unlock size={10} color="#34C759" /> : <Lock size={10} color="#8E8E93" />}
-                              <Text color={editInfo.canEdit ? '#34C759' : '#8E8E93'} fontSize={10} fontWeight="700">
-                                {editInfo.label}
-                              </Text>
-                            </XStack>
-                          </XStack>
-                          <Text color="$colorPress" fontSize={11} marginTop="$1">Date: {record.date}</Text>
-                        </YStack>
-                      </XStack>
-
-                      <YStack alignItems="flex-end" space="$1">
-                        <Text color="#FF9500" fontSize={20} fontWeight="900">{record.total_count}</Text>
-                        <Text color="$colorPress" fontSize={10} fontWeight="700">ATTENDEES</Text>
-                      </YStack>
-                    </XStack>
-                  </Card>
-                );
-              })
-            )}
-          </YStack>
-
-        </YStack>
-      </ScrollView>
-
-      {/* Live Session Launcher Modal */}
-      <Modal visible={showLauncher} transparent animationType="slide">
-        <YStack flex={1} backgroundColor="rgba(0,0,0,0.6)" justifyContent="flex-end">
-          <Card p="$4" borderTopLeftRadius="$5" borderTopRightRadius="$5" backgroundColor="$background" space="$3">
-            <XStack justifyContent="space-between" alignItems="center">
-              <Text color="$color" fontSize={16} fontWeight="800">Launch Live Session</Text>
-              <TouchableOpacity onPress={() => setShowLauncher(false)}>
-                <X size={18} color="$color" />
-              </TouchableOpacity>
-            </XStack>
-
-            <Text color="$colorPress" fontSize={12}>
-              Select service type for today's live individual member check-in session.
-            </Text>
-
-            <YStack space="$2">
-              {availableServiceTypes.map(st => {
-                const isSelected = launchServiceType === st;
-                return (
-                  <TouchableOpacity key={st} onPress={() => setLaunchServiceType(st)}>
-                    <Card p="$3" borderRadius="$3" borderWidth={1.5} borderColor={isSelected ? '#FF9500' : '$borderColor'} backgroundColor={isSelected ? 'rgba(255, 149, 0, 0.1)' : '$background'}>
-                      <XStack justifyContent="space-between" alignItems="center">
-                        <Text color={isSelected ? '#FF9500' : '$color'} fontSize={14} fontWeight={isSelected ? '800' : '600'}>{st}</Text>
-                        {isSelected && <Check size={16} color="#FF9500" />}
-                      </XStack>
-                    </Card>
-                  </TouchableOpacity>
+                  <View key={record.id} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+                    <ListRow
+                      icon={isGeneral ? Hash : UserCheck}
+                      iconTone={isGeneral ? 'info' : 'primary'}
+                      title={record.service_type}
+                      subtitle={fmtDate(record.date)}
+                      right={
+                        <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                          <AppText variant="headline" numeric>{record.total_count}</AppText>
+                          <Badge
+                            label={editInfo.canEdit ? editInfo.label : 'Locked'}
+                            tone={editInfo.canEdit ? 'success' : 'neutral'}
+                            icon={editInfo.canEdit ? Unlock : Lock}
+                          />
+                        </View>
+                      }
+                    />
+                  </View>
                 );
               })}
-            </YStack>
+            </Surface>
+          )}
+        </Section>
+      </ScrollView>
 
-            <Button backgroundColor="#FF9500" size="$4" onPress={handleStartLiveSession} marginTop="$2">
-              <Text color="white" fontWeight="800" fontSize={14}>Start Live Session</Text>
-            </Button>
-          </Card>
-        </YStack>
-      </Modal>
-    </YStack>
-    </SafeAreaView>
+      {/* Live session launcher */}
+      <Sheet
+        visible={showLauncher}
+        onClose={() => setShowLauncher(false)}
+        title="Start live check-in"
+        subtitle="Choose the service for today’s check-in"
+        footer={<Button label="Start session" icon={UserCheck} fullWidth onPress={handleStartLiveSession} />}
+      >
+        <Surface padded={false}>
+          {availableServiceTypes.map((st, i) => {
+            const selected = launchServiceType === st;
+            return (
+              <Pressable
+                key={st}
+                onPress={() => { haptic.selection(); setLaunchServiceType(st); }}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row', alignItems: 'center', minHeight: 52, paddingHorizontal: space.md, gap: space.sm,
+                  borderTopWidth: i ? 1 : 0, borderTopColor: c.border,
+                  backgroundColor: pressed ? c.surfaceMuted : 'transparent',
+                })}
+              >
+                <AppText variant={selected ? 'bodyStrong' : 'bodyMedium'} style={{ flex: 1 }}>{st}</AppText>
+                {selected ? <Check size={20} color={c.primary.text} /> : null}
+              </Pressable>
+            );
+          })}
+        </Surface>
+      </Sheet>
+    </Screen>
+  );
+}
+
+function ActionTile({ icon, title, subtitle, onPress }: { icon: any; title: string; subtitle: string; onPress: () => void }) {
+  const c = useAppColors();
+  return (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${subtitle}`}
+      style={{ flex: 1, gap: space.sm, padding: space.md, borderRadius: radius.lg, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, minHeight: 112 }}
+    >
+      <IconWell icon={icon} tone="primary" size={40} />
+      <View style={{ gap: 2 }}>
+        <AppText variant="bodyStrong">{title}</AppText>
+        <AppText variant="caption" tone="muted">{subtitle}</AppText>
+      </View>
+    </PressableScale>
+  );
+}
+
+/** Small pulsing dot for live sessions (static with Reduce Motion). */
+function LiveDot() {
+  const c = useAppColors();
+  const reduceMotion = useReducedMotion();
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (!reduceMotion) scale.value = withRepeat(withTiming(1.8, { duration: 1100 }), -1, false);
+  }, [reduceMotion]);
+  const ring = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }], opacity: 2 - scale.value }));
+  return (
+    <View style={{ width: 20, height: 20, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[{ position: 'absolute', width: 12, height: 12, borderRadius: 6, backgroundColor: c.success.base }, ring]} />
+      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: c.success.base }} />
+    </View>
   );
 }

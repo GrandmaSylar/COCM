@@ -1,10 +1,12 @@
 import React from 'react';
-import { TouchableOpacity, StatusBar } from 'react-native';
+import { Pressable, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { XStack, YStack, Text, Paragraph } from 'tamagui';
-import { ArrowLeft, Moon, Sun } from '@tamagui/lucide-icons';
+import { XStack, YStack, Text } from 'tamagui';
+import { ChevronLeft, Moon, Sun } from '@tamagui/lucide-icons';
 import { useThemeContext } from '../context/ThemeContext';
+import { fonts, HIT, radius } from '../theme/tokens';
+import { haptic } from '../theme/haptics';
 
 export interface AppHeaderProps {
   title: string;
@@ -19,6 +21,10 @@ export interface AppHeaderProps {
   compact?: boolean;
 }
 
+/**
+ * The single screen header. Handles the top safe area, back navigation and a
+ * right-side action slot.
+ */
 export function AppHeader({
   title,
   subtitle,
@@ -27,14 +33,16 @@ export function AppHeader({
   backTitle,
   rightElement,
   showThemeToggle = false,
-  backgroundColor = '$cardBackground',
-  borderColor = '$borderColor',
+  backgroundColor,
+  borderColor,
   compact = false,
 }: AppHeaderProps) {
   const router = useRouter();
-  const { isDark, toggleTheme, themeColors } = useThemeContext();
+  const { isDark, toggleTheme, colors } = useThemeContext();
+  const headerBg = backgroundColor ?? colors.surface;
 
   const handleBack = () => {
+    haptic.light();
     if (onBack) {
       onBack();
     } else if (router.canGoBack()) {
@@ -45,77 +53,77 @@ export function AppHeader({
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{ backgroundColor: themeColors.headerBackground }}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.headerBackground} />
+    <SafeAreaView edges={['top']} style={{ backgroundColor: headerBg }}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={headerBg} animated />
       <XStack
-        px="$4"
-        py={compact ? '$2.5' : '$3'}
+        paddingLeft={showBack ? 8 : 16}
+        paddingRight={16}
+        paddingVertical={compact ? 6 : 8}
         alignItems="center"
         justifyContent="space-between"
-        backgroundColor={backgroundColor}
+        backgroundColor={headerBg}
         borderBottomWidth={1}
-        borderColor={borderColor}
-        minHeight={54}
+        borderColor={borderColor ?? colors.border}
+        minHeight={compact ? 52 : 60}
+        gap={8}
       >
-        <XStack space="$3" alignItems="center" flex={1}>
+        <XStack alignItems="center" flex={1} gap={4}>
           {showBack && (
-            <TouchableOpacity
+            <Pressable
               onPress={handleBack}
-              activeOpacity={0.7}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              style={{
-                flexDirection: 'row',
+              accessibilityRole="button"
+              accessibilityLabel={backTitle ? `Back to ${backTitle}` : 'Back'}
+              hitSlop={8}
+              style={({ pressed }) => ({
+                minWidth: HIT,
+                height: HIT,
+                borderRadius: radius.pill,
                 alignItems: 'center',
-                paddingRight: 4,
-              }}
+                justifyContent: 'center',
+                backgroundColor: pressed ? colors.surfaceMuted : 'transparent',
+              })}
             >
-              <YStack
-                backgroundColor="rgba(0, 122, 255, 0.08)"
-                p="$2"
-                borderRadius="$3"
-                mr={backTitle ? '$1.5' : '$0'}
-              >
-                <ArrowLeft size={18} color="#007AFF" />
-              </YStack>
-              {backTitle ? (
-                <Text color="#007AFF" fontSize={14} fontWeight="600">
-                  {backTitle}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
+              <ChevronLeft size={26} color={colors.primary.text} />
+            </Pressable>
           )}
 
           <YStack flex={1}>
             <Text
-              color="$color"
-              fontWeight="800"
+              color={colors.text}
+              fontFamily={fonts.heading}
               fontSize={compact ? 17 : 19}
-              numberOfLines={1}
+              lineHeight={compact ? 22 : 24}
               letterSpacing={-0.3}
+              numberOfLines={1}
+              accessibilityRole="header"
             >
               {title}
             </Text>
             {subtitle ? (
-              <Paragraph color="$colorPress" fontSize={12} numberOfLines={1} marginTop={-2}>
+              <Text color={colors.textMuted} fontSize={13} lineHeight={18} numberOfLines={1}>
                 {subtitle}
-              </Paragraph>
+              </Text>
             ) : null}
           </YStack>
         </XStack>
 
-        <XStack space="$2" alignItems="center">
+        <XStack gap={8} alignItems="center">
           {showThemeToggle && (
-            <TouchableOpacity
-              onPress={toggleTheme}
-              activeOpacity={0.7}
-              style={{
-                padding: 7,
-                borderRadius: 20,
-                backgroundColor: isDark ? 'rgba(255, 149, 0, 0.15)' : 'rgba(0, 122, 255, 0.1)',
-              }}
+            <Pressable
+              onPress={() => { haptic.selection(); toggleTheme(); }}
+              accessibilityRole="button"
+              accessibilityLabel={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={({ pressed }) => ({
+                width: 40,
+                height: 40,
+                borderRadius: radius.pill,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: pressed ? colors.borderStrong : colors.surfaceMuted,
+              })}
             >
-              {isDark ? <Sun size={19} color="#FF9500" /> : <Moon size={19} color="#007AFF" />}
-            </TouchableOpacity>
+              {isDark ? <Sun size={19} color={colors.text} /> : <Moon size={19} color={colors.text} />}
+            </Pressable>
           )}
           {rightElement}
         </XStack>
@@ -123,4 +131,3 @@ export function AppHeader({
     </SafeAreaView>
   );
 }
-

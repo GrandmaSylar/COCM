@@ -1,37 +1,47 @@
 import React, { useState, useRef } from 'react';
-import { ScrollView, NativeSyntheticEvent, NativeScrollEvent, Dimensions } from 'react-native';
+import { ScrollView, NativeSyntheticEvent, NativeScrollEvent, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { YStack, XStack, Text, Button, Card, H1, Paragraph } from 'tamagui';
+import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Users, ClipboardCheck, PieChart } from '@tamagui/lucide-icons';
 import * as SecureStore from 'expo-secure-store';
-
-const { width } = Dimensions.get('window');
+import { useAppColors } from '../context/ThemeContext';
+import { AppText, Button, Screen } from '../components/ui';
+import { motion, radius, space } from '../theme/tokens';
 
 const ONBOARDING_SLIDES = [
   {
     title: 'Church Directory',
     description: 'Keep track of all members, contact details, profile summaries, zones, and registration records inside a single native dashboard.',
     icon: Users,
-    color: '#007AFF',
   },
   {
     title: 'Attendance Tracker',
     description: 'Easily track general service attendance headcounts, check-in members, register visitors, and monitor active participation history.',
     icon: ClipboardCheck,
-    color: '#FF9500',
   },
   {
     title: 'Giving & Finances',
     description: 'Record general tithes, thanksgiving offerings, special project logs, and capture expense receipts using your phone camera.',
     icon: PieChart,
-    color: '#34C759',
   },
 ];
 
+function Dot({ active }: { active: boolean }) {
+  const c = useAppColors();
+  const style = useAnimatedStyle(() => ({
+    width: withTiming(active ? 24 : 8, { duration: motion.base }),
+    opacity: withTiming(active ? 1 : 0.45, { duration: motion.base }),
+  }), [active]);
+  return <Animated.View style={[{ height: 8, borderRadius: 4, backgroundColor: active ? c.primary.base : c.borderStrong }, style]} />;
+}
+
 export default function OnboardingScreen() {
   const router = useRouter();
+  const c = useAppColors();
+  const { width } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const isLast = activeIndex === ONBOARDING_SLIDES.length - 1;
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
@@ -49,19 +59,11 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <YStack flex={1} backgroundColor="$background" justifyContent="space-between" paddingVertical="$6">
-      {/* Skip Button */}
-      <XStack justifyContent="flex-end" paddingHorizontal="$4">
-        <Button 
-          backgroundColor="transparent"
-          pressStyle={{ opacity: 0.7 }}
-          onPress={handleComplete}
-        >
-          <Text color="$colorPress" fontWeight="600" fontSize={15}>Skip</Text>
-        </Button>
-      </XStack>
+    <Screen edges={['top', 'bottom', 'left', 'right']}>
+      <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: space.md, minHeight: 48 }}>
+        {!isLast ? <Button label="Skip" variant="ghost" size="sm" onPress={handleComplete} /> : null}
+      </View>
 
-      {/* Slide Carousel */}
       <ScrollView
         ref={scrollViewRef}
         horizontal
@@ -69,81 +71,57 @@ export default function OnboardingScreen() {
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        style={{ flexGrow: 0 }}
+        style={{ flex: 1 }}
       >
         {ONBOARDING_SLIDES.map((slide, index) => {
-          const IconComponent = slide.icon;
+          const Icon = slide.icon;
           return (
-            <YStack 
-              key={index} 
-              width={width} 
-              paddingHorizontal={32} 
-              space="$4" 
-              alignItems="center" 
-              justifyContent="center"
+            <View
+              key={index}
+              style={{ width, paddingHorizontal: space.xxl, alignItems: 'center', justifyContent: 'center', gap: space.lg }}
+              accessible
+              accessibilityLabel={`${slide.title}. ${slide.description}`}
             >
-              <YStack
-                width={120}
-                height={120}
-                borderRadius={60}
-                backgroundColor={`${slide.color}1A`}
-                borderWidth={2}
-                borderColor={`${slide.color}40`}
-                justifyContent="center"
-                alignItems="center"
-                marginBottom="$4"
+              <View
+                style={{
+                  width: 128,
+                  height: 128,
+                  borderRadius: 40,
+                  backgroundColor: c.primary.soft,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: space.sm,
+                }}
               >
-                <IconComponent size={56} color={slide.color} />
-              </YStack>
-              
-              <H1 textAlign="center" fontWeight="800" color="$color" fontSize={28} letterSpacing={-0.5}>
-                {slide.title}
-              </H1>
-              
-              <Paragraph textAlign="center" color="$colorHover" fontSize={16} lineHeight={24} paddingHorizontal="$2">
+                <Icon size={56} color={c.primary.text} />
+              </View>
+              <AppText variant="display" align="center">{slide.title}</AppText>
+              <AppText variant="body" tone="muted" align="center" style={{ fontSize: 16, lineHeight: 24, maxWidth: 340 }}>
                 {slide.description}
-              </Paragraph>
-            </YStack>
+              </AppText>
+            </View>
           );
         })}
       </ScrollView>
 
-      {/* Bottom Pager Controls */}
-      <YStack space="$5" paddingHorizontal={32} alignItems="center">
-        {/* Carousel Indicators */}
-        <XStack space="$2">
-          {ONBOARDING_SLIDES.map((_, index) => (
-            <YStack
-              key={index}
-              width={index === activeIndex ? 20 : 8}
-              height={8}
-              borderRadius={4}
-              backgroundColor={index === activeIndex ? '$primary' : '$borderColor'}
-            />
-          ))}
-        </XStack>
-
-        {/* Action Button */}
-        <Button
-          themeInverse
-          backgroundColor="$primary"
-          width="100%"
-          height={50}
-          borderRadius="$4"
-          pressStyle={{ scale: 0.98 }}
-          onPress={() => {
-            if (activeIndex < ONBOARDING_SLIDES.length - 1) {
-              scrollViewRef.current?.scrollTo({ x: (activeIndex + 1) * width, animated: true });
-            } else {
-              handleComplete();
-            }
-          }}
-        >
-          <Text color="#FFFFFF" fontWeight="700" fontSize={16}>
-            {activeIndex === ONBOARDING_SLIDES.length - 1 ? 'Get Started' : 'Next'}
-          </Text>
-        </Button>
-      </YStack>
-    </YStack>
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.lg, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', gap: 8 }} accessibilityLabel={`Page ${activeIndex + 1} of ${ONBOARDING_SLIDES.length}`}>
+          {ONBOARDING_SLIDES.map((_, index) => <Dot key={index} active={index === activeIndex} />)}
+        </View>
+        <View style={{ width: '100%', borderRadius: radius.md }}>
+          <Button
+            label={isLast ? 'Get started' : 'Next'}
+            fullWidth
+            onPress={() => {
+              if (!isLast) {
+                scrollViewRef.current?.scrollTo({ x: (activeIndex + 1) * width, animated: true });
+              } else {
+                handleComplete();
+              }
+            }}
+          />
+        </View>
+      </View>
+    </Screen>
   );
 }

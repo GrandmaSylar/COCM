@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Platform, Modal, TouchableOpacity } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { YStack, XStack, Text, Input, Button } from 'tamagui';
-import { Calendar, Check, X } from '@tamagui/lucide-icons';
+import { Platform, TextInput, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Calendar } from '@tamagui/lucide-icons';
+import { useAppColors } from '../context/ThemeContext';
+import { fonts, radius } from '../theme/tokens';
+import { AppText, Button, IconButton, Sheet } from './ui';
 
 export interface NativeDatePickerProps {
   value: string;
@@ -12,11 +14,30 @@ export interface NativeDatePickerProps {
   required?: boolean;
   maxDate?: Date;
   minDate?: Date;
+  /** Inline validation message. */
+  error?: string | null;
+  /** @deprecated colors follow the theme now; kept for call-site compatibility */
   accentColor?: string;
+  /** @deprecated */
   backgroundColor?: string;
+  /** @deprecated */
   borderColor?: string;
 }
 
+const formatDateToString = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+function parse(value: string): Date | null {
+  if (!value) return null;
+  const d = new Date(value + 'T00:00:00');
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/** Date field: type YYYY-MM-DD or pick from the native calendar. Shows the date in words underneath. */
 export function NativeDatePicker({
   value,
   onChange,
@@ -25,103 +46,72 @@ export function NativeDatePicker({
   required = false,
   maxDate,
   minDate,
-  accentColor = '#FF9500',
-  backgroundColor = '$background',
-  borderColor = '$borderColor'
+  error,
 }: NativeDatePickerProps) {
+  const c = useAppColors();
   const [showPicker, setShowPicker] = useState(false);
-  const [tempDate, setTempDate] = useState<Date>(() => {
-    if (value && !isNaN(new Date(value + 'T00:00:00').getTime())) {
-      return new Date(value + 'T00:00:00');
-    }
-    return new Date();
-  });
+  const [focused, setFocused] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(() => parse(value) ?? new Date());
 
-  const parseCurrentDate = (): Date => {
-    if (value && !isNaN(new Date(value + 'T00:00:00').getTime())) {
-      return new Date(value + 'T00:00:00');
-    }
-    return new Date();
-  };
+  const current = parse(value);
+  const readable = current
+    ? current.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
-  const handleOpenPicker = () => {
-    const d = parseCurrentDate();
-    setTempDate(d);
+  const open = () => {
+    setTempDate(parse(value) ?? new Date());
     setShowPicker(true);
   };
 
-  const formatDateToString = (d: Date): string => {
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const handleAndroidChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowPicker(false);
-    if (event.type === 'set' && selectedDate) {
-      onChange(formatDateToString(selectedDate));
-    }
-  };
-
-  const handleIosDone = () => {
-    onChange(formatDateToString(tempDate));
-    setShowPicker(false);
-  };
+  const borderColor = error ? c.danger.base : focused ? c.primary.base : c.borderStrong;
 
   return (
-    <YStack space="$1.5">
+    <View style={{ gap: 6 }}>
       {label ? (
-        <Text color="$colorPress" fontSize={12} fontWeight="600">
-          {label} {required ? '*' : ''}
-        </Text>
+        <AppText variant="label" tone="muted">
+          {label}{required ? ' *' : ''}
+        </AppText>
       ) : null}
 
-      <XStack
-        alignItems="center"
-        backgroundColor={backgroundColor}
-        borderColor={borderColor}
-        borderWidth={1}
-        borderRadius="$3"
-        px="$2.5"
-        height={42}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          minHeight: 48,
+          paddingLeft: 14,
+          paddingRight: 4,
+          gap: 8,
+          borderRadius: radius.md,
+          borderWidth: focused || error ? 1.5 : 1,
+          borderColor,
+          backgroundColor: c.surface,
+        }}
       >
-        <Input
-          flex={1}
+        <TextInput
           value={value}
           onChangeText={onChange}
           placeholder={placeholder}
-          backgroundColor="transparent"
-          borderWidth={0}
-          height={40}
-          fontSize={13}
-          color="$color"
+          placeholderTextColor={c.textSubtle}
+          keyboardType="numbers-and-punctuation"
+          maxLength={10}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel={label ?? 'Date'}
+          style={{ flex: 1, minHeight: 46, color: c.text, fontFamily: fonts.body, fontSize: 15, paddingVertical: 0 }}
         />
+        <IconButton icon={Calendar} label={`Choose ${label ? label.toLowerCase() : 'date'}`} tone="primary" size={40} onPress={open} />
+      </View>
 
-        <TouchableOpacity
-          onPress={handleOpenPicker}
-          activeOpacity={0.7}
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 6,
-            borderRadius: 6,
-            backgroundColor: `${accentColor}1A`,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 4
-          }}
-        >
-          <Calendar size={16} color={accentColor} />
-          <Text color={accentColor} fontSize={11} fontWeight="700">
-            Select
-          </Text>
-        </TouchableOpacity>
-      </XStack>
+      {error ? (
+        <AppText variant="caption" tone="danger" accessibilityLiveRegion="polite">{error}</AppText>
+      ) : readable ? (
+        <AppText variant="caption" tone="subtle">{readable}</AppText>
+      ) : null}
 
-      {/* Android Native Picker */}
+      {/* Android: system dialog */}
       {Platform.OS === 'android' && showPicker && (
         <DateTimePicker
-          value={parseCurrentDate()}
+          value={parse(value) ?? new Date()}
           mode="date"
           display="default"
           maximumDate={maxDate}
@@ -134,68 +124,39 @@ export function NativeDatePicker({
         />
       )}
 
-      {/* iOS Native Picker Modal */}
+      {/* iOS: spinner in a bottom sheet */}
       {Platform.OS === 'ios' && (
-        <Modal
+        <Sheet
           visible={showPicker}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowPicker(false)}
+          onClose={() => setShowPicker(false)}
+          title={label ?? 'Select date'}
+          noScroll
+          footer={
+            <Button
+              label="Done"
+              fullWidth
+              onPress={() => {
+                onChange(formatDateToString(tempDate));
+                setShowPicker(false);
+              }}
+            />
+          }
         >
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'flex-end'
+          <DateTimePicker
+            value={tempDate}
+            mode="date"
+            display="spinner"
+            maximumDate={maxDate}
+            minimumDate={minDate}
+            onValueChange={(_, d) => {
+              if (d) setTempDate(d);
             }}
-            activeOpacity={1}
-            onPress={() => setShowPicker(false)}
-          >
-            <YStack
-              backgroundColor="$background"
-              borderTopLeftRadius={20}
-              borderTopRightRadius={20}
-              paddingBottom="$6"
-              paddingTop="$3"
-              paddingHorizontal="$4"
-              onStartShouldSetResponder={() => true}
-            >
-              {/* Header Bar */}
-              <XStack justifyContent="space-between" alignItems="center" py="$2">
-                <TouchableOpacity onPress={() => setShowPicker(false)}>
-                  <XStack space="$1" alignItems="center">
-                    <X size={16} color="$colorPress" />
-                    <Text color="$colorPress" fontSize={14} fontWeight="600">Cancel</Text>
-                  </XStack>
-                </TouchableOpacity>
-
-                <Text color="$color" fontSize={15} fontWeight="700">Select Date</Text>
-
-                <TouchableOpacity onPress={handleIosDone}>
-                  <XStack space="$1" alignItems="center">
-                    <Check size={16} color={accentColor} />
-                    <Text color={accentColor} fontSize={14} fontWeight="700">Done</Text>
-                  </XStack>
-                </TouchableOpacity>
-              </XStack>
-
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                maximumDate={maxDate}
-                minimumDate={minDate}
-                onValueChange={(_, d) => {
-                  if (d) setTempDate(d);
-                }}
-                style={{ height: 180 }}
-              />
-            </YStack>
-          </TouchableOpacity>
-        </Modal>
+            style={{ height: 200 }}
+          />
+        </Sheet>
       )}
 
-      {/* Web Fallback (if running in Expo web preview) */}
+      {/* Web fallback (Expo web preview) */}
       {Platform.OS === 'web' && showPicker && (
         React.createElement('input', {
           type: 'date',
@@ -208,15 +169,15 @@ export function NativeDatePicker({
           min: minDate ? formatDateToString(minDate) : undefined,
           style: {
             padding: 8,
-            borderRadius: 6,
-            border: '1px solid #334155',
-            backgroundColor: '#0F172A',
-            color: '#FFFFFF',
+            borderRadius: 8,
+            border: `1px solid ${c.borderStrong}`,
+            backgroundColor: c.surface,
+            color: c.text,
             fontSize: 14,
-            marginTop: 4
-          }
+            marginTop: 4,
+          },
         })
       )}
-    </YStack>
+    </View>
   );
 }

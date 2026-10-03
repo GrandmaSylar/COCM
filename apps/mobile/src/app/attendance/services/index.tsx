@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, TouchableOpacity, Alert as RNAlert } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Input, Spinner, Theme } from 'tamagui';
-import { ArrowLeft, Clock, Plus, Trash2, Check, X, Calendar, RefreshCw } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { Alert as RNAlert, ScrollView, Switch, View } from 'react-native';
+import { Calendar, Clock, Plus, Trash2 } from '@tamagui/lucide-icons';
 import {
   getLocalCustomServices,
   upsertLocalCustomService,
@@ -12,7 +9,16 @@ import {
   LocalCustomService
 } from '../../../lib/db';
 import { generateUUID } from '../../../lib/uuid';
-import { enqueueSyncTask, syncCustomServices } from '../../../lib/syncEngine';
+import { pushOrQueue, syncCustomServices } from '../../../lib/syncEngine';
+import { toServicePayload } from '../../../lib/syncPayloads';
+import { useAppColors } from '../../../context/ThemeContext';
+import { AppHeader } from '../../../components/AppHeader';
+import { SkeletonList } from '../../../components/Skeleton';
+import {
+  AppText, Badge, Button, ChoiceChips, EmptyState, FieldGroup, IconButton, ListRow, Screen, Section, Sheet, TextField, useToast,
+} from '../../../components/ui';
+import { haptic } from '../../../theme/haptics';
+import { space } from '../../../theme/tokens';
 
 const SUNDAY_MAIN_SERVICE = {
   name: 'Sunday Main Service',
@@ -25,10 +31,12 @@ const SUNDAY_MAIN_SERVICE = {
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function ServicesManagerScreen() {
-  const router = useRouter();
   const [customServices, setCustomServices] = useState<LocalCustomService[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [formErrors, setFormErrors] = useState<{ name?: string; days?: string; time?: string }>({});
+  const toast = useToast();
+  const c = useAppColors();
 
   // Form State
   const [name, setName] = useState('');
@@ -65,10 +73,13 @@ export default function ServicesManagerScreen() {
   };
 
   const handleAddService = async () => {
-    if (!name.trim() || !startDate || !endDate || !startTime || !endTime || selectedDays.length === 0) {
-      RNAlert.alert('Validation Error', 'Please fill in all required service fields.');
-      return;
-    }
+    const nextErrors = {
+      name: name.trim() ? undefined : 'Enter a service name.',
+      days: selectedDays.length ? undefined : 'Choose at least one day.',
+      time: startTime && endTime ? undefined : 'Enter start and end times.',
+    };
+    setFormErrors(nextErrors);
+    if (nextErrors.name || nextErrors.days || nextErrors.time || !startDate || !endDate) return;
 
     const newSvc: LocalCustomService = {
       id: generateUUID(),
@@ -85,19 +96,25 @@ export default function ServicesManagerScreen() {
 
     try {
       await upsertLocalCustomService(newSvc);
-      await enqueueSyncTask('INSERT', '/services', newSvc);
+      await pushOrQueue('POST', '/services', toServicePayload(newSvc));
       setName('');
       setDescription('');
       setShowAddForm(false);
+      toast.show({ title: 'Service added', message: newSvc.name });
       loadServices();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save custom service:', err);
+      toast.show({ title: 'Couldn’t save service', message: err?.message, tone: 'error' });
     }
   };
 
   const handleToggle = async (id: string) => {
     try {
+      const svc = customServices.find(s => s.id === id);
       await toggleLocalCustomService(id);
+      if (svc) {
+        await pushOrQueue('PUT', `/services/${id}`, { is_active: !svc.is_active });
+      }
       loadServices();
     } catch (err) {
       console.error('Failed to toggle service:', err);
@@ -106,16 +123,20 @@ export default function ServicesManagerScreen() {
 
   const handleDelete = async (id: string, serviceName: string) => {
     RNAlert.alert(
-      'Delete Service',
-      `Are you sure you want to delete "${serviceName}"?`,
+      'Delete service?',
+      `"${serviceName}" will no longer be available for attendance.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteLocalCustomService(id);
-            await enqueueSyncTask('DELETE', `/services/${id}`, { id });
+            try {
+              await deleteLocalCustomService(id);
+              await pushOrQueue('DELETE', `/services/${id}`);
+            } catch (err: any) {
+              toast.show({ title: 'Couldn’t delete service', message: err?.message, tone: 'error' });
+            }
             loadServices();
           }
         }
@@ -124,186 +145,91 @@ export default function ServicesManagerScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#000000' }} edges={['top', 'left', 'right']}>
-      <YStack flex={1} backgroundColor="$background">
-      {/* Navigation Header */}
-      <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor="$borderColor">
-        <XStack space="$2" alignItems="center">
-          <TouchableOpacity onPress={() => router.back()}>
-            <YStack p="$2" borderRadius="$3" backgroundColor="$borderColor" opacity={0.8}>
-              <ArrowLeft size={18} color="$color" />
-            </YStack>
-          </TouchableOpacity>
-          <YStack>
-            <Text color="$color" fontSize={18} fontWeight="800">Manage Service Types</Text>
-            <Text color="$colorPress" fontSize={12}>Configure custom church services</Text>
-          </YStack>
-        </XStack>
-        <TouchableOpacity onPress={() => setShowAddForm(!showAddForm)}>
-          <XStack backgroundColor={showAddForm ? '$colorPress' : '#FF9500'} px="$3" py="$2" borderRadius="$3" space="$1" alignItems="center">
-            {showAddForm ? <X size={16} color="white" /> : <Plus size={16} color="white" />}
-            <Text color="white" fontSize={12} fontWeight="700">{showAddForm ? 'Cancel' : 'Add Service'}</Text>
-          </XStack>
-        </TouchableOpacity>
-      </XStack>
+    <Screen>
+      <AppHeader
+        title="Services"
+        subtitle="Service types for attendance"
+        showBack
+        rightElement={<IconButton icon={Plus} label="Add service" tone="primary" onPress={() => { setFormErrors({}); setShowAddForm(true); }} />}
+      />
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <YStack space="$4">
+      <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}>
+        <Section title="Permanent">
+          <ListRow
+            icon={Clock}
+            title={SUNDAY_MAIN_SERVICE.name}
+            subtitle={`Every Sunday · ${SUNDAY_MAIN_SERVICE.startTime}–${SUNDAY_MAIN_SERVICE.endTime}`}
+            right={<Badge label="Always on" tone="success" />}
+          />
+        </Section>
 
-          {/* Permanent Sunday Main Service Card */}
-          <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="rgba(255, 149, 0, 0.3)" backgroundColor="rgba(255, 149, 0, 0.05)">
-            <XStack space="$3" alignItems="flex-start">
-              <YStack p="$2.5" borderRadius="$3" backgroundColor="rgba(255, 149, 0, 0.15)">
-                <Clock size={22} color="#FF9500" />
-              </YStack>
-              <YStack flex={1} space="$1">
-                <XStack justifyContent="space-between" alignItems="center">
-                  <Text color="$color" fontSize={15} fontWeight="800">{SUNDAY_MAIN_SERVICE.name}</Text>
-                  <XStack backgroundColor="rgba(52, 199, 89, 0.15)" px="$2" py="$0.5" borderRadius="$2">
-                    <Text color="#34C759" fontSize={10} fontWeight="800" textTransform="uppercase">Permanent</Text>
-                  </XStack>
-                </XStack>
-                <Text color="$colorPress" fontSize={12}>{SUNDAY_MAIN_SERVICE.description}</Text>
-                <Text color="$colorPress" fontSize={11} fontWeight="600" marginTop="$1">
-                  Time: {SUNDAY_MAIN_SERVICE.startTime} - {SUNDAY_MAIN_SERVICE.endTime} (Every Sunday)
-                </Text>
-              </YStack>
-            </XStack>
-          </Card>
-
-          {/* Add New Custom Service Form */}
-          {showAddForm && (
-            <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="$borderColor" backgroundColor="$background">
-              <YStack space="$3">
-                <Text color="$color" fontSize={15} fontWeight="800">Add New Custom Service</Text>
-                
-                <YStack space="$1">
-                  <Text color="$colorPress" fontSize={11} fontWeight="700">Service Name *</Text>
-                  <Input
-                    placeholder="e.g. Mid-Week Revival, Youth Service"
-                    value={name}
-                    onChangeText={setName}
-                    backgroundColor="$background"
-                    borderColor="$borderColor"
-                  />
-                </YStack>
-
-                <YStack space="$1">
-                  <Text color="$colorPress" fontSize={11} fontWeight="700">Description</Text>
-                  <Input
-                    placeholder="Optional details"
-                    value={description}
-                    onChangeText={setDescription}
-                    backgroundColor="$background"
-                    borderColor="$borderColor"
-                  />
-                </YStack>
-
-                <XStack space="$2">
-                  <YStack flex={1} space="$1">
-                    <Text color="$colorPress" fontSize={11} fontWeight="700">Start Time (HH:MM)</Text>
-                    <Input value={startTime} onChangeText={setStartTime} placeholder="09:00" backgroundColor="$background" borderColor="$borderColor" />
-                  </YStack>
-                  <YStack flex={1} space="$1">
-                    <Text color="$colorPress" fontSize={11} fontWeight="700">End Time (HH:MM)</Text>
-                    <Input value={endTime} onChangeText={setEndTime} placeholder="12:00" backgroundColor="$background" borderColor="$borderColor" />
-                  </YStack>
-                </XStack>
-
-                <YStack space="$1">
-                  <Text color="$colorPress" fontSize={11} fontWeight="700">Days of Week *</Text>
-                  <XStack flexWrap="wrap" space="$1">
-                    {DAY_NAMES.map((d, idx) => {
-                      const isSelected = selectedDays.includes(idx);
-                      return (
-                        <TouchableOpacity key={d} onPress={() => handleDayToggle(idx)}>
-                          <YStack
-                            px="$2.5"
-                            py="$1.5"
-                            borderRadius="$3"
-                            borderWidth={1}
-                            borderColor={isSelected ? '#FF9500' : '$borderColor'}
-                            backgroundColor={isSelected ? 'rgba(255, 149, 0, 0.15)' : '$background'}
-                            marginBottom="$1"
-                          >
-                            <Text color={isSelected ? '#FF9500' : '$color'} fontSize={12} fontWeight={isSelected ? '800' : '500'}>
-                              {d.slice(0, 3)}
-                            </Text>
-                          </YStack>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </XStack>
-                </YStack>
-
-                <Button backgroundColor="#FF9500" onPress={handleAddService} marginTop="$2">
-                  <Text color="white" fontWeight="800">Save Custom Service</Text>
-                </Button>
-              </YStack>
-            </Card>
+        <Section
+          title={`Custom services · ${customServices.length}`}
+          action={<Button label="Add" icon={Plus} size="sm" variant="soft" onPress={() => { setFormErrors({}); setShowAddForm(true); }} />}
+        >
+          {loading ? (
+            <View style={{ padding: space.md }}><SkeletonList count={3} hasAvatar={false} /></View>
+          ) : customServices.length === 0 ? (
+            <EmptyState icon={Calendar} title="No custom services" message="Add mid-week, youth or special services to track their attendance." />
+          ) : (
+            customServices.map(item => {
+              let daysArr: number[] = [];
+              try { daysArr = JSON.parse(item.days_of_week || '[]'); } catch {}
+              const daysText = daysArr.map(d => DAY_NAMES[d]?.slice(0, 3)).join(', ');
+              const isActive = item.is_active === 1;
+              return (
+                <ListRow
+                  key={item.id}
+                  icon={Calendar}
+                  iconTone={isActive ? 'primary' : 'neutral'}
+                  title={item.name}
+                  subtitle={[item.description, `${daysText} · ${item.start_time}–${item.end_time}`].filter(Boolean).join('\n')}
+                  right={
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Switch
+                        value={isActive}
+                        onValueChange={() => { haptic.selection(); handleToggle(item.id); }}
+                        trackColor={{ true: c.primary.base, false: c.borderStrong }}
+                        thumbColor="#FFFFFF"
+                        accessibilityLabel={`${item.name} active`}
+                      />
+                      <IconButton icon={Trash2} label={`Delete ${item.name}`} tone="danger" size={36} onPress={() => handleDelete(item.id, item.name)} />
+                    </View>
+                  }
+                />
+              );
+            })
           )}
-
-          {/* List of Custom Services */}
-          <YStack space="$2">
-            <Text color="$color" fontSize={14} fontWeight="800" textTransform="uppercase" letterSpacing={0.5}>
-              Custom Services ({customServices.length})
-            </Text>
-
-            {loading ? (
-              <Spinner size="large" color="#FF9500" py="$6" />
-            ) : customServices.length === 0 ? (
-              <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="$borderColor" alignItems="center">
-                <Text color="$colorPress" fontSize={13}>No custom services added yet.</Text>
-              </Card>
-            ) : (
-              customServices.map(item => {
-                const daysArr: number[] = JSON.parse(item.days_of_week || '[]');
-                const daysText = daysArr.map(d => DAY_NAMES[d]?.slice(0, 3)).join(', ');
-                const isActive = item.is_active === 1;
-
-                return (
-                  <Card key={item.id} p="$3.5" borderRadius="$4" borderWidth={1} borderColor="$borderColor" backgroundColor="$background">
-                    <XStack justifyContent="space-between" alignItems="flex-start">
-                      <YStack flex={1} space="$1">
-                        <XStack space="$2" alignItems="center">
-                          <Text color="$color" fontSize={15} fontWeight="800">{item.name}</Text>
-                          <XStack backgroundColor={isActive ? 'rgba(52, 199, 89, 0.15)' : 'rgba(142, 142, 147, 0.15)'} px="$2" py="$0.5" borderRadius="$2">
-                            <Text color={isActive ? '#34C759' : '#8E8E93'} fontSize={10} fontWeight="800">
-                              {isActive ? 'Active' : 'Inactive'}
-                            </Text>
-                          </XStack>
-                        </XStack>
-                        {item.description && <Text color="$colorPress" fontSize={12}>{item.description}</Text>}
-                        <Text color="$colorPress" fontSize={11} fontWeight="600">
-                          Time: {item.start_time} - {item.end_time} ({daysText})
-                        </Text>
-                      </YStack>
-
-                      <XStack space="$2">
-                        <TouchableOpacity onPress={() => handleToggle(item.id)}>
-                          <YStack px="$2.5" py="$1.5" borderRadius="$3" borderWidth={1} borderColor="$borderColor" backgroundColor="$background">
-                            <Text color={isActive ? '#FF3B30' : '#34C759'} fontSize={11} fontWeight="700">
-                              {isActive ? 'Deactivate' : 'Activate'}
-                            </Text>
-                          </YStack>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity onPress={() => handleDelete(item.id, item.name)}>
-                          <YStack p="$1.5" borderRadius="$3" backgroundColor="rgba(255, 59, 48, 0.1)">
-                            <Trash2 size={16} color="#FF3B30" />
-                          </YStack>
-                        </TouchableOpacity>
-                      </XStack>
-                    </XStack>
-                  </Card>
-                );
-              })
-            )}
-          </YStack>
-
-        </YStack>
+        </Section>
       </ScrollView>
-    </YStack>
-    </SafeAreaView>
+
+      <Sheet
+        visible={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        title="New service"
+        footer={<Button label="Save service" fullWidth onPress={handleAddService} />}
+      >
+        <TextField
+          label="Service name *"
+          placeholder="e.g. Mid-week revival"
+          value={name}
+          onChangeText={t => { setName(t); if (formErrors.name) setFormErrors(e => ({ ...e, name: undefined })); }}
+          error={formErrors.name}
+        />
+        <TextField label="Description" placeholder="Optional" value={description} onChangeText={setDescription} />
+        <View style={{ flexDirection: 'row', gap: space.xs }}>
+          <View style={{ flex: 1 }}><TextField label="Starts" value={startTime} onChangeText={setStartTime} placeholder="09:00" keyboardType="numbers-and-punctuation" /></View>
+          <View style={{ flex: 1 }}><TextField label="Ends" value={endTime} onChangeText={setEndTime} placeholder="12:00" keyboardType="numbers-and-punctuation" /></View>
+        </View>
+        {formErrors.time ? <AppText variant="caption" tone="danger">{formErrors.time}</AppText> : null}
+        <FieldGroup label="Days *" error={formErrors.days}>
+          <ChoiceChips
+            options={DAY_NAMES.map((d, idx) => ({ value: String(idx), label: d.slice(0, 3) }))}
+            value={selectedDays.map(String)}
+            onChange={v => { handleDayToggle(Number(v)); if (formErrors.days) setFormErrors(e => ({ ...e, days: undefined })); }}
+          />
+        </FieldGroup>
+      </Sheet>
+    </Screen>
   );
 }

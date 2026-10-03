@@ -27,3 +27,6 @@ export type { CacheEntry, SyncQueueEntry, ConflictEntry } from './services/offli
 
 // Export Sync Engine utilities
 export { startSync, initSyncEngine, retrySyncNow } from './services/syncEngine';
+
+// Export shared theme definitions (web + mobile)
+export * from './theme';

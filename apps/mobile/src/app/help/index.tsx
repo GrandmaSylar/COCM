@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { ScrollView, TouchableOpacity, TextInput, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Paragraph } from 'tamagui';
-import { ArrowLeft, Search, HelpCircle, ChevronDown, ChevronUp, BookOpen, Users, Calendar, Banknote, BarChart3, Settings, Shield, Plus, Eye, Pencil } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { ScrollView, View } from 'react-native';
+import Animated, { FadeIn, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import { BookOpen, Users, Calendar, Banknote, BarChart3, Settings, Shield, ChevronDown, Info, SearchX } from '@tamagui/lucide-icons';
 import { useThemeContext } from '../../context/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
+import { AppText, Badge, EmptyState, IconWell, PressableScale, Screen, SearchField, Surface } from '../../components/ui';
+import { motion, radius, space } from '../../theme/tokens';
 
 interface GuideItem {
   id: string;
@@ -144,14 +145,11 @@ const FEATURE_GUIDES: GuideItem[] = [
 ];
 
 export default function HelpScreen() {
-  const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
-
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedIds, setExpandedIds] = useState<string[]>(['dashboard']);
 
   const toggleExpand = (id: string) => {
-    setExpandedIds(prev => 
+    setExpandedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -168,100 +166,101 @@ export default function HelpScreen() {
   }, [searchTerm]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center">
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Help & User Guides</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>Feature walkthroughs & step-by-step instructions</Text>
-            </YStack>
-          </XStack>
-        </XStack>
+    <Screen>
+      <AppHeader title="Help & guides" subtitle="How each part of the app works" showBack />
 
-        <YStack flex={1} p="$4" space="$3">
-          {/* Search Input */}
-          <XStack px="$3" py="$2" borderRadius="$3" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground} alignItems="center" space="$2">
-            <Search size={16} color={themeColors.textMuted} />
-            <TextInput
-              placeholder="Search help topics, features, instructions..."
-              placeholderTextColor={themeColors.textMuted}
-              value={searchTerm}
-              onChangeText={setSearchTerm}
-              style={{ flex: 1, color: themeColors.text, fontSize: 13 }}
+      <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.sm }} keyboardShouldPersistTaps="handled">
+        <SearchField value={searchTerm} onChangeText={setSearchTerm} placeholder="Search topics and instructions" />
+
+        {filteredGuides.length === 0 ? (
+          <EmptyState
+            icon={SearchX}
+            title="No guides found"
+            message={`Nothing matches "${searchTerm}".`}
+            action={{ label: 'Clear search', onPress: () => setSearchTerm('') }}
+          />
+        ) : (
+          filteredGuides.map(guide => (
+            <GuideCard
+              key={guide.id}
+              guide={guide}
+              expanded={expandedIds.includes(guide.id) || !!searchTerm}
+              onToggle={() => toggleExpand(guide.id)}
             />
-          </XStack>
+          ))
+        )}
+      </ScrollView>
+    </Screen>
+  );
+}
 
-          {/* Guide Accordion List */}
-          <ScrollView contentContainerStyle={{ paddingBottom: 60 }}>
-            <YStack space="$3">
-              {filteredGuides.map(guide => {
-                const isExpanded = expandedIds.includes(guide.id);
-                const Icon = guide.icon;
+function GuideCard({ guide, expanded, onToggle }: { guide: GuideItem; expanded: boolean; onToggle: () => void }) {
+  const { colors: c } = useThemeContext();
+  // Titles in the guide data are numbered ("1. Dashboard"); the card shows the number separately
+  const match = guide.title.match(/^(\d+)\.\s*(.*)$/);
+  const number = match?.[1];
+  const title = match?.[2] ?? guide.title;
 
-                return (
-                  <Card key={guide.id} borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground} overflow="hidden">
-                    <TouchableOpacity onPress={() => toggleExpand(guide.id)}>
-                      <XStack p="$4" justifyContent="space-between" alignItems="center">
-                        <XStack space="$3" alignItems="center" flex={1}>
-                          <YStack p="$2" borderRadius="$3" backgroundColor="rgba(0, 122, 255, 0.12)">
-                            <Icon size={20} color="#007AFF" />
-                          </YStack>
-                          <YStack flex={1}>
-                            <Text color={themeColors.text} fontSize={15} fontWeight="800">{guide.title}</Text>
-                            <Paragraph color={themeColors.textMuted} fontSize={12} numberOfLines={isExpanded ? undefined : 1}>
-                              {guide.description}
-                            </Paragraph>
-                          </YStack>
-                        </XStack>
-                        {isExpanded ? <ChevronUp size={20} color={themeColors.textMuted} /> : <ChevronDown size={20} color={themeColors.textMuted} />}
-                      </XStack>
-                    </TouchableOpacity>
+  const chevronStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: withTiming(expanded ? '180deg' : '0deg', { duration: motion.base }) }],
+  }), [expanded]);
 
-                    {isExpanded && (
-                      <YStack p="$4" pt="$0" space="$3" borderTopWidth={1} borderColor={themeColors.borderColor}>
-                        {/* Roles Badge */}
-                        <XStack space="$1.5" alignItems="center" mt="$2">
-                          <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">AVAILABLE FOR:</Text>
-                          {guide.roles.map(r => (
-                            <XStack key={r} backgroundColor="rgba(52, 199, 89, 0.15)" px="$2" py="$0.5" borderRadius="$2">
-                              <Text color="#34C759" fontSize={10} fontWeight="800">{r}</Text>
-                            </XStack>
-                          ))}
-                        </XStack>
+  return (
+    <Surface padded={false}>
+      <PressableScale
+        onPress={onToggle}
+        haptics="selection"
+        scaleTo={0.985}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${title}. ${guide.description}`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md }}
+      >
+        <IconWell icon={guide.icon} tone="primary" size={40} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText variant="headline">{title}</AppText>
+          <AppText variant="caption" tone="muted" numberOfLines={expanded ? undefined : 1}>{guide.description}</AppText>
+        </View>
+        <Animated.View style={chevronStyle}>
+          <ChevronDown size={20} color={c.textSubtle} />
+        </Animated.View>
+      </PressableScale>
 
-                        {/* Steps List */}
-                        <YStack space="$2.5" mt="$1">
-                          {guide.steps.map((step, idx) => (
-                            <YStack key={idx} p="$3" borderRadius="$3" backgroundColor={themeColors.borderColor}>
-                              <Text color={themeColors.text} fontSize={13} fontWeight="800">{idx + 1}. {step.title}</Text>
-                              <Paragraph color={themeColors.textMuted} fontSize={12} mt="$1">
-                                {step.description}
-                              </Paragraph>
-                              {step.note && (
-                                <Text color="#FF9500" fontSize={11} fontWeight="700" mt="$1">
-                                  Note: {step.note}
-                                </Text>
-                              )}
-                            </YStack>
-                          ))}
-                        </YStack>
-                      </YStack>
-                    )}
-                  </Card>
-                );
-              })}
-            </YStack>
-          </ScrollView>
-        </YStack>
-      </YStack>
-    </SafeAreaView>
+      {expanded ? (
+        <Animated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: space.md, paddingBottom: space.md, gap: space.md }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+            <AppText variant="caption" tone="muted">For</AppText>
+            {guide.roles.map(r => <Badge key={r} label={r} tone="neutral" />)}
+            {number ? <AppText variant="caption" tone="subtle" style={{ marginLeft: 'auto' }}>Guide {number}</AppText> : null}
+          </View>
+
+          <View style={{ gap: 0 }}>
+            {guide.steps.map((step, idx) => {
+              const last = idx === guide.steps.length - 1;
+              return (
+                <View key={idx} style={{ flexDirection: 'row', gap: space.sm }}>
+                  <View style={{ alignItems: 'center' }}>
+                    <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.primary.soft, alignItems: 'center', justifyContent: 'center' }}>
+                      <AppText variant="micro" tone="primary">{idx + 1}</AppText>
+                    </View>
+                    {!last ? <View style={{ flex: 1, width: 2, backgroundColor: c.border, marginVertical: 4 }} /> : null}
+                  </View>
+                  <View style={{ flex: 1, gap: 4, paddingBottom: last ? 0 : space.md }}>
+                    <AppText variant="bodyStrong">{step.title}</AppText>
+                    <AppText variant="caption" tone="muted">{step.description}</AppText>
+                    {step.note ? (
+                      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4, padding: 10, borderRadius: radius.sm, backgroundColor: c.info.soft }}>
+                        <Info size={16} color={c.info.text} />
+                        <AppText variant="caption" color={c.info.text} style={{ flex: 1 }}>{step.note}</AppText>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Animated.View>
+      ) : null}
+    </Surface>
   );
 }

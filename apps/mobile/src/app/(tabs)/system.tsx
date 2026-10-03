@@ -1,133 +1,133 @@
-import React from 'react';
-import { TouchableOpacity, Switch } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { YStack, XStack, Text, Card, H2, Paragraph, ScrollView } from 'tamagui';
-import { BarChart3, Settings, ClipboardList, HelpCircle, ChevronRight, Moon, Sun, CloudOff } from '@tamagui/lucide-icons';
+import Animated from 'react-native-reanimated';
+import { enterUp } from '../../theme/animations';
+import {
+  BarChart3, Settings, ClipboardList, HelpCircle, CloudOff, CheckCircle2, AlertTriangle, RefreshCw, Palette,
+} from '@tamagui/lucide-icons';
 import { useThemeContext } from '../../context/ThemeContext';
+import { useAccess } from '../../lib/access';
+import { getSyncQueueStats } from '../../lib/db';
+import { subscribeSyncQueue } from '../../lib/syncEngine';
+import { AppText, ListRow, Section, SegmentedControl } from '../../components/ui';
+import { space } from '../../theme/tokens';
+
+const TOOLS = [
+  {
+    title: 'Reports & analytics',
+    description: 'Attendance, giving, expenses and membership figures',
+    icon: BarChart3,
+    route: '/reports',
+  },
+  {
+    title: 'Activity log',
+    description: 'Who changed what, and when',
+    icon: ClipboardList,
+    route: '/logs',
+  },
+  {
+    title: 'App & system settings',
+    description: 'Users, roles, security, backups and preferences',
+    icon: Settings,
+    route: '/settings',
+  },
+  {
+    title: 'Help & guides',
+    description: 'Step-by-step instructions for every module',
+    icon: HelpCircle,
+    route: '/help',
+  },
+];
 
 export default function SystemScreen() {
   const router = useRouter();
-  const { isDark, toggleTheme, themeColors } = useThemeContext();
+  const { preference, setThemeMode, colors } = useThemeContext();
+  const { canRoute } = useAccess();
+  const [queue, setQueue] = useState({ total: 0, pending: 0, syncing: 0, error: 0 });
 
-  const systemMenus = [
-    {
-      title: 'Offline Outbox & Diagnostics',
-      description: 'Manage SQLite outbox queue, retry failed items, and flush sync tasks.',
-      icon: CloudOff,
-      route: '/sync-diagnostics',
-      color: '#FF9500',
-      bgColor: 'rgba(255, 149, 0, 0.12)',
-    },
-    {
-      title: 'Reports & Analytics',
-      description: 'Generate demographic graphs and attendance & financial summaries.',
-      icon: BarChart3,
-      route: '/reports',
-      color: '#007AFF',
-      bgColor: 'rgba(0, 122, 255, 0.12)',
-    },
-    {
-      title: 'App & System Settings',
-      description: 'Configure dropdown options, themes, sync & system version info.',
-      icon: Settings,
-      route: '/settings',
-      color: '#8E8E93',
-      bgColor: 'rgba(142, 142, 147, 0.12)',
-    },
-    {
-      title: 'Activity Logs',
-      description: 'Review real-time system actions executed by leaders and users.',
-      icon: ClipboardList,
-      route: '/logs',
-      color: '#34C759',
-      bgColor: 'rgba(52, 199, 89, 0.12)',
-    },
-    {
-      title: 'Help & Guides',
-      description: 'Review interactive tutorials, role permissions & feature guides.',
-      icon: HelpCircle,
-      route: '/help',
-      color: '#AF52DE',
-      bgColor: 'rgba(175, 82, 222, 0.12)',
-    },
-  ];
+  useEffect(() => {
+    const load = () => getSyncQueueStats().then(setQueue).catch(() => {});
+    load();
+    return subscribeSyncQueue(load);
+  }, []);
+
+  const sync = queue.error > 0
+    ? { icon: AlertTriangle, tone: 'danger' as const, title: `${queue.error} ${queue.error === 1 ? 'change' : 'changes'} failed to sync`, subtitle: 'Review and retry in the outbox' }
+    : queue.syncing > 0
+      ? { icon: RefreshCw, tone: 'info' as const, title: 'Syncing changes…', subtitle: `${queue.pending + queue.syncing} in progress` }
+      : queue.pending > 0
+        ? { icon: CloudOff, tone: 'warning' as const, title: `${queue.pending} ${queue.pending === 1 ? 'change' : 'changes'} waiting to sync`, subtitle: 'They upload automatically when online' }
+        : { icon: CheckCircle2, tone: 'success' as const, title: 'All changes synced', subtitle: 'Offline outbox is empty' };
+
+  const tools = TOOLS.filter(t => canRoute(t.route));
 
   return (
-    <YStack flex={1} backgroundColor={themeColors.background}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        <YStack space="$4">
-          <YStack>
-            <H2 color={themeColors.text} fontWeight="800" fontSize={24}>System Hub</H2>
-            <Paragraph color={themeColors.textMuted} fontSize={14}>
-              Configure options, check analytics & logs, and access user guides.
-            </Paragraph>
-          </YStack>
+    <ScrollView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}
+    >
+      <Animated.View entering={enterUp()} style={{ gap: 4 }}>
+        <AppText variant="display" accessibilityRole="header">System</AppText>
+        <AppText variant="body" tone="muted">Sync, settings, reports and help.</AppText>
+      </Animated.View>
 
-          {/* Dedicated Dark Mode Toggle Card */}
-          <Card
-            padding="$4"
-            borderRadius="$5"
-            backgroundColor={themeColors.cardBackground}
-            borderColor={themeColors.borderColor}
-            borderWidth={1}
-            elevate
-          >
-            <XStack space="$3" alignItems="center" justifyContent="space-between">
-              <XStack space="$3" alignItems="center" flex={1}>
-                <YStack backgroundColor={isDark ? 'rgba(255, 149, 0, 0.15)' : 'rgba(0, 122, 255, 0.1)'} p="$2.5" borderRadius="$4">
-                  {isDark ? <Sun size={24} color="#FF9500" /> : <Moon size={24} color="#007AFF" />}
-                </YStack>
-                <YStack flex={1}>
-                  <Text color={themeColors.text} fontSize={16} fontWeight="700">Dark Mode</Text>
-                  <Paragraph color={themeColors.textMuted} fontSize={13}>
-                    {isDark ? 'Dark theme enabled' : 'Light theme enabled'}
-                  </Paragraph>
-                </YStack>
-              </XStack>
-              <Switch
-                value={isDark}
-                onValueChange={toggleTheme}
-                trackColor={{ false: '#E5E5EA', true: '#007AFF' }}
-                thumbColor="#FFFFFF"
+      <Animated.View entering={enterUp(40)}>
+        <Section title="Sync status">
+          <ListRow
+            icon={sync.icon}
+            iconTone={sync.tone}
+            title={sync.title}
+            subtitle={sync.subtitle}
+            onPress={() => router.push('/sync-diagnostics' as any)}
+          />
+        </Section>
+      </Animated.View>
+
+      <Animated.View entering={enterUp(80)}>
+        <Section title="Appearance">
+          <View style={{ padding: space.md, gap: space.sm }}>
+            <SegmentedControl
+              accessibilityLabel="Theme mode"
+              value={preference}
+              onChange={setThemeMode}
+              options={[
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+                { value: 'system', label: 'System' },
+              ]}
+            />
+          </View>
+          {canRoute('/settings') ? (
+            <ListRow
+              icon={Palette}
+              title="Theme colors"
+              subtitle="Presets and custom colors, synced with the web app"
+              onPress={() => router.push('/settings?section=appearance' as any)}
+            />
+          ) : null}
+        </Section>
+      </Animated.View>
+
+      {tools.length > 0 ? (
+        <Animated.View entering={enterUp(120)}>
+          <Section title="Tools">
+            {tools.map(tool => (
+              <ListRow
+                key={tool.route}
+                icon={tool.icon}
+                title={tool.title}
+                subtitle={tool.description}
+                onPress={() => router.push(tool.route as any)}
               />
-            </XStack>
-          </Card>
+            ))}
+          </Section>
+        </Animated.View>
+      ) : null}
 
-          <YStack space="$3">
-            {systemMenus.map((menu) => {
-              const Icon = menu.icon;
-              return (
-                <Card
-                  key={menu.title}
-                  padding="$4"
-                  borderRadius="$5"
-                  backgroundColor={themeColors.cardBackground}
-                  borderColor={themeColors.borderColor}
-                  borderWidth={1}
-                  elevate
-                  pressStyle={{ scale: 0.98 }}
-                  onPress={() => router.push(menu.route as any)}
-                >
-                  <XStack space="$3" alignItems="center" justifyContent="space-between">
-                    <XStack space="$3" alignItems="center" flex={1}>
-                      <YStack backgroundColor={menu.bgColor} p="$2.5" borderRadius="$4">
-                        <Icon size={24} color={menu.color} />
-                      </YStack>
-                      <YStack flex={1}>
-                        <Text color={themeColors.text} fontSize={16} fontWeight="700">{menu.title}</Text>
-                        <Paragraph color={themeColors.textMuted} fontSize={13} numberOfLines={2}>
-                          {menu.description}
-                        </Paragraph>
-                      </YStack>
-                    </XStack>
-                    <ChevronRight size={20} color={themeColors.textMuted} />
-                  </XStack>
-                </Card>
-              );
-            })}
-          </YStack>
-        </YStack>
-      </ScrollView>
-    </YStack>
+      <AppText variant="caption" tone="subtle" align="center">
+        CoC.M Mobile · Version 1.0.0
+      </AppText>
+    </ScrollView>
   );
 }

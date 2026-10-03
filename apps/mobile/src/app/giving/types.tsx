@@ -1,23 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, TouchableOpacity, TextInput, Alert as RNAlert, StatusBar } from 'react-native';
-import { YStack, XStack, Text, Card, Button, Spinner } from 'tamagui';
-import { ArrowLeft, Plus, Trash2, RefreshCw } from '@tamagui/lucide-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { 
-  getLocalCustomGivingTypes, 
-  upsertLocalCustomGivingType, 
-  deleteLocalCustomGivingType, 
-  LocalCustomGivingType 
+import { Alert as RNAlert, RefreshControl, ScrollView, Switch, View } from 'react-native';
+import { Plus, RefreshCw, Tags, Trash2 } from '@tamagui/lucide-icons';
+import {
+  getLocalCustomGivingTypes,
+  upsertLocalCustomGivingType,
+  deleteLocalCustomGivingType,
+  LocalCustomGivingType
 } from '../../lib/db';
 import { generateUUID } from '../../lib/uuid';
-import { syncCustomGivingTypes } from '../../lib/syncEngine';
-import { api } from '../../lib/api';
-import { useThemeContext } from '../../context/ThemeContext';
+import { pushOrQueue, syncCustomGivingTypes } from '../../lib/syncEngine';
+import { useAppColors } from '../../context/ThemeContext';
+import { AppHeader } from '../../components/AppHeader';
+import { SkeletonList } from '../../components/Skeleton';
+import { AppText, Button, EmptyState, IconButton, ListRow, Screen, Section, Sheet, TextField, useToast } from '../../components/ui';
+import { haptic } from '../../theme/haptics';
+import { space } from '../../theme/tokens';
 
 export default function CustomGivingTypesScreen() {
-  const router = useRouter();
-  const { isDark, themeColors } = useThemeContext();
+  const c = useAppColors();
+  const toast = useToast();
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const [types, setTypes] = useState<LocalCustomGivingType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,9 +60,10 @@ export default function CustomGivingTypesScreen() {
 
   const handleSaveType = async () => {
     if (!name.trim()) {
-      RNAlert.alert('Validation Error', 'Category name is required.');
+      setNameError('Enter a category name.');
       return;
     }
+    setNameError(null);
 
     setSaving(true);
     try {
@@ -75,19 +78,17 @@ export default function CustomGivingTypesScreen() {
 
       await upsertLocalCustomGivingType(newType);
 
-      try {
-        await api.giving.types.create({ name: name.trim(), description: description.trim() || undefined });
-      } catch (e) {
-        console.warn('Backend custom giving type create warning:', e);
-      }
+      // Queued if offline (a swallowed failure used to lose it on the next sync)
+      await pushOrQueue('POST', '/giving/types', { name: name.trim(), description: description.trim() || undefined });
 
       setName('');
       setDescription('');
       setShowAddForm(false);
+      toast.show({ title: 'Category added', message: newType.name });
       loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to add custom giving category:', err);
-      RNAlert.alert('Error', 'Failed to save category.');
+      toast.show({ title: 'Couldn’t save category', message: err?.message, tone: 'error' });
     } finally {
       setSaving(false);
     }
@@ -98,9 +99,7 @@ export default function CustomGivingTypesScreen() {
       const nextActive = item.is_active === 1 ? 0 : 1;
       await upsertLocalCustomGivingType({ ...item, is_active: nextActive });
 
-      try {
-        await api.giving.types.toggle(item.id);
-      } catch (e) {}
+      await pushOrQueue('PATCH', `/giving/types/${item.id}/toggle`);
 
       loadData();
     } catch (err) {
@@ -110,8 +109,8 @@ export default function CustomGivingTypesScreen() {
 
   const handleDelete = async (id: string) => {
     RNAlert.alert(
-      'Delete Category',
-      'Are you sure you want to delete this custom giving category?',
+      'Delete category?',
+      'It will no longer appear when recording giving.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -120,9 +119,7 @@ export default function CustomGivingTypesScreen() {
           onPress: async () => {
             try {
               await deleteLocalCustomGivingType(id);
-              try {
-                await api.giving.types.delete(id);
-              } catch (e) {}
+              await pushOrQueue('DELETE', `/giving/types/${id}`);
               loadData();
             } catch (err) {
               console.error('Failed to delete custom category:', err);
@@ -133,141 +130,76 @@ export default function CustomGivingTypesScreen() {
     );
   };
 
-  const inputStyle = {
-    color: themeColors.text,
-    backgroundColor: themeColors.cardBackground,
-    borderWidth: 1,
-    borderColor: themeColors.borderColor,
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-  };
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: themeColors.background }} edges={['top', 'left', 'right']}>
-      <StatusBar barStyle={themeColors.statusBarStyle} backgroundColor={themeColors.background} animated />
-      <YStack flex={1} backgroundColor={themeColors.background}>
-        {/* Navigation Header */}
-        <XStack px="$4" py="$3" alignItems="center" justifyContent="space-between" borderBottomWidth={1} borderColor={themeColors.borderColor}>
-          <XStack space="$2" alignItems="center">
-            <TouchableOpacity onPress={() => router.back()}>
-              <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-                <ArrowLeft size={18} color={themeColors.text} />
-              </YStack>
-            </TouchableOpacity>
-            <YStack>
-              <Text color={themeColors.text} fontSize={18} fontWeight="900">Custom Giving Categories</Text>
-              <Text color={themeColors.textMuted} fontSize={11}>Manage dynamic offering categories</Text>
-            </YStack>
-          </XStack>
+    <Screen>
+      <AppHeader
+        title="Giving types"
+        subtitle="Extra offering categories"
+        showBack
+        rightElement={
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <IconButton icon={RefreshCw} label="Refresh" spinning={refreshing} onPress={handleRefresh} />
+            <IconButton icon={Plus} label="Add category" tone="primary" onPress={() => { setNameError(null); setShowAddForm(true); }} />
+          </View>
+        }
+      />
+      <ScrollView
+        contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.lg }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
+      >
+        <AppText variant="caption" tone="muted" style={{ paddingHorizontal: 4 }}>
+          Offertory, thanksgiving and donations are always available. Add categories like Building Fund or Harvest here.
+        </AppText>
+        <Section title={`Categories · ${types.length}`}>
+          {loading ? (
+            <View style={{ padding: space.md }}><SkeletonList count={3} hasAvatar={false} /></View>
+          ) : types.length === 0 ? (
+            <EmptyState icon={Tags} title="No extra categories" action={{ label: 'Add category', onPress: () => setShowAddForm(true) }} />
+          ) : (
+            types.map(item => {
+              const isActive = item.is_active === 1;
+              return (
+                <ListRow
+                  key={item.id}
+                  icon={Tags}
+                  iconTone={isActive ? 'primary' : 'neutral'}
+                  title={item.name}
+                  subtitle={item.description || (isActive ? 'Shown when recording giving' : 'Hidden')}
+                  right={
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Switch
+                        value={isActive}
+                        onValueChange={() => { haptic.selection(); handleToggle(item); }}
+                        trackColor={{ true: c.primary.base, false: c.borderStrong }}
+                        thumbColor="#FFFFFF"
+                        accessibilityLabel={`${item.name} active`}
+                      />
+                      <IconButton icon={Trash2} label={`Delete ${item.name}`} tone="danger" size={36} onPress={() => handleDelete(item.id)} />
+                    </View>
+                  }
+                />
+              );
+            })
+          )}
+        </Section>
+      </ScrollView>
 
-          <TouchableOpacity onPress={handleRefresh}>
-            <YStack p="$2" borderRadius="$3" backgroundColor={themeColors.borderColor} opacity={0.8}>
-              <RefreshCw size={18} color={themeColors.text} className={refreshing ? 'animate-spin' : ''} />
-            </YStack>
-          </TouchableOpacity>
-        </XStack>
-
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 80 }}>
-          <YStack space="$4">
-
-            {/* Add New Category Button / Form Toggle */}
-            {!showAddForm ? (
-              <Button backgroundColor="#FF9500" size="$4" onPress={() => setShowAddForm(true)}>
-                <XStack space="$2" alignItems="center">
-                  <Plus size={18} color="white" />
-                  <Text color="white" fontWeight="800" fontSize={14}>Add Custom Category</Text>
-                </XStack>
-              </Button>
-            ) : (
-              <Card p="$4" borderRadius="$4" borderWidth={1} borderColor="#FF9500" backgroundColor={themeColors.cardBackground}>
-                <YStack space="$3">
-                  <Text color={themeColors.text} fontSize={15} fontWeight="800">New Custom Giving Category</Text>
-
-                  <YStack space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">CATEGORY NAME *</Text>
-                    <TextInput
-                      value={name}
-                      onChangeText={setName}
-                      placeholder="e.g. Harvest Offering, Building Fund..."
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-
-                  <YStack space="$1">
-                    <Text color={themeColors.textMuted} fontSize={11} fontWeight="700">DESCRIPTION (OPTIONAL)</Text>
-                    <TextInput
-                      value={description}
-                      onChangeText={setDescription}
-                      placeholder="Purpose of this giving category..."
-                      placeholderTextColor={themeColors.textMuted}
-                      style={inputStyle}
-                    />
-                  </YStack>
-
-                  <XStack space="$2" justifyContent="flex-end">
-                    <Button size="$3" variant="outlined" onPress={() => setShowAddForm(false)}>
-                      <Text color={themeColors.textMuted}>Cancel</Text>
-                    </Button>
-                    <Button size="$3" backgroundColor="#FF9500" onPress={handleSaveType} disabled={saving}>
-                      {saving ? <Spinner color="white" /> : <Text color="white" fontWeight="800">Save</Text>}
-                    </Button>
-                  </XStack>
-                </YStack>
-              </Card>
-            )}
-
-            {/* List of Custom Categories */}
-            <YStack space="$2">
-              <Text color={themeColors.text} fontSize={13} fontWeight="800" textTransform="uppercase" letterSpacing={0.5}>
-                Categories ({types.length})
-              </Text>
-
-              {loading ? (
-                <Spinner size="large" color="#FF9500" py="$6" />
-              ) : types.length === 0 ? (
-                <Card p="$4" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground} alignItems="center">
-                  <Text color={themeColors.textMuted} fontSize={13}>No custom giving categories added yet.</Text>
-                </Card>
-              ) : (
-                types.map(item => {
-                  const isActive = item.is_active === 1;
-
-                  return (
-                    <Card key={item.id} p="$3.5" borderRadius="$4" borderWidth={1} borderColor={themeColors.borderColor} backgroundColor={themeColors.cardBackground}>
-                      <XStack justifyContent="space-between" alignItems="center">
-                        <YStack flex={1} space="$1">
-                          <XStack space="$2" alignItems="center">
-                            <Text color={themeColors.text} fontSize={15} fontWeight="800">{item.name}</Text>
-                            <TouchableOpacity onPress={() => handleToggle(item)}>
-                              <XStack backgroundColor={isActive ? 'rgba(52, 199, 89, 0.15)' : 'rgba(142, 142, 147, 0.15)'} px="$2" py="$0.5" borderRadius="$2">
-                                <Text color={isActive ? '#34C759' : themeColors.textMuted} fontSize={10} fontWeight="800">
-                                  {isActive ? 'Active' : 'Inactive'}
-                                </Text>
-                              </XStack>
-                            </TouchableOpacity>
-                          </XStack>
-                          {item.description && (
-                            <Text color={themeColors.textMuted} fontSize={12}>{item.description}</Text>
-                          )}
-                        </YStack>
-
-                        <TouchableOpacity onPress={() => handleDelete(item.id)}>
-                          <YStack p="$2" borderRadius="$3" backgroundColor="rgba(255, 59, 48, 0.15)">
-                            <Trash2 size={16} color="#FF3B30" />
-                          </YStack>
-                        </TouchableOpacity>
-                      </XStack>
-                    </Card>
-                  );
-                })
-              )}
-            </YStack>
-
-          </YStack>
-        </ScrollView>
-      </YStack>
-    </SafeAreaView>
+      <Sheet
+        visible={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        title="New giving category"
+        footer={<Button label="Save category" loading={saving} fullWidth onPress={handleSaveType} />}
+      >
+        <TextField
+          label="Name *"
+          placeholder="e.g. Building fund"
+          value={name}
+          onChangeText={t => { setName(t); if (nameError) setNameError(null); }}
+          error={nameError}
+          autoFocus
+        />
+        <TextField label="Description" placeholder="Optional" value={description} onChangeText={setDescription} />
+      </Sheet>
+    </Screen>
   );
 }

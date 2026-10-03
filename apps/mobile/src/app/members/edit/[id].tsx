@@ -1,51 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { TouchableOpacity, Alert, Image, Modal, FlatList } from 'react-native';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { 
-  YStack, 
-  XStack, 
-  Text, 
-  Card, 
-  H2, 
-  Input, 
-  Button, 
-  Separator, 
-  Spinner, 
-  TextArea,
-  ScrollView
-} from 'tamagui';
-import { 
-  ArrowLeft, 
-  Save, 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Church, 
-  ShieldCheck, 
-  Users, 
-  CreditCard, 
-  FileText, 
-  Plus, 
-  Trash2, 
-  Check, 
-  Search, 
-  X 
-} from '@tamagui/lucide-icons';
 import { getLocalDb, LocalMember, upsertLocalMember, upsertLocalFamilyMember, getLocalFamilyMembers } from '../../../lib/db';
-import { NativeDatePicker } from '../../../components/NativeDatePicker';
 import { getOrCacheProfilePhoto } from '../../../lib/photoCache';
 import { supabase } from '../../../lib/supabase';
 import { getDropdownOptions, getChurchZones } from '../../../lib/options';
-import { enqueueSyncTask } from '../../../lib/syncEngine';
+import { pushOrQueue } from '../../../lib/syncEngine';
 import { generateUUID } from '../../../lib/uuid';
-import { api } from '../../../lib/api';
 import { resolveMemberFamily } from '../../../lib/family';
 import { AppHeader } from '../../../components/AppHeader';
+import { SkeletonForm } from '../../../components/Skeleton';
+import { SaveBar, Screen, useToast } from '../../../components/ui';
+import { MemberForm, MemberFormBindings, MemberFormErrors } from '../../../components/forms/MemberForm';
+import { space } from '../../../theme/tokens';
 
-const GENDERS = ['male', 'female'];
-const MARITAL_STATUSES = ['single', 'married', 'divorced', 'widowed'];
 const MEMBER_STATUSES = ['active', 'semi-active', 'new', 'sick', 'traveled', 'schooling', 'inactive', 'not baptised', 'blacklisted'];
 
 interface FamilyMemberItem {
@@ -65,6 +34,8 @@ export default function EditMemberScreen() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
+  const [errors, setErrors] = useState<MemberFormErrors>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   // Dynamic Options
@@ -122,6 +93,30 @@ export default function EditMemberScreen() {
   // Family Members
   const [familyMembers, setFamilyMembers] = useState<FamilyMemberItem[]>([]);
 
+  // Verified DB Query: Check if zone number is already assigned to an existing member in SQLite / Remote DB (excluding current member)
+  const conflictingMember = useMemo(() => {
+    if (!zoneNumber.trim()) return null;
+    const target = zoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!target) return null;
+    const targetFull = `${zone || ''}${target}`.replace(/[^A-Z0-9]/g, '');
+
+    return memberRoster.find((m) => {
+      if (m.id === id) return false;
+      let mZoneNumber = m.zone_number || '';
+      if (!mZoneNumber && m.raw_json) {
+        try {
+          const parsed = JSON.parse(m.raw_json);
+          mZoneNumber = parsed.zoneNumber || parsed.zone_number || '';
+        } catch (e) {}
+      }
+      const mNum = mZoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!mNum) return false;
+      const mFull = `${m.zone || ''}${mNum}`.replace(/[^A-Z0-9]/g, '');
+
+      return mNum === target || mNum === targetFull || mFull === target || mFull === targetFull;
+    }) || null;
+  }, [zoneNumber, zone, memberRoster, id]);
+
   useEffect(() => {
     async function loadDynamicMetadata() {
       try {
@@ -136,10 +131,31 @@ export default function EditMemberScreen() {
         if (p.length > 0) setPositionsList(p);
         else setPositionsList(['Pastor', 'Elder', 'Deacon', 'Deaconess', 'Ministry Leader', 'Executive Member', 'General Member']);
 
-        // Load adult member directory for family linking
+        // Load adult member directory for family linking & duplicate zone check
         const db = await getLocalDb();
         const roster = await db.getAllAsync<LocalMember>('SELECT * FROM members ORDER BY name ASC');
         if (roster) setMemberRoster(roster);
+
+        // Fetch fresh server members to guarantee 100% database coverage for duplicate detection
+        const { data: remoteMembers } = await supabase.from('members').select('id, name, first_name, last_name, zone, zone_number, phone, primary_phone');
+        if (remoteMembers && remoteMembers.length > 0) {
+          setMemberRoster(prev => {
+            const map = new Map<string, LocalMember>();
+            for (const item of prev) map.set(item.id, item);
+            for (const r of remoteMembers) {
+              const prevItem = map.get(r.id);
+              map.set(r.id, {
+                id: r.id,
+                name: r.name || `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+                zone: r.zone || prevItem?.zone,
+                zone_number: r.zone_number || prevItem?.zone_number,
+                phone: r.phone || r.primary_phone || prevItem?.phone,
+                created_at: prevItem?.created_at || new Date().toISOString()
+              });
+            }
+            return Array.from(map.values());
+          });
+        }
       } catch (err) {
         console.warn('Error fetching dynamic options in EditMember:', err);
       }
@@ -322,9 +338,58 @@ export default function EditMemberScreen() {
     setActiveFamilyIndex(null);
   };
 
+  const pickPhotoFromLibrary = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Permission to access media library is required to select a profile photo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.warn('Image picker error:', err);
+      Alert.alert('Error', 'Could not open photo library.');
+    }
+  };
+
+  const takePhotoWithCamera = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Permission to access camera is required to take a profile photo.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.warn('Camera error:', err);
+      Alert.alert('Error', 'Could not open camera.');
+    }
+  };
+
   const handleSave = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Validation Error', 'First Name and Last Name are required.');
+    const nextErrors: MemberFormErrors = {
+      firstName: firstName.trim() ? undefined : 'Enter a first name.',
+      lastName: lastName.trim() ? undefined : 'Enter a last name.',
+      zoneNumber: conflictingMember ? `Already assigned to ${conflictingMember.name}.` : undefined,
+    };
+    setErrors(nextErrors);
+    if (Object.values(nextErrors).some(Boolean)) {
+      toast.show({ title: 'Check the highlighted fields', tone: 'warning' });
       return;
     }
 
@@ -351,6 +416,8 @@ export default function EditMemberScreen() {
         zoneNumber,
         status,
         notes: notes.trim() || undefined,
+        photo: avatarUri || undefined,
+        photoUrl: avatarUri || undefined,
         baptismInfo: {
           baptismStatus,
           dateType: baptismDateType,
@@ -382,6 +449,8 @@ export default function EditMemberScreen() {
         zone_number: zoneNumber,
         ministry: selectedMinistries[0],
         status,
+        photo_url: avatarUri || undefined,
+        local_photo_path: avatarUri || undefined,
         raw_json: JSON.stringify(updatedMemberData),
         created_at: new Date().toISOString()
       });
@@ -404,419 +473,64 @@ export default function EditMemberScreen() {
         }
       }
 
-      // 2. Enqueue Outbox Queue Task for guaranteed offline persistence
-      await enqueueSyncTask('member_update', `/members/${id}`, updatedMemberData);
+      // 2. Live Server Update via Edge Function (handles family_members & reciprocal inverse links);
+      //    queued in the outbox only if the server can't be reached.
+      await pushOrQueue('PUT', `/members/${id}`, updatedMemberData);
 
-      // 3. Live Server Update via Edge Function (handles family_members & reciprocal inverse links)
-      try {
-        await api.members.update(id as string, updatedMemberData);
-      } catch (apiErr) {
-        console.warn('API member update failed, queued offline:', apiErr);
-      }
-
-      Alert.alert('Success', 'Member profile updated successfully!');
+      toast.show({ title: 'Changes saved', message: fullName });
       router.back();
 
     } catch (err) {
       console.warn('Error saving member update:', err);
-      Alert.alert('Error', 'Failed to save member update.');
+      toast.show({ title: 'Couldn’t save changes', message: 'Check your entries and try again.', tone: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) {
-    return (
-      <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="$background">
-        <Spinner size="large" color="#007AFF" />
-        <Text color="$colorPress" marginTop="$2" fontSize={13}>Loading member details...</Text>
-      </YStack>
-    );
-  }
-
   const filteredMembers = memberRoster.filter(m => 
     !searchMemberQuery || m.name.toLowerCase().includes(searchMemberQuery.toLowerCase())
   );
 
+  if (loading) {
+    return (
+      <Screen>
+        <AppHeader title="Edit member" showBack />
+        <SkeletonForm />
+      </Screen>
+    );
+  }
+
+  const form: MemberFormBindings = {
+    photoUri: avatarUri, setPhotoUri: setAvatarUri, pickPhotoFromLibrary, takePhotoWithCamera,
+    firstName, setFirstName: v => { setFirstName(v); if (errors.firstName) setErrors(e => ({ ...e, firstName: undefined })); },
+    lastName, setLastName: v => { setLastName(v); if (errors.lastName) setErrors(e => ({ ...e, lastName: undefined })); },
+    otherNames, setOtherNames, gender, setGender, maritalStatus, setMaritalStatus,
+    dateOfBirth, setDateOfBirth, occupation, setOccupation, hometown, setHometown,
+    phone, setPhone, secondPhone, setSecondPhone, email, setEmail,
+    residenceLocation, setResidenceLocation, digitalAddress, setDigitalAddress,
+    zonesList, zone, setZone,
+    zoneNumber, setZoneNumber: v => { setZoneNumber(v); if (errors.zoneNumber) setErrors(e => ({ ...e, zoneNumber: undefined })); },
+    conflictingMember,
+    baptismStatus, setBaptismStatus, baptismDateType, setBaptismDateType, baptismFullDate, setBaptismFullDate,
+    baptismMonth, setBaptismMonth, baptismYear, setBaptismYear,
+    previousCongregation, setPreviousCongregation, roleInPreviousCongregation, setRoleInPreviousCongregation,
+    ministriesList, selectedMinistries, toggleMinistry, positionsList, selectedPositions, togglePosition,
+    familyMembers, handleAddFamilyMember, handleRemoveFamilyMember, handleUpdateFamilyMember, openMemberPicker,
+    memberPickerVisible, setMemberPickerVisible, searchMemberQuery, setSearchMemberQuery,
+    filteredMembers, selectMemberAsRelative,
+    statuses: MEMBER_STATUSES, status, setStatus, notes, setNotes,
+  };
+
   return (
-    <YStack flex={1} backgroundColor="$background">
-      <AppHeader
-        title="Edit Member"
-        subtitle={`Updating ${firstName} ${lastName}`}
-        showBack
-        backTitle="Profile"
-        rightElement={
-          <Button 
-            size="$3" 
-            backgroundColor="#007AFF" 
-            borderRadius="$3"
-            onPress={handleSave}
-            disabled={submitting}
-            icon={submitting ? <Spinner size="small" color="#FFFFFF" /> : <Save size={14} color="#FFFFFF" />}
-            pressStyle={{ scale: 0.98 }}
-          >
-            <Text color="#FFFFFF" fontWeight="700" fontSize={13}>{submitting ? 'Saving...' : 'Save'}</Text>
-          </Button>
-        }
-      />
-
-      <ScrollView style={{ flex: 1 }} backgroundColor="$background" contentContainerStyle={{ padding: 16, paddingBottom: 50 }}>
-        <YStack space="$4">
-
-          {/* Section 1: Basic Information */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <User size={18} color="#007AFF" />
-                <Text color="$color" fontSize={16} fontWeight="700">Basic Information</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">First Name *</Text>
-                <Input value={firstName} onChangeText={setFirstName} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Last Name *</Text>
-                <Input value={lastName} onChangeText={setLastName} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Other Names</Text>
-                <Input value={otherNames} onChangeText={setOtherNames} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Gender *</Text>
-                <XStack space="$2">
-                  {GENDERS.map(g => (
-                    <TouchableOpacity key={g} onPress={() => setGender(g)} style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: gender === g ? '#007AFF' : 'rgba(142,142,147,0.12)', alignItems: 'center' }}>
-                      <Text color={gender === g ? '#FFFFFF' : '$color'} fontSize={13} fontWeight="700" textTransform="capitalize">{g}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </XStack>
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Marital Status</Text>
-                <XStack space="$1.5" flexWrap="wrap">
-                  {MARITAL_STATUSES.map(m => (
-                    <TouchableOpacity key={m} onPress={() => setMaritalStatus(m)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: maritalStatus === m ? '#007AFF' : 'rgba(142,142,147,0.12)', marginBottom: 4 }}>
-                      <Text color={maritalStatus === m ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700" textTransform="capitalize">{m}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </XStack>
-
-                <NativeDatePicker
-                  label="Date of Birth (YYYY-MM-DD)"
-                  value={dateOfBirth}
-                  onChange={setDateOfBirth}
-                  placeholder="YYYY-MM-DD"
-                  maxDate={new Date()}
-                  accentColor="#007AFF"
-                />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Occupation</Text>
-                <Input value={occupation} onChangeText={setOccupation} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Hometown</Text>
-                <Input value={hometown} onChangeText={setHometown} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Section 2: Contact Information */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <Phone size={18} color="#34C759" />
-                <Text color="$color" fontSize={16} fontWeight="700">Contact Details</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Primary Phone *</Text>
-                <Input value={phone} onChangeText={setPhone} keyboardType="phone-pad" backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Secondary Phone</Text>
-                <Input value={secondPhone} onChangeText={setSecondPhone} keyboardType="phone-pad" backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Email Address</Text>
-                <Input value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Section 3: Location & Church Zone */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <MapPin size={18} color="#FF9500" />
-                <Text color="$color" fontSize={16} fontWeight="700">Location & Zone</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Residential Area / Location *</Text>
-                <Input value={residenceLocation} onChangeText={setResidenceLocation} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Digital Address</Text>
-                <Input value={digitalAddress} onChangeText={setDigitalAddress} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Church Zone *</Text>
-                <XStack space="$2" flexWrap="wrap">
-                  {zonesList.map(z => (
-                    <TouchableOpacity key={z} onPress={() => setZone(z)} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: zone === z ? '#FF9500' : 'rgba(142,142,147,0.12)', marginBottom: 6 }}>
-                      <Text color={zone === z ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700">Zone {z}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </XStack>
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Assigned Zone Number</Text>
-                <Input value={zoneNumber} onChangeText={setZoneNumber} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Section 4: Baptism Information */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <Church size={18} color="#5856D6" />
-                <Text color="$color" fontSize={16} fontWeight="700">Baptism Information</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Baptism Status</Text>
-                <XStack space="$2">
-                  <TouchableOpacity onPress={() => setBaptismStatus('baptised')} style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: baptismStatus === 'baptised' ? '#34C759' : 'rgba(142,142,147,0.12)', alignItems: 'center' }}>
-                    <Text color={baptismStatus === 'baptised' ? '#FFFFFF' : '$color'} fontSize={13} fontWeight="700">Baptised</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setBaptismStatus('not_baptised')} style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: baptismStatus === 'not_baptised' ? '#FF3B30' : 'rgba(142,142,147,0.12)', alignItems: 'center' }}>
-                    <Text color={baptismStatus === 'not_baptised' ? '#FFFFFF' : '$color'} fontSize={13} fontWeight="700">Not Baptised</Text>
-                  </TouchableOpacity>
-                </XStack>
-
-                {baptismStatus === 'baptised' ? (
-                  <>
-                    <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Date Record Type</Text>
-                    <XStack space="$1.5" flexWrap="wrap">
-                      {['full', 'monthYear', 'yearOnly', 'forgotten'].map(dt => (
-                        <TouchableOpacity key={dt} onPress={() => setBaptismDateType(dt)} style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: baptismDateType === dt ? '#5856D6' : 'rgba(142,142,147,0.12)', marginBottom: 4 }}>
-                          <Text color={baptismDateType === dt ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700" textTransform="capitalize">{dt}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </XStack>
-
-                    {baptismDateType === 'full' && (
-                      <NativeDatePicker
-                        value={baptismFullDate}
-                        onChange={setBaptismFullDate}
-                        placeholder="Full Date (YYYY-MM-DD)"
-                        maxDate={new Date()}
-                        accentColor="#5856D6"
-                      />
-                    )}
-
-                    {baptismDateType === 'monthYear' && (
-                      <XStack space="$2">
-                        <Input flex={1} value={baptismMonth} onChangeText={setBaptismMonth} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} placeholder="Month (1-12)" />
-                        <Input flex={1} value={baptismYear} onChangeText={setBaptismYear} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} placeholder="Year (YYYY)" />
-                      </XStack>
-                    )}
-
-                    {baptismDateType === 'yearOnly' && (
-                      <Input value={baptismYear} onChangeText={setBaptismYear} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} placeholder="Year (YYYY)" />
-                    )}
-
-                    <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Previous Congregation</Text>
-                    <Input value={previousCongregation} onChangeText={setPreviousCongregation} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-
-                    <Text color="$colorPress" fontSize={12} fontWeight="600">Role in Previous Congregation</Text>
-                    <Input value={roleInPreviousCongregation} onChangeText={setRoleInPreviousCongregation} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" height={40} />
-                  </>
-                ) : null}
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Section 5: Ministries & Positions */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <ShieldCheck size={18} color="#AF52DE" />
-                <Text color="$color" fontSize={16} fontWeight="700">Ministries & Positions</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Ministries</Text>
-                <XStack space="$1.5" flexWrap="wrap">
-                  {ministriesList.map(m => {
-                    const sel = selectedMinistries.includes(m);
-                    return (
-                      <TouchableOpacity key={m} onPress={() => toggleMinistry(m)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: sel ? '#007AFF' : 'rgba(142,142,147,0.12)', marginBottom: 6 }}>
-                        <XStack space="$1" alignItems="center">
-                          {sel ? <Check size={12} color="#FFFFFF" /> : null}
-                          <Text color={sel ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700">{m}</Text>
-                        </XStack>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </XStack>
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$3">Positions Held</Text>
-                <XStack space="$1.5" flexWrap="wrap">
-                  {positionsList.map(p => {
-                    const sel = selectedPositions.includes(p);
-                    return (
-                      <TouchableOpacity key={p} onPress={() => togglePosition(p)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, backgroundColor: sel ? '#AF52DE' : 'rgba(142,142,147,0.12)', marginBottom: 6 }}>
-                        <XStack space="$1" alignItems="center">
-                          {sel ? <Check size={12} color="#FFFFFF" /> : null}
-                          <Text color={sel ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700">{p}</Text>
-                        </XStack>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </XStack>
-              </YStack>
-            </YStack>
-          </Card>
-
-          {/* Section 6: Family Members & Relatives */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack justifyContent="space-between" alignItems="center">
-                <XStack space="$2" alignItems="center">
-                  <Users size={18} color="#007AFF" />
-                  <Text color="$color" fontSize={16} fontWeight="700">Family Members ({familyMembers.length})</Text>
-                </XStack>
-                <Button size="$2.5" backgroundColor="#007AFF" borderRadius="$3" onPress={handleAddFamilyMember} icon={<Plus size={12} color="#FFFFFF" />}>
-                  <Text color="#FFFFFF" fontSize={11} fontWeight="700">Add Relative</Text>
-                </Button>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              {familyMembers.length === 0 ? (
-                <Text color="$colorPress" fontSize={12} textAlign="center" py="$2">No family members linked yet. Tap "+ Add Relative" above.</Text>
-              ) : (
-                <YStack space="$3">
-                  {familyMembers.map((fm, idx) => (
-                    <YStack key={fm.id || idx} p="$3" borderRadius="$3" backgroundColor="$background" borderColor="$borderColor" borderWidth={1} space="$2.5">
-                      <XStack justifyContent="space-between" alignItems="center">
-                        <Text color="#007AFF" fontSize={13} fontWeight="800">Relative #{idx + 1}</Text>
-                        <TouchableOpacity onPress={() => handleRemoveFamilyMember(idx)}>
-                          <Trash2 size={16} color="#FF3B30" />
-                        </TouchableOpacity>
-                      </XStack>
-
-                      {/* Select from Church Directory Button */}
-                      <Button 
-                        size="$3" 
-                        backgroundColor="rgba(0, 122, 255, 0.1)" 
-                        borderWidth={1} 
-                        borderColor="#007AFF"
-                        onPress={() => openMemberPicker(idx)}
-                        icon={<Search size={14} color="#007AFF" />}
-                      >
-                        <Text color="#007AFF" fontWeight="700" fontSize={12}>
-                          {fm.isLinked ? '✓ Linked Church Member' : 'Select from Church Directory'}
-                        </Text>
-                      </Button>
-
-                      {/* Relationship Choice */}
-                      <XStack space="$1.5" flexWrap="wrap">
-                        {(['father', 'mother', 'spouse', 'child', 'sibling'] as const).map(rel => (
-                          <TouchableOpacity 
-                            key={rel} 
-                            onPress={() => handleUpdateFamilyMember(idx, 'relationship', rel)} 
-                            style={{ 
-                              paddingHorizontal: 9, 
-                              paddingVertical: 5, 
-                              borderRadius: 6, 
-                              backgroundColor: fm.relationship === rel ? '#007AFF' : 'rgba(142,142,147,0.12)' 
-                            }}
-                          >
-                            <Text color={fm.relationship === rel ? '#FFFFFF' : '$color'} fontSize={11} fontWeight="700" textTransform="capitalize">
-                              {rel}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </XStack>
-
-                      <XStack space="$2">
-                        <Input flex={1} value={fm.firstName} onChangeText={t => handleUpdateFamilyMember(idx, 'firstName', t)} placeholder="First Name" backgroundColor="$cardBackground" borderColor="$borderColor" borderRadius="$3" height={36} fontSize={12} />
-                        <Input flex={1} value={fm.lastName} onChangeText={t => handleUpdateFamilyMember(idx, 'lastName', t)} placeholder="Last Name" backgroundColor="$cardBackground" borderColor="$borderColor" borderRadius="$3" height={36} fontSize={12} />
-                      </XStack>
-
-                      <Input value={fm.phone || ''} onChangeText={t => handleUpdateFamilyMember(idx, 'phone', t)} placeholder="Phone Number" keyboardType="phone-pad" backgroundColor="$cardBackground" borderColor="$borderColor" borderRadius="$3" height={36} fontSize={12} />
-                    </YStack>
-                  ))}
-                </YStack>
-              )}
-            </YStack>
-          </Card>
-
-          {/* Section 7: Status & Notes */}
-          <Card padding="$4" borderRadius="$5" backgroundColor="$cardBackground" borderColor="$borderColor" borderWidth={1} elevate>
-            <YStack space="$3">
-              <XStack space="$2" alignItems="center">
-                <FileText size={18} color="#FF2D55" />
-                <Text color="$color" fontSize={16} fontWeight="700">Status & Notes</Text>
-              </XStack>
-              <Separator borderColor="$borderColor" />
-
-              <YStack space="$2">
-                <Text color="$colorPress" fontSize={12} fontWeight="600">Member Status</Text>
-                <XStack space="$1.5" flexWrap="wrap">
-                  {MEMBER_STATUSES.map(st => (
-                    <TouchableOpacity key={st} onPress={() => setStatus(st)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: status === st ? '#007AFF' : 'rgba(142,142,147,0.12)', marginBottom: 6 }}>
-                      <Text color={status === st ? '#FFFFFF' : '$color'} fontSize={12} fontWeight="700" textTransform="capitalize">{st}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </XStack>
-
-                <Text color="$colorPress" fontSize={12} fontWeight="600" marginTop="$2">Notes</Text>
-                <TextArea value={notes} onChangeText={setNotes} backgroundColor="$background" borderColor="$borderColor" borderRadius="$3" minHeight={80} placeholder="Add administrative notes..." />
-              </YStack>
-            </YStack>
-          </Card>
-
-        </YStack>
-      </ScrollView>
-
-      {/* Adult Member Selection Modal for Family Linking */}
-      <Modal visible={memberPickerVisible} animationType="slide" transparent>
-        <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
-          <YStack flex={1} backgroundColor="$background" marginTop={60} borderTopLeftRadius={20} borderTopRightRadius={20} padding="$4">
-            <XStack justifyContent="space-between" alignItems="center" marginBottom="$3">
-              <Text color="$color" fontSize={17} fontWeight="800">Select Church Member</Text>
-              <TouchableOpacity onPress={() => setMemberPickerVisible(false)}>
-                <X size={22} color="$colorPress" />
-              </TouchableOpacity>
-            </XStack>
-
-            <Input 
-              value={searchMemberQuery} 
-              onChangeText={setSearchMemberQuery} 
-              placeholder="Search by member name..." 
-              backgroundColor="$cardBackground" 
-              borderColor="$borderColor" 
-              marginBottom="$3" 
-            />
-
-            <FlatList 
-              data={filteredMembers} 
-              keyExtractor={(m) => m.id} 
-              renderItem={({ item }) => (
-                <TouchableOpacity onPress={() => selectMemberAsRelative(item)}>
-                  <XStack p="$3" borderRadius="$3" backgroundColor="$cardBackground" borderWidth={1} borderColor="$borderColor" marginBottom="$2" justifyContent="space-between" alignItems="center">
-                    <YStack>
-                      <Text color="$color" fontSize={14} fontWeight="700">{item.name}</Text>
-                      <Text color="$colorPress" fontSize={12}>{item.phone || item.email || (item.zone ? `Zone ${item.zone}` : 'Member')}</Text>
-                    </YStack>
-                    <Check size={18} color="#007AFF" />
-                  </XStack>
-                </TouchableOpacity>
-              )} 
-            />
-          </YStack>
-        </SafeAreaView>
-      </Modal>
-    </YStack>
+    <Screen>
+      <AppHeader title="Edit member" subtitle={`${firstName} ${lastName}`.trim()} showBack />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: space.md, paddingBottom: space.xl }} keyboardShouldPersistTaps="handled">
+          <MemberForm form={form} errors={errors} />
+        </ScrollView>
+        <SaveBar label={submitting ? 'Saving…' : 'Save changes'} loading={submitting} onPress={handleSave} />
+      </KeyboardAvoidingView>
+    </Screen>
   );
 }
