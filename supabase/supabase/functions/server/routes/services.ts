@@ -694,6 +694,8 @@ router.post("/visitors", async (c)=>{
     }
     const data = await c.req.json();
     let createPayload: any = {
+      // Offline clients send their locally generated id so replays are idempotent
+      ...(data.id ? { id: data.id } : {}),
       first_name: data.firstName,
       last_name: data.lastName,
       other_names: data.otherNames,

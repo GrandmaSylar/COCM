@@ -62,6 +62,8 @@ router.post('/children/visitors', async (c) => {
     }
 
     const { data, error } = await supabase.from('children_visitors').insert({
+      // Offline clients send their locally generated id so replays are idempotent
+      ...(body.id ? { id: body.id } : {}),
       first_name: body.firstName,
       last_name: body.lastName,
       other_names: body.otherNames,

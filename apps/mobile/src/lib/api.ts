@@ -49,6 +49,70 @@ export const api = {
     },
 
     getSession: () => fetchApi('/auth/session'),
+
+    sendOtp: (data: { userId: string; tempToken: string; method: string }) =>
+      fetchApi<{ message: string; destination: string }>('/auth/send-otp', { method: 'POST', body: JSON.stringify(data) }),
+
+    verifyOtp: (data: { userId: string; tempToken: string; code: string }) =>
+      fetchApi<{ session: { access_token: string; refresh_token: string }; user: any }>('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, deviceId: getDeviceId() }),
+      }),
+
+    resendOtp: (data: { userId: string; tempToken: string }) =>
+      fetchApi<{ message: string }>('/auth/resend-otp', { method: 'POST', body: JSON.stringify(data) }),
+  },
+
+  // ============================================================================
+  // USERS & ACCESS MANAGEMENT
+  // ============================================================================
+  users: {
+    getAll: () => fetchApi('/users'),
+    getTabAccess: (userId: string) => fetchApi(`/users/${userId}/tab-access`),
+    approve: (id: string) => fetchApi(`/users/${id}/approve`, { method: 'POST' }),
+    reject: (id: string) => fetchApi(`/users/${id}/reject`, { method: 'POST' }),
+    updateRole: (id: string, role: string) => fetchApi(`/users/${id}/role`, { method: 'PATCH', body: JSON.stringify({ role }) }),
+    resetPassword: (id: string, newPassword: string) => fetchApi(`/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword }) }),
+    // Server expects { tabs } with web tab ids ('members', 'activity-log', ...)
+    updateTabAccess: (id: string, tabs: string[]) => fetchApi(`/users/${id}/tab-access`, { method: 'PUT', body: JSON.stringify({ tabs }) }),
+    updateTempPermissions: (id: string, permissions: string[], expiresAt?: string) =>
+      fetchApi(`/users/${id}/temp-permissions`, { method: 'PUT', body: JSON.stringify({ permissions, expiresAt }) }),
+  },
+
+  // ============================================================================
+  // CUSTOM ROLES
+  // ============================================================================
+  roles: {
+    getAll: () => fetchApi('/custom-roles'),
+    create: (data: any) => fetchApi('/custom-roles', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => fetchApi(`/custom-roles/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => fetchApi(`/custom-roles/${id}`, { method: 'DELETE' }),
+  },
+
+  // ============================================================================
+  // BACKUPS & SYSTEM EXPORTS
+  // ============================================================================
+  backups: {
+    getAll: () => safeFetch('/backups'),
+    create: () => fetchApi('/backups', { method: 'POST' }),
+    restore: (id: string) => fetchApi(`/backups/${id}/restore`, { method: 'POST' }),
+  },
+
+  // ============================================================================
+  // PREFERENCES
+  // ============================================================================
+  preferences: {
+    get: () => safeFetch('/preferences'),
+    save: (data: any) => fetchApi('/preferences', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
+  // ============================================================================
+  // THEME (per-user, shared with the web app)
+  // ============================================================================
+  theme: {
+    get: () => fetchApi<{ colors: any; mode: string }>('/theme'),
+    save: (data: { colors: any; mode: string }) =>
+      fetchApi('/theme', { method: 'PUT', body: JSON.stringify(data) }),
   },
 
   // ============================================================================
@@ -106,14 +170,11 @@ export const api = {
         const qs = params.toString();
         return safeFetch(`/children/members/${id}/attendance-history${qs ? '?' + qs : ''}`);
       },
-      promoteToMember: (id: string, data?: any) => fetchApi(`/children/members/${id}/promote`, { method: 'POST', body: JSON.stringify(data || {}) }),
     },
     visitors: {
       getAll: () => fetchApi('/children/visitors'),
       create: (data: any) => fetchApi('/children/visitors', { method: 'POST', body: JSON.stringify(data) }),
       update: (id: string, data: any) => fetchApi(`/children/visitors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-      delete: (id: string) => fetchApi(`/children/visitors/${id}`, { method: 'DELETE' }),
-      convert: (id: string, data: any) => fetchApi(`/children/visitors/${id}/convert`, { method: 'POST', body: JSON.stringify(data) }),
     },
     attendance: {
       getAll: () => fetchApi('/children/attendance'),
@@ -160,11 +221,6 @@ export const api = {
     cancelSession: (id: string) =>
       fetchApi(`/attendance/session/${id}/cancel`, { method: 'POST' }),
     getLiveSessions: () => fetchApi('/attendance/live-sessions'),
-    getLiveState: (sessionId: string) => fetchApi(`/attendance/live/${sessionId}`),
-    checkIn: (sessionId: string, memberId: string) =>
-      fetchApi(`/attendance/session/${sessionId}/checkin`, { method: 'POST', body: JSON.stringify({ memberId }) }),
-    checkOut: (sessionId: string, memberId: string) =>
-      fetchApi(`/attendance/session/${sessionId}/checkout`, { method: 'DELETE', body: JSON.stringify({ memberId }) }),
     getAll: () => fetchApi('/attendance'),
     getById: (id: string) => fetchApi(`/attendance/${id}`),
     create: (data: any) => fetchApi('/attendance', { method: 'POST', body: JSON.stringify(data) }),
@@ -231,6 +287,7 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
       return safeFetch(`/activity-log${qs}`);
     },
+    clear: () => fetchApi('/activity-log', { method: 'DELETE' }),
   },
 
   // ============================================================================

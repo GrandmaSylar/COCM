@@ -254,9 +254,10 @@ router.post('/children/members', async (c) => {
       dbData.join_date = new Date().toISOString().split('T')[0];
     }
 
-    // Only pass columns that exist on children_members table
+    // Only pass columns that exist on children_members table.
+    // 'id' lets offline clients keep their locally generated id (idempotent replays).
     const allowedColumns = [
-      'first_name', 'last_name', 'other_names', 'gender', 'date_of_birth',
+      'id', 'first_name', 'last_name', 'other_names', 'gender', 'date_of_birth',
       'phone', 'second_phone', 'email', 'digital_address', 'occupation', 'hometown',
       'zone', 'status', 'residence_location', 'notes', 'photo_url', 'ministries',
       'join_date', 'converted_to_member', 'converted_member_id'

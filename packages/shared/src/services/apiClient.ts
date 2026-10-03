@@ -234,7 +234,10 @@ export async function fetchApi<T = any>(endpoint: string, options: RequestInit =
   // Track in-flight GET requests for dedup
   if (isGet && !isRetry) {
     inflightRequests.set(cacheKey, requestPromise);
-    requestPromise.finally(() => inflightRequests.delete(cacheKey));
+    // .finally() returns a new promise that rejects with the request; the caller
+    // handles the original, so swallow this copy to avoid an unhandled rejection
+    // on every failed (e.g. offline) GET.
+    requestPromise.finally(() => inflightRequests.delete(cacheKey)).catch(() => {});
   }
 
   return requestPromise;
