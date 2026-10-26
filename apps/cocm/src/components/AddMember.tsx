@@ -149,19 +149,23 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
       .map(o => o.label);
   }, [dropdownOptions]);
 
-  // State for existing zone numbers (for sequential numbering)
+  // State for existing members and zone numbers (for sequential numbering and conflict verification)
+  const [existingMembers, setExistingMembers] = useState<Member[]>([]);
   const [existingZoneNumbers, setExistingZoneNumbers] = useState<Record<Zone, number[]>>({
     A: [], B: [], F: [], K: [], M: [], R: []
   });
 
-  // Fetch existing members to get zone numbers
+  // Fetch existing members to get zone numbers and check conflicts
   useEffect(() => {
     const fetchZoneNumbers = async () => {
       try {
         const members = await api.members.getAll();
+        if (Array.isArray(members)) {
+          setExistingMembers(members);
+        }
         const zoneNums: Record<Zone, number[]> = { A: [], B: [], F: [], K: [], M: [], R: [] };
 
-        members.forEach((member: Member) => {
+        (members || []).forEach((member: Member) => {
           if (member.zone && member.zoneNumber) {
             // Extract the number part from zone number (e.g., "A05" -> 5 or "A-05" -> 5)
             const numPart = parseInt(member.zoneNumber.replace(/[^0-9]/g, ''), 10);
@@ -179,6 +183,23 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
     fetchZoneNumbers();
   }, []);
+
+  // Verified DB Query: Check if the entered zone number is already assigned to another member
+  const conflictingMember = useMemo(() => {
+    if (!formData.zoneNumber?.trim()) return null;
+    const target = formData.zoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!target) return null;
+    const targetFull = `${formData.zone || ''}${target}`.replace(/[^A-Z0-9]/g, '');
+
+    return existingMembers.find((m: Member) => {
+      if (!m.zoneNumber) return false;
+      const mNum = m.zoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!mNum) return false;
+      const mFull = `${m.zone || ''}${mNum}`.replace(/[^A-Z0-9]/g, '');
+
+      return mNum === target || mNum === targetFull || mFull === target || mFull === targetFull;
+    }) || null;
+  }, [formData.zoneNumber, formData.zone, existingMembers]);
 
   // Auto-generate zone number when zone is selected
   const generateZoneNumber = (zone: Zone) => {
@@ -232,6 +253,11 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     e.preventDefault();
 
     if (!formData.gender || !formData.zone) return;
+
+    if (conflictingMember) {
+      toast.error(`Zone Number '${formData.zoneNumber}' is already assigned to ${conflictingMember.firstName} ${conflictingMember.lastName}. Please select a unique zone number.`);
+      return;
+    }
 
     setIsLoading(true);
 
@@ -803,7 +829,16 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       value={formData.zoneNumber}
                       onChange={(e) => handleInputChange('zoneNumber', e.target.value)}
                       placeholder="Auto-generated — editable"
+                      className={conflictingMember ? "border-amber-500 focus-visible:ring-amber-500" : ""}
                     />
+                    {conflictingMember && (
+                      <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>
+                          <strong>Zone Number '{formData.zoneNumber}' is already assigned to {conflictingMember.firstName} {conflictingMember.lastName}</strong> ({conflictingMember.zone ? `Zone ${conflictingMember.zone}` : 'Member'}).
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
