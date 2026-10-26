@@ -42,6 +42,8 @@ router.post('/children/giving', async (c) => {
     const body = await c.req.json();
     const total = (body.offeringAmount || 0) + (body.cashAmount || 0) + (body.mobileMoneyAmount || 0);
     const { data, error } = await supabase.from('children_giving_records').insert({
+      // Offline clients send their locally generated id so replays are idempotent
+      ...(body.id ? { id: body.id } : {}),
       service_date: body.serviceDate,
       service_type: body.serviceType,
       offering_amount: body.offeringAmount || 0,

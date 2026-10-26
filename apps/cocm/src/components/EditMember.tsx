@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -184,6 +184,11 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     e.preventDefault();
 
     if (!formData.gender || !formData.zone) return;
+
+    if (conflictingMember) {
+      toast.error(`Zone Number '${formData.zoneNumber}' is already assigned to ${conflictingMember.firstName} ${conflictingMember.lastName}. Please select a unique zone number.`);
+      return;
+    }
 
     setIsLoading(true);
 
@@ -390,10 +395,22 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   formData.gender && formData.dateOfBirth && formData.residenceLocation &&
                   formData.zone && formData.zoneNumber?.trim();
 
-  // Derived: check if the current zone number conflicts with another member
-  const zoneNumberConflict = existingMembers
-    .filter(m => m.id !== member.id && formData.zoneNumber?.trim() && m.zoneNumber === formData.zoneNumber.trim())
-    .length > 0;
+  // Verified DB Query: check if the current zone number is already assigned to another member
+  const conflictingMember = useMemo(() => {
+    if (!formData.zoneNumber?.trim()) return null;
+    const target = formData.zoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (!target) return null;
+    const targetFull = `${formData.zone || ''}${target}`.replace(/[^A-Z0-9]/g, '');
+
+    return existingMembers.find((m: Member) => {
+      if (m.id === member.id || !m.zoneNumber) return false;
+      const mNum = m.zoneNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!mNum) return false;
+      const mFull = `${m.zone || ''}${mNum}`.replace(/[^A-Z0-9]/g, '');
+
+      return mNum === target || mNum === targetFull || mFull === target || mFull === targetFull;
+    }) || null;
+  }, [formData.zoneNumber, formData.zone, existingMembers, member.id]);
 
   return (
     <div className="space-y-6">
@@ -691,10 +708,12 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                   <p className="text-xs text-muted-foreground">
                     Editable. Change Zone and leave this empty to auto-generate a number.
                   </p>
-                  {zoneNumberConflict && (
-                    <div className="flex items-center gap-1.5 mt-1 text-amber-600 dark:text-amber-400">
-                      <AlertTriangle className="w-4 h-4 shrink-0" />
-                      <span className="text-xs font-medium">This zone number is already assigned to another member.</span>
+                  {conflictingMember && (
+                    <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <span>
+                        <strong>Zone Number '{formData.zoneNumber}' is already assigned to {conflictingMember.firstName} {conflictingMember.lastName}</strong> ({conflictingMember.zone ? `Zone ${conflictingMember.zone}` : 'Member'}).
+                      </span>
                     </div>
                   )}
                 </div>
