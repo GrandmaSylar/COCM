@@ -147,7 +147,7 @@ function check(
   };
 }
 
-const alnum = (s: unknown) => String(s ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+export const alnum = (s: unknown) => String(s ?? '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 const digits = (s: unknown) => String(s ?? '').replace(/\D/g, '');
 const fullName = (r: Row) => `${r.first_name ?? ''} ${r.last_name ?? ''}`.trim();
 const num = (v: unknown) => (v === null || v === undefined || v === '' ? 0 : Number(v));
@@ -169,7 +169,7 @@ function groupsWithDuplicates<T>(groups: Map<string, T[]>): { key: string; items
 }
 
 // Strip the zone letter and leading zeros: "A05", "A-05" and "5" in zone A are all "5".
-function zoneNumberCore(zone: unknown, zoneNumber: unknown): string {
+export function zoneNumberCore(zone: unknown, zoneNumber: unknown): string {
   let n = alnum(zoneNumber);
   const z = alnum(zone);
   if (z && n.startsWith(z)) n = n.slice(z.length);
@@ -215,6 +215,16 @@ export function analyze(data: HealthData): HealthCheck[] {
     'Members missing a zone or zone number',
     'The zone or the zone number is empty.',
     members.filter((m) => !alnum(m.zone) || !alnum(m.zone_number)).map((m) => ({ id: m.id, name: fullName(m), zone: m.zone, zoneNumber: m.zone_number })),
+    'warn',
+  ));
+
+  checks.push(check(
+    'members_placeholder_zone_number',
+    'Members with a placeholder zone number',
+    'The number is all zeros (like A00 or B000), so the member has not been given a real zone number yet.',
+    members
+      .filter((m) => alnum(m.zone_number) && zoneNumberCore(m.zone, m.zone_number) === '0')
+      .map((m) => ({ id: m.id, name: fullName(m), zone: m.zone, zoneNumber: m.zone_number })),
     'warn',
   ));
 

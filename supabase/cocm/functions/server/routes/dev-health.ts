@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { supabase } from "../lib/supabase.ts";
-import { getUserFromToken } from "../lib/auth-helpers.ts";
+import { requireDev } from "../lib/dev-guard.ts";
 import { loadHealthData, analyze, summarize } from "../lib/health-checks.ts";
 
 const router = new Hono();
@@ -9,17 +9,8 @@ const router = new Hono();
 // Only an active, approved account with the `dev` role may call it.
 router.get('/dev/health', async (c) => {
   try {
-    const user = await getUserFromToken(c.req.raw);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, is_active, approval_status')
-      .eq('id', user.id)
-      .single();
-    if (!profile || profile.role !== 'dev' || profile.is_active === false || profile.approval_status !== 'approved') {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
+    const guard = await requireDev(c);
+    if ('error' in guard) return guard.error;
 
     const started = Date.now();
     const { data, counts, loadErrors } = await loadHealthData(supabase);

@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Info, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import { AdminApiError, getHealth } from '../lib/api';
 import type { HealthCheck, HealthReport, Severity } from '../types';
+import { BackupCard } from './BackupCard';
+import { FixZoneNumbers } from './FixZoneNumbers';
+import { RecentFixes } from './RecentFixes';
 
 const SEVERITY_STYLE: Record<Severity, { label: string; icon: typeof Info; chip: string }> = {
   error: { label: 'Error', icon: AlertCircle, chip: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300' },
@@ -64,6 +67,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [issuesOnly, setIssuesOnly] = useState(true);
+  const [fixCount, setFixCount] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +87,11 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
 
   useEffect(() => { void load(); }, [load]);
 
+  const afterChange = useCallback(() => {
+    setFixCount((n) => n + 1);
+    void load();
+  }, [load]);
+
   const checks = report
     ? [...report.checks]
         .sort((a, b) => ORDER.indexOf(a.severity) - ORDER.indexOf(b.severity) || b.count - a.count)
@@ -94,7 +103,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">CoC.M Admin</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Read-only health report for the live database · {email}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Health report and fixes for the live database · {email}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => void load()} disabled={loading} className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:hover:bg-slate-800">
@@ -120,9 +129,13 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
             ))}
           </section>
           <p className="text-xs text-slate-500">
-            Generated {when(report.generatedAt)} in {(report.durationMs / 1000).toFixed(1)}s. Nothing on this page changes data.
+            Generated {when(report.generatedAt)} in {(report.durationMs / 1000).toFixed(1)}s. Only the Fix buttons change data.
             {report.loadErrors.length > 0 && <span className="text-red-600"> Could not read: {report.loadErrors.join('; ')}</span>}
           </p>
+
+          <BackupCard lastBackupAt={report.backups.find((b) => b.status === 'completed')?.completedAt ?? null} onDone={afterChange} />
+          <FixZoneNumbers report={report} onChanged={afterChange} />
+          <RecentFixes refreshKey={fixCount} />
 
           <section className={card}>
             <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">

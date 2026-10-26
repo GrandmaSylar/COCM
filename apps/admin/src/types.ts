@@ -36,3 +36,29 @@ export interface HealthReport {
   backups: { id: string; type: string; status: string; fileName: string; fileSize: number | null; createdAt: string; completedAt: string | null; error: string | null }[];
   tally: Record<string, number>;
 }
+
+export interface ZoneFixPreview {
+  member: { id: string; name: string; zone: string; zoneNumber: string; status: string };
+  proposed: string;
+  problems: string[];
+  conflicts: { id: string; name: string; zoneNumber: string }[];
+  canApply: boolean;
+  confirmPhrase: string;
+}
+
+export interface RecentFix {
+  id: string;
+  by: string;
+  description: string;
+  kind: string | null;
+  memberId: string | null;
+  before: string | null;
+  after: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface BackupResult {
+  backup: { id: string; fileName: string; fileSize: number | null };
+  data: unknown;
+}
