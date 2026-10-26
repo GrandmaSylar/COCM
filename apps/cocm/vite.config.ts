@@ -38,6 +38,8 @@ export default defineConfig({
     setupFiles: './src/setupTests.ts',
   },
   resolve: {
+    // @cms/shared lives outside this app; make it use this app's React.
+    dedupe: ['react', 'react-dom'],
     extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
     alias: {
       '@': path.resolve(__dirname, './src'),
