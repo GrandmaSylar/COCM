@@ -8,8 +8,10 @@
   "scripts": {
     "dev:cocm": "npm run dev -w apps/cocm",
     "dev:new": "npm run dev -w apps/new-church",
+    "dev:admin": "npm run dev -w apps/admin",
     "build:cocm": "npm run build -w apps/cocm",
     "build:new": "npm run build -w apps/new-church",
+    "build:admin": "npm run build -w apps/admin",
     "test:cocm": "npm run test -w apps/cocm",
     "bump": "node scripts/bump-version.mjs"
   },
