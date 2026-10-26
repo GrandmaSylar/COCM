@@ -23,7 +23,6 @@ export function Screen({ children, edges = ['left', 'right'], tone = 'background
     <SafeAreaView style={{ flex: 1, backgroundColor }} edges={edges}>
       <StatusBar
         barStyle={colors.isDark ? 'light-content' : 'dark-content'}
-        backgroundColor={colors.surface}
         animated
       />
       {children}

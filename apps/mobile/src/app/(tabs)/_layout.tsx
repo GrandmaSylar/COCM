@@ -33,7 +33,7 @@ export default function TabLayout() {
 
   return (
     <>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} animated />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} animated />
       <Tabs
         screenListeners={{ tabPress: () => { haptic.selection(); } }}
         screenOptions={{

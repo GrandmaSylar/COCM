@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, type ComponentRef } from 'react';
 import { ScrollView, NativeSyntheticEvent, NativeScrollEvent, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
@@ -40,7 +40,7 @@ export default function OnboardingScreen() {
   const c = useAppColors();
   const { width } = useWindowDimensions();
   const [activeIndex, setActiveIndex] = useState(0);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const isLast = activeIndex === ONBOARDING_SLIDES.length - 1;
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {

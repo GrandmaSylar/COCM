@@ -50,7 +50,7 @@ export function GroupRoster({ groups, icon, memberNoun, emptyTitle, refreshing, 
           <View style={{ paddingBottom: space.xs }}>
             <SearchField value={search} onChangeText={setSearch} placeholder={`Search groups or ${memberNoun}s`} />
           </View>
-        ) : null
+        ) : undefined
       }
       ListEmptyComponent={<EmptyState icon={icon} title={q ? 'Nothing matches' : emptyTitle} />}
       renderItem={({ item }) => (
