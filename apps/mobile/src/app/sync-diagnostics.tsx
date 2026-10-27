@@ -184,7 +184,7 @@ export default function SyncDiagnosticsScreen() {
                 <AppText variant="captionStrong" tone="muted">Queued changes · {items.length}</AppText>
                 <Button label="Clear all" variant="ghost" size="sm" onPress={handleClearAll} />
               </View>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <EmptyState

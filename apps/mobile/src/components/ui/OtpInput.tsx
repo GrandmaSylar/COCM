@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useAppColors } from '../../context/ThemeContext';
 import { fonts, radius } from '../../theme/tokens';
@@ -15,7 +15,7 @@ export interface OtpInputProps {
 /** One hidden numeric input rendered as separate digit boxes (supports paste and SMS autofill). */
 export function OtpInput({ value, onChange, length = 6, error, autoFocus, onComplete }: OtpInputProps) {
   const c = useAppColors();
-  const ref = useRef<TextInput>(null);
+  const ref = useRef<ComponentRef<typeof TextInput>>(null);
   const [focused, setFocused] = useState(false);
 
   return (

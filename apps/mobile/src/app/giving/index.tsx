@@ -99,7 +99,7 @@ export default function GivingHistoryScreen() {
                 <AppText variant="caption" tone="muted">{filteredRecords.length} {filteredRecords.length === 1 ? 'record' : 'records'}</AppText>
                 <AppText variant="captionStrong" tone="success" numeric>{formatGHS(total)}</AppText>
               </View>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <EmptyState

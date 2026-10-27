@@ -544,7 +544,7 @@ export default function ChildrenScreen() {
               <View style={{ paddingBottom: space.sm }}>
                 <Button label="Mark today’s attendance" icon={UserCheck} fullWidth onPress={() => router.push('/children/attendance/mark' as any)} />
               </View>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <EmptyState icon={Calendar} title="No attendance yet" message="Mark which children were present at a service." action={{ label: 'Mark attendance', onPress: () => router.push('/children/attendance/mark' as any) }} />

@@ -268,7 +268,7 @@ export default function MembersScreen() {
               <AppText variant="caption" tone="muted" style={{ paddingHorizontal: 4, paddingBottom: space.xs }}>
                 {hasFilters ? `${totalFiltered} of ${totalCount} members` : `${totalCount} members`}
               </AppText>
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             <EmptyState
@@ -322,7 +322,7 @@ export default function MembersScreen() {
                   ))}
                 </View>
               </View>
-            ) : null
+            ) : undefined
           }
         />
       )}

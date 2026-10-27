@@ -54,7 +54,7 @@ export function AppHeader({
 
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: headerBg }}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={headerBg} animated />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} animated />
       <XStack
         paddingLeft={showBack ? 8 : 16}
         paddingRight={16}
