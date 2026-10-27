@@ -13,7 +13,8 @@ export default defineConfig({
     outDir: path.resolve(__dirname, 'build'),
   },
   server: {
-    port: 8081,
+    port: 8084,
+    strictPort: true,
     open: true,
   },
 });

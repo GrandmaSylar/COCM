@@ -10,5 +10,5 @@ export default defineConfig({
   // use this app's copy.
   resolve: { dedupe: ['react', 'react-dom'] },
   build: { outDir: path.resolve(__dirname, 'build') },
-  server: { port: 8082, strictPort: true, open: true },
+  server: { port: 8083, strictPort: true, open: true },
 });
