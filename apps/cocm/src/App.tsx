@@ -1196,7 +1196,7 @@ import { TutorialOverlay } from './components/TutorialOverlay';
 export default function App() {
   return (
     <Sentry.ErrorBoundary fallback={
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4 text-center">
+      <div className="min-h-dvh bg-background flex flex-col items-center justify-center p-4 text-center">
         <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
         <p className="text-muted-foreground mb-4">We've been notified and are looking into the issue.</p>
         <button onClick={() => window.location.reload()} className="px-4 py-2 bg-primary text-primary-foreground rounded-md">
@@ -1207,7 +1207,7 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <TutorialProvider>
-            <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
+            <div className="min-h-dvh bg-background overflow-x-clip w-full max-w-full">
               <AppContent />
               <TutorialOverlay />
               <Toaster position="top-right" />

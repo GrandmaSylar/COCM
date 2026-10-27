@@ -90,7 +90,7 @@ export function OtpVerification({ userId, tempToken, method, destination, onVeri
   const isExpired = timeRemaining <= 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
       <div className="w-full max-w-md space-y-6">
         <Card className="shadow-lg">
           <CardHeader className="text-center space-y-4">

@@ -174,7 +174,7 @@ export function ForgotPassword({ onBackToLogin }: ForgotPasswordProps) {
   const isExpired = timeRemaining <= 0;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
+    <div className="min-h-dvh flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
       <div className="w-full max-w-md">
         <Card className="shadow-lg">
           <CardHeader className="text-center space-y-4">

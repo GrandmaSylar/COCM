@@ -96,10 +96,34 @@
   }
   html {
     font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    /* clip, not hidden: hidden makes html/body a scroll container and breaks position: sticky */
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;
     line-height: 1.5;
+    overflow-x: clip;
+  }
+  /* No pull-to-refresh bounce once installed; in a browser it stays available. */
+  @media (display-mode: standalone) {
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+  /* Removes the double-tap-to-zoom delay on controls without disabling pinch zoom. */
+  a, button, summary, label, select, textarea, input, [role="button"], [role="tab"], [role="menuitem"] {
+    touch-action: manipulation;
+  }
+  /* iOS Safari zooms the page when a focused field is smaller than 16px. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
   h1 {
     @apply text-2xl font-bold leading-tight lg:text-3xl;
@@ -157,5 +181,26 @@
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+}
+
+@layer utilities {
+  /* Safe-area insets (notches, home indicator, rounded corners). They are 0 where there is none. */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}
+
+/* Honour the reduced-motion preference everywhere, not only for the named animation classes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
