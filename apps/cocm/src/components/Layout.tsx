@@ -328,7 +328,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
 
   return (
     <>
-      <div className="min-h-screen bg-background overflow-x-hidden w-full max-w-full">
+      <div className="min-h-dvh bg-background overflow-x-clip w-full max-w-full px-safe pt-safe">
         {/* Mobile Header */}
         {/* eslint-disable-next-line -- PWA install banner for mobile (rendered after header) */}
         <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between no-print">
@@ -639,7 +639,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
               onClick={() => setMobileMenuOpen(false)}
             >
               <div
-                className="fixed inset-y-0 left-0 w-[80%] max-w-[300px] bg-card border-r shadow-2xl animate-slide-in-left p-0 flex flex-col"
+                className="fixed inset-y-0 left-0 w-[80%] max-w-[300px] bg-card border-r shadow-2xl animate-slide-in-left pt-safe pb-safe pl-safe flex flex-col"
                 onClick={(e) => e.stopPropagation()}
               >
                   <div className="flex items-center justify-between px-6 py-5 border-b border-border/50 bg-sidebar/50">
@@ -737,7 +737,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
           )}
 
           {/* Main Content */}
-          <div className="flex-1 lg:ml-64 overflow-x-hidden content-watermark min-h-screen bg-muted/40 dark:bg-background">
+          <div className="flex-1 lg:ml-64 overflow-x-clip content-watermark min-h-dvh pb-safe bg-muted/40 dark:bg-background">
             {/* Desktop Top Bar */}
             <div className="hidden lg:flex items-center justify-end px-8 py-3 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20 no-print">
               <DropdownMenu>
@@ -852,7 +852,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
               )}
               <div
                 key={currentPage}
-                className="page-transition min-h-[calc(100vh-4rem)]" // Ensure min height for transition
+                className="page-transition min-h-[calc(100dvh-4rem)]" // Ensure min height for transition
               >
                 {children}
               </div>

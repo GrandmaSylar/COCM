@@ -16,7 +16,7 @@
     --popover: #ffffff;
     --popover-foreground: #111827;
 
-    --primary: #2563eb;
+    --primary: #dc2626;
     --primary-foreground: #ffffff;
 
     --secondary: #f3f4f6;
@@ -33,18 +33,18 @@
 
     --border: #e5e7eb;
     --input: #e5e7eb;
-    --ring: #2563eb;
+    --ring: #dc2626;
 
     /* Sidebar */
     --sidebar: #f8f9fc;
     --sidebar-foreground: #374151;
-    --sidebar-primary: #2563eb;
+    --sidebar-primary: #dc2626;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #eff6ff;
+    --sidebar-accent: #fef2f2;
     --sidebar-accent-foreground: #374151;
     --sidebar-border: #e5e7eb;
-    --sidebar-ring: #2563eb;
-    --primary-gradient-end: #3b82f6;
+    --sidebar-ring: #dc2626;
+    --primary-gradient-end: #f87171;
   }
 
   .dark {
@@ -58,7 +58,7 @@
     --popover: #1a1d27;
     --popover-foreground: #f9fafb;
 
-    --primary: #60a5fa;
+    --primary: #f87171;
     --primary-foreground: #1a1d27;
 
     --secondary: #1f2335;
@@ -75,18 +75,18 @@
 
     --border: #2a2d3e;
     --input: #2a2d3e;
-    --ring: #60a5fa;
+    --ring: #f87171;
 
     /* Sidebar */
     --sidebar: #0f1117;
     --sidebar-foreground: #9ca3af;
-    --sidebar-primary: #60a5fa;
+    --sidebar-primary: #f87171;
     --sidebar-primary-foreground: #f9fafb;
     --sidebar-accent: #1f2335;
     --sidebar-accent-foreground: #f9fafb;
     --sidebar-border: #2a2d3e;
-    --sidebar-ring: #60a5fa;
-    --primary-gradient-end: #93c5fd;
+    --sidebar-ring: #f87171;
+    --primary-gradient-end: #fca5a5;
   }
 }
 
@@ -96,10 +96,34 @@
   }
   html {
     font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    /* clip, not hidden: hidden makes html/body a scroll container and breaks position: sticky */
+    overflow-x: clip;
   }
   body {
     @apply bg-background text-foreground;
     line-height: 1.5;
+    overflow-x: clip;
+  }
+  /* No pull-to-refresh bounce once installed; in a browser it stays available. */
+  @media (display-mode: standalone) {
+    body {
+      overscroll-behavior-y: none;
+    }
+  }
+  /* Removes the double-tap-to-zoom delay on controls without disabling pinch zoom. */
+  a, button, summary, label, select, textarea, input, [role="button"], [role="tab"], [role="menuitem"] {
+    touch-action: manipulation;
+  }
+  /* iOS Safari zooms the page when a focused field is smaller than 16px. */
+  @media (pointer: coarse) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
   h1 {
     @apply text-2xl font-bold leading-tight lg:text-3xl;
@@ -157,5 +181,26 @@
   .no-scrollbar {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+  }
+}
+
+@layer utilities {
+  /* Safe-area insets (notches, home indicator, rounded corners). They are 0 where there is none. */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+  .px-safe { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}
+
+/* Honour the reduced-motion preference everywhere, not only for the named animation classes. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

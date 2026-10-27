@@ -233,6 +233,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme, customColors]);
 
+  // Keep the browser and installed-app title bar in step with the header colour (--card).
+  useEffect(() => {
+    const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || (isDark ? '#1a1d27' : '#ffffff');
+    document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = card;
+    document.head.appendChild(meta);
+  }, [theme, isDark, customColors]);
+
   const value = {
     theme,
     setTheme: handleSetTheme,

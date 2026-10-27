@@ -95,7 +95,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-8 px-4 h-[calc(100vh-100px)] flex flex-col">
+    <div className="max-w-5xl mx-auto py-8 px-4 h-[calc(100dvh-100px)] flex flex-col">
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4 px-2">
         <div className="flex items-center gap-3">
