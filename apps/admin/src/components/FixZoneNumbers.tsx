@@ -1,41 +1,11 @@
 import { useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { applyZoneFix, previewZoneFix } from '../lib/api';
+import { zoneFixCandidates, type ZoneFixCandidate } from '@cms/admin-core';
 import type { HealthReport, ZoneFixPreview } from '../types';
 import { Avatar, Button, EmptyState, ListRow, Section, TextField, useToast } from '../ui';
 
-interface Candidate {
-  id: string;
-  name: string;
-  zoneNumber: string;
-  reasons: string[];
-}
-
-// Members that need a zone number, gathered from the health checks.
-function candidatesFrom(report: HealthReport): Candidate[] {
-  const byId = new Map<string, Candidate>();
-  const add = (id: string, name: string, zoneNumber: string, reason: string) => {
-    const existing = byId.get(id);
-    if (existing) {
-      if (!existing.reasons.includes(reason)) existing.reasons.push(reason);
-    } else {
-      byId.set(id, { id, name, zoneNumber, reasons: [reason] });
-    }
-  };
-  for (const check of report.checks) {
-    if (check.id === 'members_duplicate_zone_number') {
-      for (const group of check.samples as unknown as { members: { id: string; name: string; zoneNumber: string }[] }[]) {
-        for (const m of group.members) add(m.id, m.name, m.zoneNumber, 'shares its number with someone');
-      }
-    } else if (check.id === 'members_missing_zone' || check.id === 'members_placeholder_zone_number') {
-      const reason = check.id === 'members_missing_zone' ? 'no zone number' : 'placeholder number';
-      for (const m of check.samples as unknown as { id: string; name: string; zoneNumber: string }[]) add(m.id, m.name, m.zoneNumber, reason);
-    }
-  }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
-function FixPanel({ candidate, onChanged, onClose }: { candidate: Candidate; onChanged: () => void; onClose: () => void }) {
+function FixPanel({ candidate, onChanged, onClose }: { candidate: ZoneFixCandidate; onChanged: () => void; onClose: () => void }) {
   const toast = useToast();
   const [proposed, setProposed] = useState('');
   const [preview, setPreview] = useState<ZoneFixPreview | null>(null);
@@ -136,7 +106,7 @@ function FixPanel({ candidate, onChanged, onClose }: { candidate: Candidate; onC
   );
 }
 
-function CandidateRow({ candidate, onChanged }: { candidate: Candidate; onChanged: () => void }) {
+function CandidateRow({ candidate, onChanged }: { candidate: ZoneFixCandidate; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <div>
@@ -156,7 +126,7 @@ function CandidateRow({ candidate, onChanged }: { candidate: Candidate; onChange
 }
 
 export function FixZoneNumbers({ report, onChanged }: { report: HealthReport; onChanged: () => void }) {
-  const candidates = useMemo(() => candidatesFrom(report), [report]);
+  const candidates = useMemo(() => zoneFixCandidates(report), [report]);
 
   return (
     <Section
