@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { runBackup } from '../lib/api';
+import { Button, IconWell, Surface, useToast } from '../ui';
 
 function formatSize(bytes: number | null) {
   if (!bytes) return '';
@@ -10,13 +11,14 @@ function formatSize(bytes: number | null) {
 // The app's backups are files saved to this computer, not stored on the server,
 // so "backing up" means creating one and downloading it.
 export function BackupCard({ lastBackupAt, onDone }: { lastBackupAt: string | null; onDone: () => void }) {
+  const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function run() {
     setBusy(true);
-    setMessage(null);
+    setError(null);
     try {
       const result = await runBackup();
       const blob = new Blob([JSON.stringify(result.data)], { type: 'application/json' });
@@ -26,11 +28,11 @@ export function BackupCard({ lastBackupAt, onDone }: { lastBackupAt: string | nu
       link.download = result.backup.fileName || `cocm-backup-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      setMessage({ kind: 'ok', text: `Saved ${result.backup.fileName} ${formatSize(result.backup.fileSize)}. Keep it somewhere safe.` });
+      toast.show({ title: 'Backup saved', message: `${result.backup.fileName} ${formatSize(result.backup.fileSize)}. Keep it somewhere safe.` });
       setConfirming(false);
       onDone();
     } catch (e) {
-      setMessage({ kind: 'error', text: e instanceof Error ? e.message : 'Backup failed' });
+      setError(e instanceof Error ? e.message : 'Backup failed');
     } finally {
       setBusy(false);
     }
@@ -39,36 +41,28 @@ export function BackupCard({ lastBackupAt, onDone }: { lastBackupAt: string | nu
   const age = lastBackupAt ? Math.floor((Date.now() - new Date(lastBackupAt).getTime()) / 86400000) : null;
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-medium">Backup</h2>
-          <p className="text-xs text-slate-500">
+    <Surface className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <IconWell icon={Download} tone={age === null || age > 14 ? 'warning' : 'success'} />
+        <div className="min-w-0 flex-1">
+          <h2 className="t-headline text-ink">Backup</h2>
+          <p className="t-caption text-muted">
             {age === null ? 'No completed backup on record.' : `Last completed backup: ${age} day${age === 1 ? '' : 's'} ago.`} Take one before making any fixes.
           </p>
         </div>
-        {!confirming ? (
-          <button
-            onClick={() => setConfirming(true)}
-            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            <Download className="h-4 w-4" /> Download a full backup
-          </button>
-        ) : (
-          <div className="flex items-center gap-2">
-            <button disabled={busy} onClick={() => void run()} className="flex items-center gap-2 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60">
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} {busy ? 'Creating…' : 'Create and download'}
-            </button>
-            <button disabled={busy} onClick={() => setConfirming(false)} className="rounded-md px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-800">
-              Cancel
-            </button>
-          </div>
-        )}
       </div>
-      {message && (
-        <p className={`mt-2 text-sm ${message.kind === 'ok' ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>{message.text}</p>
+
+      {!confirming ? (
+        <Button label="Download a full backup" variant="secondary" icon={Download} onClick={() => setConfirming(true)} />
+      ) : (
+        <div className="flex gap-2">
+          <Button label={busy ? 'Creating…' : 'Create and download'} loading={busy} onClick={() => void run()} />
+          <Button label="Cancel" variant="ghost" disabled={busy} onClick={() => setConfirming(false)} />
+        </div>
       )}
-      <p className="mt-2 text-xs text-slate-500">The existing backup covers members, children, attendance, giving, expenses, accounts and settings. It does not include zones, ministries or service setups.</p>
-    </section>
+
+      {error ? <p className="t-caption text-danger-text">{error}</p> : null}
+      <p className="t-caption text-subtle">The backup covers members, children, attendance, giving, expenses, accounts and settings. It does not include zones, ministries or service setups.</p>
+    </Surface>
   );
 }

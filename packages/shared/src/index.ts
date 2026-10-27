@@ -30,3 +30,6 @@ export { startSync, initSyncEngine, retrySyncNow } from './services/syncEngine';
 
 // Export shared theme definitions (web + mobile)
 export * from './theme';
+
+// Platform-neutral design tokens (also importable without the rest of the package via @cms/shared/design)
+export * from './design';

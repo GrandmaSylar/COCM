@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@cms/shared": "*",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/plus-jakarta-sans": "^5.2.8",
     "@supabase/supabase-js": "^2",
     "lucide-react": "^0.487.0",
     "react": "^18.3.1",
