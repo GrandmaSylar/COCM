@@ -10,6 +10,7 @@
     "dev:new": "npm run dev -w apps/new-church",
     "dev:admin": "npm run dev -w apps/admin",
     "dev:mobile": "npm run start -w apps/mobile",
+    "dev:admin-mobile": "npm run start -w apps/admin-mobile",
     "build:cocm": "npm run build -w apps/cocm",
     "build:new": "npm run build -w apps/new-church",
     "build:admin": "npm run build -w apps/admin",
@@ -18,6 +19,8 @@
     "bump": "node scripts/bump-version.mjs"
   },
   "devDependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "typescript": "~5.7"
   }
 }

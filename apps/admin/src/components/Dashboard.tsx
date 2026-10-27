@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, Loader2, LogOut, Moon, RefreshCw, Sun } from 'lucide-react';
+import { timeAgo } from '@cms/admin-core';
 import { AdminApiError, getHealth } from '../lib/api';
 import { useTheme } from '../theme/ThemeProvider';
 import type { HealthCheck, HealthReport, Severity } from '../types';
@@ -16,15 +17,6 @@ const SEVERITY: Record<Severity, { label: string; tone: Tone; icon: typeof Info 
 };
 
 const ORDER: Severity[] = ['error', 'warn', 'info', 'ok'];
-
-function when(iso: string | null) {
-  if (!iso) return 'never';
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 60 * 48) return `${Math.round(mins / 60)}h ago`;
-  return `${Math.round(mins / 1440)}d ago`;
-}
 
 function CheckRow({ check }: { check: HealthCheck }) {
   const [open, setOpen] = useState(false);
@@ -122,7 +114,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
               <StatTile label="Passing" value={report.summary.ok} tone="success" icon={CheckCircle2} />
             </div>
             <p className="t-caption -mt-2 px-1 text-subtle">
-              Generated {when(report.generatedAt)} in {(report.durationMs / 1000).toFixed(1)}s. Only the Fix and backup buttons change anything.
+              Generated {timeAgo(report.generatedAt)} in {(report.durationMs / 1000).toFixed(1)}s. Only the Fix and backup buttons change anything.
               {report.loadErrors.length > 0 ? <span className="text-danger-text"> Could not read: {report.loadErrors.join('; ')}</span> : null}
             </p>
 
@@ -148,7 +140,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
                     ) : u.approvalStatus !== 'approved' ? (
                       <Badge tone="warning" label={u.approvalStatus} />
                     ) : (
-                      <span className="t-caption shrink-0 text-subtle">{when(u.lastLogin)}</span>
+                      <span className="t-caption shrink-0 text-subtle">{timeAgo(u.lastLogin)}</span>
                     )
                   }
                 />
@@ -162,7 +154,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
                       key={b.id}
                       title={`${b.type} · ${b.status}`}
                       subtitle={b.fileName}
-                      trailing={<span className="t-caption shrink-0 text-subtle">{when(b.completedAt ?? b.createdAt)}</span>}
+                      trailing={<span className="t-caption shrink-0 text-subtle">{timeAgo(b.completedAt ?? b.createdAt)}</span>}
                     />
                   ))
                 : [<EmptyState key="none" icon={Info} title="No backups recorded" />]}
@@ -174,7 +166,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
                   key={a.id}
                   title={a.description || `${a.action} ${a.entityType}`}
                   subtitle={`${a.user} · ${a.action}`}
-                  trailing={<span className="t-caption shrink-0 text-subtle">{when(a.createdAt)}</span>}
+                  trailing={<span className="t-caption shrink-0 text-subtle">{timeAgo(a.createdAt)}</span>}
                 />
               ))}
             </Section>

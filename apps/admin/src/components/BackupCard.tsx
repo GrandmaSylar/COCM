@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
+import { daysSince, formatBytes } from '@cms/admin-core';
 import { runBackup } from '../lib/api';
 import { Button, IconWell, Surface, useToast } from '../ui';
-
-function formatSize(bytes: number | null) {
-  if (!bytes) return '';
-  return bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
-}
 
 // The app's backups are files saved to this computer, not stored on the server,
 // so "backing up" means creating one and downloading it.
@@ -28,7 +24,7 @@ export function BackupCard({ lastBackupAt, onDone }: { lastBackupAt: string | nu
       link.download = result.backup.fileName || `cocm-backup-${new Date().toISOString().slice(0, 10)}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.show({ title: 'Backup saved', message: `${result.backup.fileName} ${formatSize(result.backup.fileSize)}. Keep it somewhere safe.` });
+      toast.show({ title: 'Backup saved', message: `${result.backup.fileName} ${formatBytes(result.backup.fileSize)}. Keep it somewhere safe.` });
       setConfirming(false);
       onDone();
     } catch (e) {
@@ -38,7 +34,7 @@ export function BackupCard({ lastBackupAt, onDone }: { lastBackupAt: string | nu
     }
   }
 
-  const age = lastBackupAt ? Math.floor((Date.now() - new Date(lastBackupAt).getTime()) / 86400000) : null;
+  const age = daysSince(lastBackupAt);
 
   return (
     <Surface className="flex flex-col gap-3">
