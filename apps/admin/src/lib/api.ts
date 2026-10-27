@@ -1,3 +1,4 @@
+import type { ThemeColors, ThemeModePreference } from '@cms/shared/theme';
 import type { BackupResult, HealthReport, RecentFix, ZoneFixPreview } from '../types';
 import { anonKey, supabase, supabaseUrl } from './supabase';
 
@@ -39,3 +40,10 @@ export const getRecentFixes = () => request<RecentFix[]>('/dev/actions/recent');
 // Uses the app's existing backup route; the backup is returned for download.
 export const runBackup = () =>
   request<BackupResult>('/backups', { method: 'POST', body: { type: 'full', storageLocations: ['device'] } });
+
+// The colors and mode the person saved in the Expo/web app. Read only.
+export async function getTheme() {
+  const data = await request<{ colors: Partial<ThemeColors> | null; mode: string }>('/theme');
+  const mode: ThemeModePreference = data.mode === 'light' || data.mode === 'dark' ? data.mode : 'system';
+  return { colors: data.colors ?? null, mode };
+}

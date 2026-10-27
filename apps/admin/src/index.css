@@ -2,8 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: light dark; }
-body { @apply bg-slate-50 text-slate-900 antialiased; }
-@media (prefers-color-scheme: dark) {
-  body { @apply bg-slate-950 text-slate-100; }
+/* Variables are written by ThemeProvider; these defaults only cover the first paint. */
+:root {
+  color-scheme: light;
+  --c-background: #f5f6f8;
+  --c-text: #111827;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--c-background);
+  color: var(--c-text);
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The mobile app's text variants (AppText), as classes. */
+@layer components {
+  .t-display { font: 800 var(--fs-display)/var(--lh-display) 'Plus Jakarta Sans', Inter, sans-serif; letter-spacing: -0.6px; }
+  .t-title { font: 700 var(--fs-title)/var(--lh-title) 'Plus Jakarta Sans', Inter, sans-serif; letter-spacing: -0.3px; }
+  .t-headline { font: 700 var(--fs-headline)/var(--lh-headline) 'Plus Jakarta Sans', Inter, sans-serif; letter-spacing: -0.2px; }
+  .t-body { font: 400 var(--fs-body)/var(--lh-body) Inter, sans-serif; }
+  .t-body-medium { font: 500 var(--fs-body)/var(--lh-body) Inter, sans-serif; }
+  .t-body-strong { font: 600 var(--fs-body)/var(--lh-body) Inter, sans-serif; }
+  .t-caption { font: 400 var(--fs-caption)/var(--lh-caption) Inter, sans-serif; }
+  .t-caption-strong { font: 600 var(--fs-caption)/var(--lh-caption) Inter, sans-serif; }
+  .t-label { font: 600 var(--fs-caption)/var(--lh-caption) Inter, sans-serif; letter-spacing: 0.1px; }
+  .t-micro { font: 600 var(--fs-micro)/var(--lh-micro) Inter, sans-serif; letter-spacing: 0.2px; }
+  .t-numeric { font-variant-numeric: tabular-nums; }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.toast-in { animation: toast-in 200ms ease-out both; }
+.fade-in { animation: fade-in 250ms ease-out both; }
+
+/* Press feedback like the mobile app's PressableScale. */
+.press { transition: transform 120ms ease, background-color 120ms ease; }
+.press:active:not(:disabled) { transform: scale(0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-in, .fade-in { animation: none; }
+  .press { transition: none; }
 }
