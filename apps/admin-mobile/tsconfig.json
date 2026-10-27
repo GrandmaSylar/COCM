@@ -1,0 +1,15 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "moduleResolution": "bundler",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "**/*.tsx", "expo-env.d.ts"]
+}
