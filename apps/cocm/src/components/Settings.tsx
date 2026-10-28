@@ -809,7 +809,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <Button
                             onClick={() => handleApproveUser(pendingUser.id)}
                             size="sm"
-                            className="bg-success hover:bg-success w-full sm:w-auto"
+                            className="bg-success-solid hover:bg-success-solid text-white w-full sm:w-auto"
                           >
                             Approve
                           </Button>
@@ -1551,10 +1551,10 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         }
                                       }}
                                     />
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-success-text" onClick={() => handleSaveOptionEdit(opt.id, cat.id)}>
+                                    <Button aria-label="Save" size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-success-text" onClick={() => handleSaveOptionEdit(opt.id, cat.id)}>
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-destructive" onClick={() => {
+                                    <Button aria-label="Cancel" size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-destructive" onClick={() => {
                                       setEditingOptionId(null);
                                       setEditingLabel('');
                                     }}>
@@ -1574,7 +1574,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                     <div className="flex items-center gap-1 flex-shrink-0">
                                       {opt.isActive ? (
                                         <>
-                                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => {
+                                          <Button aria-label="Edit" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" onClick={() => {
                                             setEditingOptionId(opt.id);
                                             setEditingLabel(opt.label);
                                           }}>
@@ -1604,7 +1604,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   if (e.key === 'Enter') handleAddOption(cat.id);
                                 }}
                               />
-                              <Button size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleAddOption(cat.id)}>
+                              <Button aria-label="Add" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => handleAddOption(cat.id)}>
                                 <Plus className="h-4 w-4" />
                               </Button>
                             </div>
@@ -2035,7 +2035,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             <Button
               onClick={handleResetPassword}
               disabled={isResettingPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
-              className="bg-warning hover:bg-warning"
+              className="bg-warning-solid hover:bg-warning-solid text-white"
             >
               {isResettingPassword ? 'Resetting...' : 'Reset Password'}
             </Button>

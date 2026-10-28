@@ -755,7 +755,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                                     onChange={(e) => searchExistingMembers(parent.id, e.target.value)}
                                     placeholder="Search by name or phone..."
                                   />
-                                  <Button type="button" variant="outline" size="icon">
+                                  <Button aria-label="Search" type="button" variant="outline" size="icon">
                                     <Search className="w-4 h-4" />
                                   </Button>
                                 </div>

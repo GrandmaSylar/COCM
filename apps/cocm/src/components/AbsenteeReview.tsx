@@ -236,7 +236,7 @@ export function AbsenteeReview({
         <div>
           <h1 className="flex items-center gap-2">
             Absentee Review
-            <Badge className="bg-info text-white text-[10px]">LIVE</Badge>
+            <Badge className="bg-info-solid text-white text-[10px]">LIVE</Badge>
           </h1>
           <p className="text-muted-foreground text-sm">
             Session by <strong>{sessionCreatorName || 'Loading...'}</strong> — Changes sync in real time.

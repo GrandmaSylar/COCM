@@ -24,11 +24,11 @@ export interface SwipeAction {
 
 const ACTION_TONE: Record<NonNullable<SwipeAction["tone"]>, string> = {
   primary: "bg-primary text-primary-foreground",
-  destructive: "bg-destructive text-white",
+  destructive: "bg-destructive text-destructive-foreground",
   neutral: "bg-fill-strong text-foreground",
-  info: "bg-info text-white",
-  warning: "bg-warning text-white",
-  success: "bg-success text-white",
+  info: "bg-info-solid text-white",
+  warning: "bg-warning-solid text-white",
+  success: "bg-success-solid text-white",
 };
 
 const ACTION_WIDTH = 76;

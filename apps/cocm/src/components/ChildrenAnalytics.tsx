@@ -316,7 +316,7 @@ export function ChildrenAnalytics() {
                     Turns 18 on: {new Date(alert.turnsEighteenOn).toLocaleDateString()}
                   </Badge>
                 </div>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => dismissAlert(alert.id)}>
+                <Button aria-label="Dismiss" variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={() => dismissAlert(alert.id)}>
                   <X className="w-4 h-4" />
                 </Button>
               </div>

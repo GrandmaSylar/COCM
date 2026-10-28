@@ -74,16 +74,19 @@ module.exports = {
             DEFAULT: token("success"),
             soft: token("success-soft"),
             text: token("success-text"),
+            solid: token("success-solid"),
           },
           warning: {
             DEFAULT: token("warning"),
             soft: token("warning-soft"),
             text: token("warning-text"),
+            solid: token("warning-solid"),
           },
           info: {
             DEFAULT: token("info"),
             soft: token("info-soft"),
             text: token("info-text"),
+            solid: token("info-solid"),
           },
           popover: {
             DEFAULT: token("popover"),

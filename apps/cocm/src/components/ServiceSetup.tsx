@@ -393,7 +393,7 @@ export function ServiceSetup({ onBack, onSaved, initialSetup }: ServiceSetupProp
       <div className="max-w-5xl mx-auto space-y-6 pb-20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleBack}>
+            <Button aria-label="Back" variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl md:text-2xl font-bold tracking-tight">Service Setup</h1>

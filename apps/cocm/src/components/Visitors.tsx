@@ -974,7 +974,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember, onV
               visitor.interestedInMembership && (
                 <Button 
                   onClick={() => onConvertToMember(visitor)} 
-                  className="flex-1 sm:flex-none h-9 sm:h-10 bg-success hover:bg-success shadow-sm"
+                  className="flex-1 sm:flex-none h-9 sm:h-10 bg-success-solid hover:bg-success-solid text-white shadow-sm"
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   <span className="whitespace-nowrap">Convert to Member</span>

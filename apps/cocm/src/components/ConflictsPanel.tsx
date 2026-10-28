@@ -187,7 +187,7 @@ export function ConflictsPanel({ onAllResolved }: ConflictsPanelProps) {
               <Button
                 variant="default"
                 size="sm"
-                className="bg-warning hover:bg-warning text-white"
+                className="bg-warning-solid hover:bg-warning-solid text-white"
                 disabled={resolving !== null}
                 onClick={() => handleResolve(conflict, 'keep-mine')}
               >

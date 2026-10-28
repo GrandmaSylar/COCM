@@ -243,7 +243,7 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onBack}>
+        <Button aria-label="Back" variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className="text-2xl font-bold tracking-tight min-w-0 flex-1 truncate">Edit Expense Requisition</h1>
@@ -276,7 +276,7 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
               <div className="space-y-2">
                 <Label>Status</Label>
                 <div>
-                  <Badge className="bg-success hover:bg-success text-white shadow-sm mt-1">✓ Approved</Badge>
+                  <Badge className="bg-success-solid hover:bg-success-solid text-white shadow-sm mt-1">✓ Approved</Badge>
                 </div>
               </div>
 

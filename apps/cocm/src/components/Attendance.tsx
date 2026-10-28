@@ -408,7 +408,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
               title={
                 <span className="flex items-center gap-2">
                   {session.serviceType}
-                  <Badge className="border-0 bg-success px-1.5 text-[10px] text-white">LIVE</Badge>
+                  <Badge className="border-0 bg-success-solid px-1.5 text-[10px] text-white">LIVE</Badge>
                 </span>
               }
               subtitle={`${session.attendees?.length || 0} marked present so far`}
