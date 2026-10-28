@@ -11,9 +11,9 @@ type IconType = React.ComponentType<{ className?: string }>;
 const TILE: Record<string, string> = {
   primary: "bg-primary text-primary-foreground",
   gray: "bg-fill-strong text-foreground",
-  success: "bg-success text-white",
-  warning: "bg-warning text-white",
-  info: "bg-info text-white",
+  success: "bg-success-solid text-white",
+  warning: "bg-warning-solid text-white",
+  info: "bg-info-solid text-white",
 };
 
 function IconTile({ icon: Icon, tone = "gray", className }: { icon: IconType; tone?: keyof typeof TILE; className?: string }) {

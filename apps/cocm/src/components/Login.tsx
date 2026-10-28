@@ -66,7 +66,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
       
       {/* Theme Toggle (Absolute) */}
       <div className="absolute top-6 right-6 z-50">
-        <Button
+        <Button aria-label="Toggle theme"
           variant="ghost"
           size="icon"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

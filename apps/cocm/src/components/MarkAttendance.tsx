@@ -272,7 +272,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
           <div>
             <h1 className="flex items-center gap-2">
               Mark Attendance
-              <Badge className="bg-success text-white text-[10px]">LIVE</Badge>
+              <Badge className="bg-success-solid text-white text-[10px]">LIVE</Badge>
             </h1>
             <p className="text-muted-foreground text-sm">
               Session by <strong>{sessionCreatorName || 'Loading...'}</strong>
@@ -463,7 +463,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
                         variant={isPresent ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleMember(member.id)}
-                        className={isPresent ? 'bg-success hover:bg-success' : ''}
+                        className={isPresent ? 'bg-success-solid hover:bg-success-solid text-white' : ''}
                       >
                         {isPresent ? <Check className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                       </Button>

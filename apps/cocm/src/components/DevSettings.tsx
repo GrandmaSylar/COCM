@@ -135,7 +135,7 @@ export function DevSettings() {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => setEditingNotif(cfg)}>
+                  <Button aria-label="Edit" variant="ghost" size="icon" onClick={() => setEditingNotif(cfg)}>
                     <Edit className="w-4 h-4" />
                   </Button>
                 </div>
@@ -181,7 +181,7 @@ export function DevSettings() {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => setEditingLog(cfg)}>
+                  <Button aria-label="Edit" variant="ghost" size="icon" onClick={() => setEditingLog(cfg)}>
                     <Edit className="w-4 h-4" />
                   </Button>
                 </div>

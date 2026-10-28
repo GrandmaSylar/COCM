@@ -181,7 +181,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         root.style.setProperty('--sidebar-ring', customColors.primary);
         // As text on a card the primary colour may need to be darker (light mode) or lighter (dark mode).
         const card = getComputedStyle(root).getPropertyValue('--card').trim();
-        root.style.setProperty('--primary-text', card ? ensureContrast(customColors.primary, card) : customColors.primary);
+        root.style.setProperty('--primary-text', card ? ensureContrast(customColors.primary, card, 5) : customColors.primary);
         root.style.setProperty('--secondary', customColors.secondary);
         root.style.setProperty('--accent', customColors.accent);
 
@@ -247,7 +247,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Keep the browser and installed-app title bar in step with the header colour (--card).
   useEffect(() => {
-    const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || (isDark ? '#171a21' : '#ffffff');
+    const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || (isDark ? '#1c1c1e' : '#ffffff');
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
     const meta = document.createElement('meta');
     meta.name = 'theme-color';

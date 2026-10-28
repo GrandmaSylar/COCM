@@ -21,13 +21,13 @@
     --primary: #dc2626;               /* tint */
     --primary-foreground: #ffffff;
     /* The tint as text on a card; a saved theme may need a more legible version. */
-    --primary-text: var(--primary);
+    --primary-text: #cf2020;
 
     --secondary: rgb(120 120 128 / 0.12);   /* systemFill */
     --secondary-foreground: #000000;
 
     --muted: rgb(120 120 128 / 0.12);
-    --muted-foreground: rgb(60 60 67 / 0.72);   /* secondaryLabel */
+    --muted-foreground: rgb(60 60 67 / 0.75);   /* secondaryLabel */
 
     --accent: rgb(120 120 128 / 0.16);
     --accent-foreground: #000000;
@@ -68,6 +68,10 @@
     --warning-soft: color-mix(in srgb, var(--warning) 16%, var(--card));
     --info-soft: color-mix(in srgb, var(--info) 14%, var(--card));
     --success-text: color-mix(in srgb, var(--success) 58%, #000000);
+    /* Darker fills that carry white text or glyphs at 4.5:1 or better. */
+    --success-solid: color-mix(in srgb, var(--success) 66%, #000000);
+    --warning-solid: color-mix(in srgb, var(--warning) 66%, #000000);
+    --info-solid: color-mix(in srgb, var(--info) 66%, #000000);
     --warning-text: color-mix(in srgb, var(--warning) 58%, #000000);
     --info-text: color-mix(in srgb, var(--info) 58%, #000000);
   }
@@ -84,6 +88,7 @@
 
     --primary: #f87171;
     --primary-foreground: #1c1c1e;
+    --primary-text: var(--primary);
 
     --secondary: rgb(120 120 128 / 0.36);
     --secondary-foreground: #ffffff;

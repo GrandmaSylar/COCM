@@ -369,7 +369,7 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
                           variant={status === 'present' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => handleAttendanceToggle(child.id, 'present')}
-                          className={status === 'present' ? 'bg-success hover:bg-success' : ''}
+                          className={status === 'present' ? 'bg-success-solid hover:bg-success-solid text-white' : ''}
                         >
                           <Check className="w-4 h-4" />
                         </Button>
