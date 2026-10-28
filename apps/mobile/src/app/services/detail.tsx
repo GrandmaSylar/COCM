@@ -1,20 +1,25 @@
-import React, { useCallback, useState } from 'react';
-import { RefreshControl, ScrollView, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { NativeScrollEvent, NativeSyntheticEvent, RefreshControl, ScrollView, View } from 'react-native';
 import { Church } from '@tamagui/lucide-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { loadServiceSummary, refreshServiceData, ServiceSummary } from '../../lib/serviceRecords';
+import { loadCachedServiceDetail, loadServiceDetail, ServiceDateDetail } from '../../lib/serviceRecords';
 import { useAppColors } from '../../context/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
 import { SkeletonList } from '../../components/Skeleton';
-import { AppText, Badge, DetailRow, EmptyState, ListRow, Screen, Section } from '../../components/ui';
+import {
+  ChildrenSection,
+  ExpenseList,
+  fmtDate,
+  GivingBreakdown,
+  hasChildrenData,
+  OverviewSection,
+  PeopleSection,
+  SetupSection,
+} from '../../components/ServiceParts';
+import { AppText, Badge, EmptyState, FilterChips, Screen } from '../../components/ui';
 import { space } from '../../theme/tokens';
 
-const ghs = (n: number) => `GH₵ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const fmtDate = (d: string) => {
-  const date = new Date(d);
-  return isNaN(date.getTime()) ? d : date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-};
+type SectionId = 'overview' | 'setup' | 'finances' | 'people' | 'children';
 
 export default function ServiceDetailScreen() {
   const router = useRouter();
@@ -22,39 +27,74 @@ export default function ServiceDetailScreen() {
   const params = useLocalSearchParams<{ date?: string; type?: string }>();
   const date = String(params.date ?? '');
   const type = String(params.type ?? '');
-  const [service, setService] = useState<ServiceSummary | null>(null);
+  const [detail, setDetail] = useState<ServiceDateDetail | null>(null);
+  const [stale, setStale] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [active, setActive] = useState<SectionId>('overview');
+  const scroller = useRef<any>(null);
+  const offsets = useRef<Partial<Record<SectionId, number>>>({});
 
   const load = useCallback(async () => {
-    try {
-      setService(await loadServiceSummary(date, type));
-    } catch (err) {
-      console.error('Failed to load service:', err);
-    } finally {
-      setLoading(false);
-    }
+    const result = await loadServiceDetail(date, type);
+    setDetail(result?.detail ?? null);
+    setStale(result?.stale ?? false);
   }, [date, type]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load])
+      let alive = true;
+      (async () => {
+        const cached = await loadCachedServiceDetail(date, type);
+        if (alive && cached) {
+          setDetail(cached);
+          setStale(true);
+          setLoading(false);
+        }
+        try {
+          await load();
+        } finally {
+          if (alive) setLoading(false);
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [date, type, load])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshServiceData();
       await load();
     } finally {
       setRefreshing(false);
     }
   };
 
-  const header = <AppHeader title={service ? service.type : 'Service'} subtitle={fmtDate(date)} showBack />;
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y + 80;
+    let best: SectionId = 'overview';
+    for (const [id, top] of Object.entries(offsets.current) as [SectionId, number][]) {
+      if (top <= y) best = id;
+    }
+    setActive(prev => (prev === best ? prev : best));
+  };
 
-  if (loading) {
+  const goTo = (id: SectionId) => {
+    setActive(id);
+    scroller.current?.scrollTo({ y: Math.max(0, (offsets.current[id] ?? 0) - 56), animated: true });
+  };
+
+  const header = (
+    <AppHeader
+      title="Service detail"
+      subtitle={detail ? `${fmtDate(detail.serviceDate, 'long')}${detail.serviceTypes?.length ? ` — ${detail.serviceTypes.join(', ')}` : ''}` : fmtDate(date, 'long')}
+      showBack
+    />
+  );
+
+  if (loading && !detail) {
     return (
       <Screen>
         {header}
@@ -63,116 +103,74 @@ export default function ServiceDetailScreen() {
     );
   }
 
-  if (!service) {
+  if (!detail) {
     return (
       <Screen>
         {header}
         <View style={{ padding: space.md }}>
-          <EmptyState icon={Church} title="Service not found" message="It may have been removed, or has not synced to this device yet." action={{ label: 'Back to services', onPress: () => router.back() }} />
+          <EmptyState
+            icon={Church}
+            title="Service not available"
+            message="It could not be loaded. Open it once while online and it will be available offline afterwards."
+            action={{ label: 'Back to services', onPress: () => router.back() }}
+          />
         </View>
       </Screen>
     );
   }
 
-  const s = service;
-  const net = s.totalGiving - s.expenses;
-  const sum = (pick: (g: ServiceSummary['givingRecords'][number]) => number) => s.givingRecords.reduce((n, g) => n + (pick(g) || 0), 0);
-  const customTotals = new Map<string, number>();
-  for (const g of s.givingRecords) {
-    if (!g.custom_types) continue;
-    try {
-      for (const [name, amount] of Object.entries(JSON.parse(g.custom_types) as Record<string, number>)) {
-        customTotals.set(name, (customTotals.get(name) || 0) + (Number(amount) || 0));
-      }
-    } catch {
-      // Ignore a malformed custom_types value; the totals above still add up.
-    }
-  }
-  const givingLines: [string, number][] = [
-    ['Offertory', sum(g => g.offering_amount)],
-    ['Thanksgiving', sum(g => g.thanksgiving_amount)],
-    ['Donation', sum(g => g.donation_amount)],
-    ...[...customTotals.entries()],
+  const hasSetup = !!detail.serviceSetup;
+  const hasChildren = hasChildrenData(detail);
+  const pills: { value: SectionId; label: string }[] = [
+    { value: 'overview', label: 'Overview' },
+    ...(hasSetup ? [{ value: 'setup' as SectionId, label: 'Setup' }] : []),
+    { value: 'finances', label: 'Finances' },
+    { value: 'people', label: 'People' },
+    ...(hasChildren ? [{ value: 'children' as SectionId, label: 'Children' }] : []),
   ];
-  const methodLines: [string, number][] = [
-    ['Cash', sum(g => g.cash_amount)],
-    ['Mobile money', sum(g => g.mobile_money_amount)],
-    ['Card', sum(g => g.card_amount)],
-    ['Bank transfer', sum(g => g.bank_transfer_amount)],
-  ];
+
+  const section = (id: SectionId, title: string, body: React.ReactNode) => (
+    <View onLayout={e => { offsets.current[id] = e.nativeEvent.layout.y; }} style={{ gap: space.sm }}>
+      <AppText variant="headline" accessibilityRole="header">{title}</AppText>
+      {body}
+    </View>
+  );
 
   return (
     <Screen>
       {header}
+      <View style={{ backgroundColor: c.background, paddingTop: space.xs }}>
+        <FilterChips options={pills} value={active} onChange={goTo} />
+      </View>
       <ScrollView
-        contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.md }}
+        ref={scroller}
+        onScroll={onScroll}
+        scrollEventThrottle={64}
+        contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.xl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
       >
-        <Section title="Overview">
-          <DetailRow label="Present" value={String(s.totalAttendance)} />
-          <DetailRow label="Absent" value={String(s.absentees)} />
-          <DetailRow label="Visitors" value={String(s.visitors)} />
-          <DetailRow label="Total giving" value={ghs(s.totalGiving)} valueTone="success" />
-          {s.expenses > 0 ? <DetailRow label="Expenses" value={ghs(s.expenses)} valueTone="danger" /> : null}
-          {s.expenses > 0 ? <DetailRow label="Net giving" value={ghs(net)} valueTone="success" /> : null}
-        </Section>
-
-        {s.givingRecords.length > 0 ? (
-          <Section title="Giving">
-            {givingLines.filter(([, n]) => n > 0).map(([name, n]) => (
-              <DetailRow key={name} label={name} value={ghs(n)} />
-            ))}
-            {methodLines.some(([, n]) => n > 0) ? (
-              <View style={{ paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.xs }}>
-                <AppText variant="captionStrong" tone="muted">PAID BY</AppText>
-              </View>
-            ) : null}
-            {methodLines.filter(([, n]) => n > 0).map(([name, n]) => (
-              <DetailRow key={name} label={name} value={ghs(n)} />
-            ))}
-          </Section>
+        {stale ? (
+          <View style={{ alignItems: 'flex-start' }}>
+            <Badge label="Offline: showing the last saved copy" tone="warning" />
+          </View>
         ) : null}
 
-        {s.attendanceRecords.length > 0 ? (
-          <Section title="Attendance records">
-            {s.attendanceRecords.map(r => (
-              <ListRow
-                key={r.id}
-                title={r.attendance_type === 'general' ? 'Head count' : 'Individual register'}
-                subtitle={r.attendance_type === 'general' ? `${r.men_count ?? 0} men · ${r.women_count ?? 0} women · ${r.children_count ?? 0} children` : `${r.total_count} marked present`}
-                value={String(r.total_count)}
-              />
-            ))}
-          </Section>
-        ) : null}
-
-        {s.expenseRecords.length > 0 ? (
-          <Section title="Expenses">
-            {s.expenseRecords.map(e => (
-              <ListRow key={e.id} title={e.details || e.form_id} subtitle={`${e.form_id} · ${e.payment_method_name}`} value={ghs(e.amount)} />
-            ))}
-          </Section>
-        ) : null}
-
-        {s.visitorRecords.length > 0 ? (
-          <Section title="Visitors">
-            {s.visitorRecords.map(v => (
-              <ListRow key={v.id} title={v.name} subtitle={v.phone || undefined} />
-            ))}
-          </Section>
-        ) : null}
-
-        {s.childrenAttendance > 0 || s.childrenGiving > 0 || s.childrenVisitors > 0 ? (
-          <Section title="Children's ministry">
-            <DetailRow label="Present" value={String(s.childrenAttendance)} />
-            <DetailRow label="Giving" value={ghs(s.childrenGiving)} valueTone="success" />
-            <DetailRow label="Visitors" value={String(s.childrenVisitors)} />
-          </Section>
-        ) : null}
-
-        <View style={{ alignItems: 'center' }}>
-          <Badge label="Figures come from records stored on this device" tone="neutral" />
-        </View>
+        {section('overview', 'Overview', <OverviewSection sr={detail} />)}
+        {hasSetup ? section('setup', 'Service setup', <SetupSection setup={detail.serviceSetup} />) : null}
+        {section('finances', 'Finances', (
+          <View style={{ gap: space.md }}>
+            <GivingBreakdown sr={detail} />
+            <ExpenseList expenses={detail.expenses ?? []} />
+          </View>
+        ))}
+        {section('people', 'People', (
+          <PeopleSection
+            sr={detail}
+            onViewMember={id => router.push(`/members/${id}` as any)}
+            onConvertVisitor={v => router.push(`/members/add?fromVisitorId=${encodeURIComponent(v.id)}` as any)}
+          />
+        ))}
+        {hasChildren ? section('children', 'Children', <ChildrenSection sr={detail} />) : null}
       </ScrollView>
     </Screen>
   );

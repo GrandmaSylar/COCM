@@ -1,169 +1,188 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { RefreshControl, ScrollView, View } from 'react-native';
-import { Banknote, Church, SearchX, UserMinus, UserPlus, Users, Receipt } from '@tamagui/lucide-icons';
+import { CalendarPlus, Church } from '@tamagui/lucide-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { loadServiceSummaries, refreshServiceData, ServiceSummary } from '../../lib/serviceRecords';
+import {
+  loadCachedServiceSetups,
+  loadCachedServicesOverview,
+  loadServiceSetups,
+  loadServicesOverview,
+  ServiceDateSummary,
+} from '../../lib/serviceRecords';
 import { useAppColors } from '../../context/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
 import { SkeletonList } from '../../components/Skeleton';
-import { AppText, Badge, EmptyState, ListRow, PressableScale, Screen, SearchField, Section, StatTile } from '../../components/ui';
+import { FeaturedCard, monthLabel, serviceHref, SetupCard, StatsBar, TimelineRow } from '../../components/ServiceParts';
+import { AppText, Badge, Button, EmptyState, IconButton, Screen, Section, Surface } from '../../components/ui';
 import { space } from '../../theme/tokens';
-
-const ghs = (n: number) => `GH₵ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const fmtDate = (d: string, long = false) => {
-  const date = new Date(d);
-  return isNaN(date.getTime())
-    ? d
-    : date.toLocaleDateString([], long
-        ? { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }
-        : { weekday: 'short', day: 'numeric', month: 'short' });
-};
-
-const monthLabel = (d: string) => {
-  const date = new Date(d);
-  return isNaN(date.getTime()) ? 'Other' : date.toLocaleDateString([], { month: 'long', year: 'numeric' });
-};
-
-export const serviceHref = (s: Pick<ServiceSummary, 'date' | 'type'>) =>
-  `/services/detail?date=${encodeURIComponent(s.date)}&type=${encodeURIComponent(s.type)}` as any;
 
 export default function ServicesScreen() {
   const router = useRouter();
   const c = useAppColors();
-  const [services, setServices] = useState<ServiceSummary[]>([]);
+  const [today, setToday] = useState<ServiceDateSummary[]>([]);
+  const [past, setPast] = useState<ServiceDateSummary[]>([]);
+  const [setups, setSetups] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState('');
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const everLoaded = useRef(false);
 
-  const load = useCallback(async () => {
-    try {
-      setServices(await loadServiceSummaries());
-    } catch (err) {
-      console.error('Failed to load services:', err);
-    } finally {
-      setLoading(false);
+  const fetchAll = useCallback(async () => {
+    const [overview, setupResult] = await Promise.all([loadServicesOverview(1), loadServiceSetups()]);
+    if (overview) {
+      setToday(overview.today);
+      setPast(overview.records);
+      setTotal(overview.total);
+      setPage(1);
     }
+    setSetups(setupResult.setups);
+    setOffline(!overview || overview.stale);
   }, []);
 
-  // Show what is stored right away, then pull fresh records and re-read.
+  // Show the cached copy straight away, then refresh from the server.
   useFocusEffect(
     useCallback(() => {
-      load();
-      refreshServiceData().then(load).catch(() => {});
-    }, [load])
+      let active = true;
+      (async () => {
+        if (!everLoaded.current) {
+          const [cachedOverview, cachedSetups] = await Promise.all([loadCachedServicesOverview(), loadCachedServiceSetups()]);
+          if (active && cachedOverview) {
+            setToday(cachedOverview.today);
+            setPast(cachedOverview.records);
+            setTotal(cachedOverview.total);
+            setSetups(cachedSetups ?? []);
+            setLoading(false);
+          }
+        }
+        try {
+          await fetchAll();
+        } finally {
+          if (active) {
+            setLoading(false);
+            everLoaded.current = true;
+          }
+        }
+      })();
+      return () => {
+        active = false;
+      };
+    }, [fetchAll])
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshServiceData();
-      await load();
+      await fetchAll();
     } finally {
       setRefreshing(false);
     }
   };
 
-  const latest = services[0];
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return services;
-    return services.filter(s => s.type.toLowerCase().includes(q) || s.date.includes(q) || fmtDate(s.date, true).toLowerCase().includes(q));
-  }, [services, search]);
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const next = await loadServicesOverview(page + 1);
+      if (next) {
+        setPast(prev => [...prev, ...next.records]);
+        setTotal(next.total);
+        setPage(next.page);
+      }
+    } catch {
+      // Offline or a failed page: keep what is shown; the button stays so it can be retried.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
-  const groups = useMemo(() => {
-    const map = new Map<string, ServiceSummary[]>();
-    for (const s of filtered) {
-      const label = monthLabel(s.date);
-      map.set(label, [...(map.get(label) || []), s]);
+  const groups = (() => {
+    const map = new Map<string, ServiceDateSummary[]>();
+    for (const r of past) {
+      if (!r.serviceDate) continue;
+      const key = r.serviceDate.slice(0, 7);
+      map.set(key, [...(map.get(key) || []), r]);
     }
     return [...map.entries()];
-  }, [filtered]);
+  })();
 
-  const avgAttendance = services.length ? Math.round(services.reduce((n, s) => n + s.totalAttendance, 0) / services.length) : 0;
-  const totalGiving = services.reduce((n, s) => n + s.totalGiving, 0);
+  const todayIsToday = today[0]?.serviceDate === new Date().toISOString().split('T')[0];
+  const open = (date: string, type?: string) => router.push(serviceHref(date, type));
+  const setupRoute = (setup?: any) => router.push((setup ? `/services/setup?id=${encodeURIComponent(setup.id)}` : '/services/setup') as any);
 
   return (
     <Screen>
-      <AppHeader title="Services" subtitle="Attendance and giving by service" showBack />
+      <AppHeader
+        title="Services"
+        subtitle="Attendance and giving by service"
+        showBack
+        rightElement={<IconButton icon={CalendarPlus} label="Service setup" tone="primary" onPress={() => setupRoute()} />}
+      />
       {loading ? (
         <View style={{ padding: space.md }}><SkeletonList count={5} hasAvatar={false} /></View>
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.md, flexGrow: 1 }}
+          contentContainerStyle={{ padding: space.md, paddingBottom: space.xxl, gap: space.lg, flexGrow: 1 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.primary.base} colors={[c.primary.base]} />}
-          keyboardShouldPersistTaps="handled"
         >
-          {services.length === 0 ? (
-            <EmptyState
-              icon={Church}
-              title="No services yet"
-              message="Services appear here once attendance or giving has been recorded for a date."
-            />
-          ) : (
-            <>
-              <View style={{ flexDirection: 'row', gap: space.sm }}>
-                <StatTile label="Services" value={String(services.length)} icon={Church} tone="info" />
-                <StatTile label="Avg attendance" value={String(avgAttendance)} icon={Users} tone="warning" />
+          {offline ? (
+            <View style={{ alignItems: 'flex-start' }}>
+              <Badge label="Offline: showing the last saved copy" tone="warning" />
+            </View>
+          ) : null}
+
+          <StatsBar records={past} total={total} />
+
+          <Section title="Service setups">
+            {setups.length === 0 ? (
+              <View style={{ padding: space.md }}>
+                <AppText variant="caption" tone="muted" align="center">No service setups yet.</AppText>
               </View>
-              <StatTile label="Total giving" value={ghs(totalGiving)} icon={Banknote} tone="success" valueTone="success" />
+            ) : (
+              <View style={{ gap: space.sm, padding: space.sm }}>
+                {setups.map(s => <SetupCard key={s.id} setup={s} onPress={() => setupRoute(s)} />)}
+              </View>
+            )}
+          </Section>
 
-              {latest && !search ? (
-                <Section title="Latest service">
-                  <PressableScale onPress={() => router.push(serviceHref(latest))} accessibilityRole="button" accessibilityLabel={`${latest.type}, ${fmtDate(latest.date, true)}`}>
-                    <View style={{ padding: space.md, gap: space.sm }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm }}>
-                        <AppText variant="bodyStrong">{fmtDate(latest.date, true)}</AppText>
-                        <Badge label={latest.type} tone="primary" />
-                      </View>
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', rowGap: space.sm }}>
-                        {[
-                          { icon: Users, label: String(latest.totalAttendance), note: 'present', color: c.primary.base },
-                          { icon: Banknote, label: ghs(latest.totalGiving), note: '', color: c.success.base },
-                          { icon: UserMinus, label: String(latest.absentees), note: 'absent', color: c.warning.base },
-                          { icon: UserPlus, label: String(latest.visitors), note: 'visitors', color: c.info.base },
-                          ...(latest.expenses > 0 ? [{ icon: Receipt, label: ghs(latest.expenses), note: 'expenses', color: c.danger.base }] : []),
-                        ].map((item, i) => (
-                          <View key={i} style={{ width: '50%', flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <item.icon size={16} color={item.color} />
-                            <AppText variant="bodyMedium" numeric>{item.label}</AppText>
-                            {item.note ? <AppText variant="caption" tone="muted">{item.note}</AppText> : null}
-                          </View>
-                        ))}
-                      </View>
-                      {latest.expenses > 0 ? (
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: space.sm, borderTopWidth: 1, borderTopColor: c.border }}>
-                          <AppText variant="caption" tone="muted">Net giving (after expenses)</AppText>
-                          <AppText variant="captionStrong" tone="success" numeric>{ghs(latest.totalGiving - latest.expenses)}</AppText>
-                        </View>
-                      ) : null}
-                    </View>
-                  </PressableScale>
-                </Section>
-              ) : null}
+          {today.length > 0 ? (
+            <View style={{ gap: space.sm }}>
+              <AppText variant="captionStrong" tone="muted" style={{ paddingHorizontal: 4 }}>
+                {(todayIsToday ? "Today's service" : 'Latest service').toUpperCase()}
+              </AppText>
+              {today.map(sr => (
+                <FeaturedCard key={`${sr.serviceDate}_${sr.serviceType || 'NA'}`} sr={sr} onPress={() => open(sr.serviceDate, sr.serviceType)} />
+              ))}
+            </View>
+          ) : null}
 
-              <SearchField value={search} onChangeText={setSearch} placeholder="Search by date or service type" />
-
-              {groups.length === 0 ? (
-                <EmptyState icon={SearchX} title="No services match" message={`Nothing matches "${search}".`} action={{ label: 'Clear search', onPress: () => setSearch('') }} />
-              ) : (
-                groups.map(([label, items]) => (
-                  <Section key={label} title={label}>
-                    {items.map(s => (
-                      <ListRow
-                        key={s.key}
-                        title={fmtDate(s.date)}
-                        subtitle={`${s.type} · ${s.totalAttendance} present`}
-                        value={ghs(s.totalGiving)}
-                        onPress={() => router.push(serviceHref(s))}
-                        chevron
-                      />
+          <View style={{ gap: space.sm }}>
+            <AppText variant="captionStrong" tone="muted" style={{ paddingHorizontal: 4 }}>ALL SERVICES</AppText>
+            {groups.length === 0 ? (
+              <EmptyState
+                icon={Church}
+                title="No service records yet"
+                message={offline ? 'Connect once to load your services; they are then available offline.' : 'Services appear here once attendance or giving has been recorded for a date.'}
+              />
+            ) : (
+              groups.map(([key, items]) => (
+                <View key={key} style={{ gap: 4 }}>
+                  <AppText variant="captionStrong" tone="muted" style={{ paddingHorizontal: 4 }}>{monthLabel(key)}</AppText>
+                  <Surface padded={false} style={{ overflow: 'hidden' }}>
+                    {items.map((sr, i) => (
+                      <TimelineRow key={`${sr.serviceDate}_${sr.serviceType || 'NA'}`} sr={sr} last={i === items.length - 1} onPress={() => open(sr.serviceDate, sr.serviceType)} />
                     ))}
-                  </Section>
-                ))
-              )}
-            </>
-          )}
+                  </Surface>
+                </View>
+              ))
+            )}
+            {page * 15 < total ? (
+              <View style={{ alignItems: 'center', paddingTop: space.sm }}>
+                <Button label={loadingMore ? 'Loading…' : 'Load more'} variant="secondary" loading={loadingMore} onPress={loadMore} />
+              </View>
+            ) : null}
+          </View>
         </ScrollView>
       )}
     </Screen>
