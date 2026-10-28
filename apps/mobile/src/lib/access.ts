@@ -110,6 +110,7 @@ export async function clearAccessProfile(): Promise<void> {
 
 /** Maps a top-level route segment to the tab that guards it. */
 const ROUTE_TABS: Record<string, AppTab> = {
+  services: 'services',
   members: 'members',
   visitors: 'visitors',
   children: 'children',

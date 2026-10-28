@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "helvetica",
+        "files": [
+          "apps/mobile/src/lib/serviceSetupPdf.ts"
+        ],
+        "createdAt": "2026-10-28T19:53:16.775Z",
+        "reason": "PDF mirrors the web order-of-service, which uses Helvetica; user confirmed"
+      }
+    ]
+  }
+}
