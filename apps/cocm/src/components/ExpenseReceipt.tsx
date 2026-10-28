@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { ArrowLeft, Download, Edit, Save, Printer, Eye } from 'lucide-react';
 import { api } from '../services/api';
@@ -99,8 +100,8 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
       {/* Action Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between mb-8 gap-4 px-2">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" onClick={onBack} size="icon">
-            <ArrowLeft className="w-5 h-5" />
+          <Button variant="soft" onClick={onBack} size="icon" aria-label="Back">
+            <ChevronLeft className="size-5" />
           </Button>
           <div className="flex flex-col">
             <h1 className="text-xl font-bold leading-none">Requisition Preview</h1>
@@ -110,19 +111,19 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
 
         <div className="flex items-center gap-2">
           {onEdit && (
-            <Button variant="outline" onClick={onEdit} disabled={isSubmitting} className="gap-2">
+            <Button variant="soft" onClick={onEdit} disabled={isSubmitting} className="gap-2">
               <Edit className="w-4 h-4" />
               <span className="hidden sm:inline">Edit</span>
             </Button>
           )}
           
-          <Button variant="outline" onClick={handleDownloadPDF} disabled={isDownloading || isSubmitting} className="gap-2">
+          <Button variant="soft" onClick={handleDownloadPDF} disabled={isDownloading || isSubmitting} className="gap-2">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">{isDownloading ? 'Generating...' : 'Download PDF'}</span>
           </Button>
 
           {onSave && (
-            <Button onClick={onSave} disabled={isSubmitting} className="bg-success hover:bg-success text-white gap-2">
+            <Button onClick={onSave} disabled={isSubmitting} className="gap-2">
               <Save className="w-4 h-4" />
               <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save Requisition'}</span>
             </Button>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LargeTitle, StatusNotice } from './ui/ios';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
@@ -444,7 +445,7 @@ export function Help() {
 
   const getRoleBadgeColor = (role: string) => {
     const colors = {
-      dev: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+      dev: 'bg-primary/10 text-primary-text ',
       admin: 'bg-destructive/10 text-destructive ',
       pastor: 'bg-info-soft text-info-text ',
       elder: 'bg-success-soft text-success-text '
@@ -465,34 +466,23 @@ export function Help() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <HelpCircle className="w-8 h-8 text-primary" />
-          <div>
-            <h1 className="text-2xl lg:text-3xl">Help & Guide</h1>
-            <p className="text-muted-foreground">
-              Learn how to use the Church Management System
-            </p>
-          </div>
-        </div>
+      <div className="space-y-4">
+        <LargeTitle title="Help & Guide" subtitle="Learn how to use the Church Management System" />
 
         {/* Current Role Info */}
-        <Alert>
-          <Shield className="h-4 w-4" />
-          <AlertDescription>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span>You are logged in as:</span>
-              <Badge className={getRoleBadgeColor(user?.role || '')}>
-                {getRoleLabel(user?.role || '')}
+        <StatusNotice icon={Shield}>
+          <span className="flex flex-wrap items-center gap-2">
+            <span>You are logged in as</span>
+            <Badge className={`border-0 ${getRoleBadgeColor(user?.role || '')}`}>
+              {getRoleLabel(user?.role || '')}
+            </Badge>
+            {isDev && (
+              <Badge variant="outline" className="border-0 bg-primary/10 text-primary-text">
+                Supreme Access
               </Badge>
-              {isDev && (
-                <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
-                  Supreme Access
-                </Badge>
-              )}
-            </div>
-          </AlertDescription>
-        </Alert>
+            )}
+          </span>
+        </StatusNotice>
       </div>
 
       {/* Quick Start Guide */}
@@ -780,7 +770,7 @@ export function Help() {
           <div className="space-y-3">
             <div className="p-4 bg-info-soft rounded-lg border border-info/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
+                <Badge className="bg-primary/10 text-primary-text ">
                   Developer
                 </Badge>
                 <Shield className="w-4 h-4 text-info-text" />
