@@ -19,10 +19,14 @@ export interface PersonRowProps {
   onPress?: () => void;
   /** Position in a grouped list: rounds the outer corners and draws dividers. */
   position?: 'single' | 'first' | 'middle' | 'last';
+  /** An action under the row (e.g. "Convert to member"), left-aligned with the text. */
+  footer?: React.ReactNode;
+  /** Fades the row, for records that are finished with (e.g. a converted visitor). */
+  dimmed?: boolean;
 }
 
 /** Row for people lists: avatar, name, badges, optional call button. */
-export function PersonRow({ name, photoUri, meta, subtitle, phone, onPress, position = 'single' }: PersonRowProps) {
+export function PersonRow({ name, photoUri, meta, subtitle, phone, onPress, position = 'single', footer, dimmed }: PersonRowProps) {
   const c = useAppColors();
   const first = position === 'single' || position === 'first';
   const last = position === 'single' || position === 'last';
@@ -41,6 +45,7 @@ export function PersonRow({ name, photoUri, meta, subtitle, phone, onPress, posi
         borderBottomLeftRadius: last ? radius.lg : 0,
         borderBottomRightRadius: last ? radius.lg : 0,
         overflow: 'hidden',
+        opacity: dimmed ? 0.65 : 1,
       }}
     >
       <PressableScale
@@ -61,6 +66,11 @@ export function PersonRow({ name, photoUri, meta, subtitle, phone, onPress, posi
         ) : null}
         {onPress ? <ChevronRight size={18} color={c.textSubtle} /> : null}
       </PressableScale>
+      {footer ? (
+        <View style={{ paddingLeft: space.md + 44 + space.sm, paddingRight: space.md, paddingBottom: 12, alignItems: 'flex-start' }}>
+          {footer}
+        </View>
+      ) : null}
     </View>
   );
 }
