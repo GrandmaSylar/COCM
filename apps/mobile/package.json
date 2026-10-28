@@ -4,10 +4,10 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "npx expo start",
-    "android": "npx expo start --android",
-    "ios": "npx expo start --ios",
-    "web": "npx expo start --web"
+    "start": "npx expo start --port 8086",
+    "android": "npx expo start --android --port 8086",
+    "ios": "npx expo start --ios --port 8086",
+    "web": "npx expo start --web --port 8086"
   },
   "dependencies": {
     "@cms/shared": "file:../../packages/shared",

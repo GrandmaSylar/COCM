@@ -4,10 +4,10 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "start": "npx expo start",
-    "android": "npx expo start --android",
-    "ios": "npx expo start --ios",
-    "web": "npx expo start --web"
+    "start": "npx expo start --port 8085",
+    "android": "npx expo start --android --port 8085",
+    "ios": "npx expo start --ios --port 8085",
+    "web": "npx expo start --web --port 8085"
   },
   "dependencies": {
     "@cms/admin-core": "*",
