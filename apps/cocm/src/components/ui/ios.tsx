@@ -1,7 +1,7 @@
 // Reusable iOS building blocks: inset grouped lists, settings-style icon tiles,
 // large titles and a status notice. Built on the design tokens in globals.css.
 import * as React from "react";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 
 import { cn } from "./utils";
 
@@ -152,4 +152,64 @@ function StatusNotice({
   );
 }
 
-export { Group, GroupRow, IconTile, LargeTitle, StatusNotice };
+/** A rounded, filled search field with a clear button, in the iOS style. */
+function SearchField({
+  value,
+  onChange,
+  placeholder = "Search",
+  className,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="h-9 w-full rounded-[10px] bg-fill pl-8 pr-8 text-[17px] outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40 lg:text-[15px] [&::-webkit-search-cancel-button]:hidden"
+      />
+      {value ? (
+        <button type="button" onClick={() => onChange("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground active:opacity-60">
+          <X className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** What a list shows when there is nothing to list: an icon, a short title, one line of help, and an action. */
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  className,
+}: {
+  icon?: IconType;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  action?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col items-center px-6 py-12 text-center", className)}>
+      {Icon ? (
+        <span className="mb-4 flex size-14 items-center justify-center rounded-full bg-fill text-muted-foreground">
+          <Icon className="size-7" />
+        </span>
+      ) : null}
+      <h3 className="text-[20px] font-semibold leading-tight">{title}</h3>
+      {description ? <p className="mt-1 max-w-sm text-[15px] text-muted-foreground">{description}</p> : null}
+      {action ? <div className="mt-5">{action}</div> : null}
+    </div>
+  );
+}
+
+export { EmptyState, Group, GroupRow, IconTile, LargeTitle, SearchField, StatusNotice };
