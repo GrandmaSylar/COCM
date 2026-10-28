@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -230,9 +231,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
       </div>
 
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1 className="text-2xl font-bold">Add Child Visitor</h1>
           <p className="text-muted-foreground">Register a new visiting child</p>
@@ -382,7 +381,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
         </Card>
       </form>
 
-      <div className="fixed bottom-0 left-0 right-0 sm:left-64 lg:left-64 bg-background/80 backdrop-blur-md border-t p-4 z-40 transition-all duration-300 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.1)]">
+      <div className="fixed bottom-[calc(3.25rem+env(safe-area-inset-bottom))] left-0 right-0 lg:bottom-0 lg:left-60 bg-background/80 backdrop-blur-md border-t p-4 z-40 transition-all duration-300 shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.1)]">
         <div className="max-w-[1200px] mx-auto flex items-center justify-between">
           <div className="hidden sm:block">
             {!isValid && (

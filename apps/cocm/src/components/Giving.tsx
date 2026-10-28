@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -629,9 +630,7 @@ export function CustomTypeManager({ customTypes, onBack, onDelete, onToggle, onA
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <h1>Manage Custom Giving Types</h1>
             <p className="text-muted-foreground">
@@ -901,9 +900,7 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Record Service Giving</h1>
           <p className="text-muted-foreground">
@@ -1328,9 +1325,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <h1>Giving Record</h1>
         </div>
         <div className="flex items-center justify-center py-12">
@@ -1344,9 +1339,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <h1>Giving Record</h1>
         </div>
         <Card>
@@ -1375,9 +1368,7 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+            <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
             <div>
               <h1>{record.serviceName}</h1>
               <p className="text-muted-foreground">{formatDate(record.serviceDate)}</p>

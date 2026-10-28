@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { EmptyState, Group, IconTile, LargeTitle, SearchField } from './ui/ios';
@@ -352,9 +353,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Add Visitor</h1>
           <p className="text-muted-foreground">
@@ -676,9 +675,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
     <OfflineOverlay>
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Edit Visitor</h1>
           <p className="text-muted-foreground">

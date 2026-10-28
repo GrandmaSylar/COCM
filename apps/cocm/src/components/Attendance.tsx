@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -581,9 +582,7 @@ function ServiceManager({ customServices, onBack, onDelete, onToggle, onAdd, onR
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <h1>Manage Service Types</h1>
             <p className="text-muted-foreground">
@@ -884,9 +883,7 @@ export function RecordAttendance({ onBack, onSave }: RecordAttendanceProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Record General Attendance</h1>
           <p className="text-muted-foreground">
@@ -1203,9 +1200,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <h1>Attendance Record</h1>
             <p className="text-muted-foreground">Loading...</p>
@@ -1222,9 +1217,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <h1>Attendance Record</h1>
             <p className="text-muted-foreground">Record not found.</p>
@@ -1239,9 +1232,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <div className="flex items-center gap-2">
               <h1>{record.serviceType}</h1>

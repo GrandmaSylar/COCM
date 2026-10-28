@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -551,9 +552,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
 
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>{childData ? 'Promote Child to Member' : isConvertingVisitor ? 'Convert Visitor to Member' : 'Add New Member'}</h1>
           <p className="text-muted-foreground">
@@ -1417,7 +1416,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
         </Card>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2 sticky bottom-0 bg-background pb-4">
+        <div className="flex gap-3 pt-2 [&>button]:flex-1 sm:[&>button]:flex-none sticky bottom-[calc(3.25rem+env(safe-area-inset-bottom))] z-10 -mx-4 bg-background/90 px-4 pb-3 backdrop-blur lg:bottom-0 lg:mx-0 lg:px-0">
           <Button type="submit" disabled={!isValid || isLoading} className="sm:w-auto">
             <Save className="w-4 h-4 mr-2" />
             {isLoading ? 'Saving...' : 'Save Member'}
@@ -1426,7 +1425,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
             Cancel
           </Button>
           {!isValid && (
-            <p className="text-sm text-muted-foreground self-center">
+            <p className="hidden text-sm text-muted-foreground self-center sm:block">
               Complete all required fields to save
             </p>
           )}

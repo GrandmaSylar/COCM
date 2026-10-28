@@ -333,7 +333,7 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     id === "notifications"
       ? "Notifications"
       : allItems.find((item) => item.id === id)?.label ??
-        id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+        id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const pageTitle = labelFor(currentPage);
 
   // Phone tab bar: the four most-used destinations the person can open, then More.
