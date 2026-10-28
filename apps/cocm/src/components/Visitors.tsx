@@ -945,9 +945,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember, onV
       {/* Enhanced Header - Improved Mobile Layout */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2 hover:bg-muted/50">
-            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Visitor Profile</h1>
             <p className="text-[11px] sm:text-sm text-muted-foreground line-clamp-1">
@@ -958,7 +956,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember, onV
         
         {canManageVisitors && (
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => onEdit(visitor)} className="flex-1 sm:flex-none h-9 sm:h-10">
+            <Button variant="soft" onClick={() => onEdit(visitor)} className="flex-1 sm:flex-none h-9 sm:h-10">
               <Pencil className="w-4 h-4 mr-2 hidden sm:inline-block" />
               Edit
             </Button>
