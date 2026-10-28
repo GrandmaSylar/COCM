@@ -1,5 +1,4 @@
 import { ReactNode, useCallback } from "react";
-import { Button } from "./ui/button";
 import { useAuth } from "./AuthContext";
 import { useTheme } from "./ThemeContext";
 import {
@@ -7,9 +6,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "./ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "./ui/tabs";
+import { Group, GroupRow, StatusNotice } from "./ui/ios";
+import { cn } from "./ui/utils";
 import {
   Users,
   Calendar,
@@ -18,23 +23,16 @@ import {
   Settings,
   LogOut,
   Home,
-  Menu,
-  X,
-  Play,
   Download,
   RefreshCw,
   Moon,
   Sun,
   Monitor,
-  Shield,
   UserPlus,
   HelpCircle,
   ClipboardList,
   Bell,
   Church,
-  ArrowLeft,
-  ArrowRight,
-  User,
   Baby,
   Receipt,
   WifiOff,
@@ -42,7 +40,9 @@ import {
   AlertTriangle,
   Share,
   HandHeart,
-  Map
+  Map,
+  MoreHorizontal,
+  ChevronsUpDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -58,6 +58,8 @@ import {
   setBeforeInstallPromptEvent,
   type BeforeInstallPromptEvent,
 } from "../services/pwa";
+
+const Spinner = ({ className }: { className?: string }) => <Loader2 className={cn(className, "animate-spin")} />;
 
 interface LayoutProps {
   children: ReactNode;
@@ -326,563 +328,322 @@ export function Layout({ children, currentPage, onNavigate }: LayoutProps) {
     })
   })).filter(group => group.items.length > 0);
 
+  const allItems = filteredNavGroups.flatMap((group) => group.items);
+  const labelFor = (id: string) =>
+    id === "notifications"
+      ? "Notifications"
+      : allItems.find((item) => item.id === id)?.label ??
+        id.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
+  const pageTitle = labelFor(currentPage);
+
+  // Phone tab bar: the four most-used destinations the person can open, then More.
+  const preferredTabs = ["dashboard", "members", "attendance", "giving"];
+  const tabItems = [
+    ...preferredTabs.map((id) => allItems.find((item) => item.id === id)).filter(Boolean),
+    ...allItems.filter((item) => !preferredTabs.includes(item.id)),
+  ].slice(0, 4) as typeof allItems;
+  const moreGroups = filteredNavGroups
+    .map((group) => ({ ...group, items: group.items.filter((item) => !tabItems.some((tab) => tab.id === item.id)) }))
+    .filter((group) => group.items.length > 0);
+
+  const initial = user?.name?.charAt(0) || "U";
+  const showInstall = showInstallBanner && !isPermanentlyInstalled();
+
+  // One status notice at a time, most urgent first.
+  const notice = !isOnline ? (
+    <StatusNotice tone="warning" icon={WifiOff}>
+      <strong className="font-semibold">You are offline.</strong>{" "}
+      {pendingCount === 0
+        ? "Changes will sync when you reconnect."
+        : `${pendingCount} change${pendingCount === 1 ? "" : "s"} will sync when you reconnect.`}
+    </StatusNotice>
+  ) : syncState === "syncing" ? (
+    <StatusNotice tone="info" icon={Spinner}>
+      Back online. Syncing {pendingCount} pending change{pendingCount === 1 ? "" : "s"}…
+    </StatusNotice>
+  ) : syncState === "conflicts" ? (
+    <StatusNotice tone="warning" icon={AlertTriangle} action={{ label: "Review", onClick: () => onNavigate("notifications") }}>
+      Sync finished with {syncConflictCount} conflict{syncConflictCount === 1 ? "" : "s"} that need your attention.
+    </StatusNotice>
+  ) : syncState === "fix-retry" ? (
+    <StatusNotice tone="danger" icon={AlertTriangle} action={{ label: "Retry", onClick: retrySyncNow }}>
+      Sync failed: {syncFailureReason}
+    </StatusNotice>
+  ) : showUpdateBtn ? (
+    <StatusNotice tone="success" icon={RefreshCw} action={{ label: "Update", onClick: () => updateSW?.(true) }}>
+      A new version of CoC.M is ready.
+    </StatusNotice>
+  ) : showInstallBanner && !sessionDismissed && !isPermanentlyInstalled() ? (
+    <StatusNotice icon={Download} action={{ label: "Install", onClick: handleInstallClick }} onDismiss={handleDismissBanner}>
+      Install CoC.M for a faster experience that also works offline.
+    </StatusNotice>
+  ) : showIosBanner && !showInstallBanner ? (
+    <StatusNotice icon={Share} onDismiss={handleDismissIosBanner}>
+      To install, tap Share, then Add to Home Screen.
+    </StatusNotice>
+  ) : null;
+
+  const themeIcons = { light: Sun, dark: Moon, system: Monitor } as const;
+
+  const accountMenu = (
+    <>
+      <DropdownMenuLabel className="font-normal">
+        <p className="truncate text-sm font-semibold">{user?.name}</p>
+        <p className="text-xs capitalize text-muted-foreground">{user?.role}</p>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={() => onNavigate("settings")}>
+        <Settings className="size-4" />
+        Settings
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Appearance</DropdownMenuLabel>
+      <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as typeof theme)}>
+        {(["light", "dark", "system"] as const).map((value) => {
+          const Icon = themeIcons[value];
+          return (
+            <DropdownMenuRadioItem key={value} value={value}>
+              <Icon className="size-4" />
+              <span className="capitalize">{value}</span>
+            </DropdownMenuRadioItem>
+          );
+        })}
+      </DropdownMenuRadioGroup>
+      {showInstall || showUpdateBtn ? <DropdownMenuSeparator /> : null}
+      {showInstall ? (
+        <DropdownMenuItem onClick={handleInstallClick}>
+          <Download className="size-4" />
+          Install app
+        </DropdownMenuItem>
+      ) : null}
+      {showUpdateBtn ? (
+        <DropdownMenuItem onClick={() => updateSW?.(true)}>
+          <RefreshCw className="size-4" />
+          Update available
+        </DropdownMenuItem>
+      ) : null}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem variant="destructive" onClick={logout}>
+        <LogOut className="size-4" />
+        Log out
+      </DropdownMenuItem>
+    </>
+  );
+
+  const avatar = (size: string) => (
+    <span className={cn("flex shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground", size)}>{initial}</span>
+  );
+
   return (
     <>
-      <div className="min-h-dvh bg-background overflow-x-clip w-full max-w-full px-safe pt-safe">
-        {/* Mobile Header */}
-        {/* eslint-disable-next-line -- PWA install banner for mobile (rendered after header) */}
-        <div className="lg:hidden bg-card border-b px-4 py-3 flex items-center justify-between no-print">
-          <div className="flex items-center gap-2">
-            <img src="/newlogo.png" alt="logo" className="w-8 h-8 object-contain" />
-            <h1 className="text-xl font-semibold">CoC.M</h1>
+      <div className="min-h-dvh w-full max-w-full overflow-x-clip bg-background">
+        {/* Desktop sidebar: a translucent source list */}
+        <aside
+          id="sidebar-nav"
+          className="no-print fixed inset-y-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar/80 backdrop-blur-xl lg:flex"
+        >
+          <div className="flex h-14 shrink-0 items-center gap-2.5 px-5">
+            <img src="/newlogo.png" alt="" className="size-7 object-contain" />
+            <span className="text-[17px] font-semibold tracking-tight">CoC.M</span>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Notification Bell for Mobile */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate("notifications")}
-              className="w-8 h-8 p-0 relative"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[8px] font-bold rounded-full w-3.5 h-3.5 flex items-center justify-center animate-soft-pulse">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-              {conflictBadgeCount > 0 && (
-                <span className="absolute -top-0.5 -left-0.5 bg-red-500 rounded-full w-2.5 h-2.5 animate-pulse border border-card" />
-              )}
-            </Button>
-            {/* Theme Toggle for Mobile */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="w-8 h-8 p-0"
-            >
-              {isDark ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              )}
-            </Button>
-            {/* Mobile User Menu */}
+
+          <nav className="flex-1 overflow-y-auto px-3 pb-3" aria-label="Main">
+            {filteredNavGroups.map((group) => (
+              <div key={group.group} className="mb-2">
+                <p className="px-2.5 pb-1 pt-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{group.group}</p>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate(item.id)}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[15px] transition-colors",
+                        isActive
+                          ? "bg-sidebar-accent font-medium text-foreground"
+                          : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-foreground active:bg-sidebar-accent"
+                      )}
+                    >
+                      <Icon className={cn("size-[18px] shrink-0", isActive ? "text-primary" : "text-muted-foreground")} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+
+          <div className="shrink-0 border-t border-sidebar-border p-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 focus:outline-none ring-2 ring-primary/30 hover:ring-primary/60 transition-all" style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>
-                  {user?.name?.charAt(0) || <User className="w-4 h-4" />}
+                <button className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-sidebar-accent/60 active:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                  {avatar("size-8")}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium leading-tight">{user?.name}</span>
+                    <span className="block truncate text-xs capitalize text-muted-foreground">{user?.role}</span>
+                  </span>
+                  <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52">
-                <DropdownMenuLabel className="font-normal">
-                  <p className="font-semibold text-sm truncate">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onNavigate("settings")} className="cursor-pointer">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Log Out
-                </DropdownMenuItem>
+              <DropdownMenuContent side="top" align="start" className="w-56">
+                {accountMenu}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              id="mobile-menu-btn"
-            >
-              {mobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <Menu className="w-5 h-5" />
-              )}
-            </Button>
+            <p className="mt-2 px-2 text-[11px] text-muted-foreground">Version {APP_VERSION}</p>
           </div>
-        </div>
+        </aside>
 
-        {/* PWA Install Banner — Mobile (between header and flex row) */}
-        {showInstallBanner && !sessionDismissed && (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
-            <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
-              <Download className="w-4 h-4 shrink-0" />
-              <span>Install CoC.M for a faster, offline-capable experience</span>
-            </p>
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Button size="sm" variant="default" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleInstallClick}>
-                Install
-              </Button>
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissBanner}>
-                <X className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <div className="min-h-dvh lg:pl-60">
+          {/* Top bar: a translucent bar with the page title, content scrolls underneath */}
+          <header className="no-print ios-material hairline-b sticky top-0 z-30 pt-safe px-safe">
+            <div className="flex h-12 items-center gap-2 px-4 sm:px-6 lg:px-8">
+              <img src="/newlogo.png" alt="" className="size-7 shrink-0 object-contain lg:hidden" />
+              <h2 className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">{pageTitle}</h2>
 
-        {/* iOS Install Banner — Mobile */}
-        {showIosBanner && !showInstallBanner && (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
-            <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-1.5">
-              <Share className="w-4 h-4 shrink-0" />
-              <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
-            </p>
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissIosBanner}>
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        )}
-
-        {/* Banner Block — Mobile (between install banner and flex row) */}
-        {!isOnline ? (
-          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700 no-print">
-            <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-amber-800 dark:text-amber-200">
-              <span className="font-semibold">⚠ You are offline</span>
-              <span>—</span>
-              {pendingCount === 0 ? (
-                <span>changes will sync automatically when reconnected.</span>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <span className="bg-amber-500 text-white rounded-full px-2 py-0.5 text-[10px] font-bold shadow-sm whitespace-nowrap">{pendingCount} pending</span>
-                  <span>will sync when reconnected.</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : syncState === 'syncing' ? (
-          <div className="lg:hidden flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700 no-print">
-            <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
-            <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
-          </div>
-        ) : syncState === 'conflicts' ? (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 flex-wrap no-print">
-            <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
-              <span>Sync complete — {syncConflictCount} conflicts</span>
-            </div>
-            <Button size="sm" variant="outline" className="h-7 text-xs border-orange-400 text-orange-700 hover:bg-orange-100" onClick={() => onNavigate('notifications')}>
-              Review Conflicts
-            </Button>
-          </div>
-        ) : syncState === 'fix-retry' ? (
-          <div className="lg:hidden flex items-center justify-between gap-2 px-4 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 flex-wrap no-print">
-            <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
-              <span className="truncate max-w-[200px]">Sync failed: {syncFailureReason}</span>
-            </div>
-            <Button size="sm" variant="default" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white" onClick={retrySyncNow}>
-              Retry Now
-            </Button>
-          </div>
-        ) : null}
-
-        <div className="flex">
-          {/* Desktop Sidebar */}
-          <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 z-30" id="sidebar-nav">
-            <div className="flex flex-col flex-grow bg-sidebar/95 backdrop-blur-xl border-r border-sidebar-border shadow-sm overflow-y-auto">
-              <div className="flex items-center justify-between flex-shrink-0 px-4 py-4 border-b border-sidebar-border/50">
-                <div className="flex items-center gap-2 min-w-0">
-                  <img src="/newlogo.png" alt="logo" className="w-7 h-7 object-contain shrink-0" />
-                  <h1 className="text-lg font-bold tracking-tight bg-clip-text text-transparent truncate" style={{ backgroundImage: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>
-                    CoC.M
-                  </h1>
-                </div>
-                {/* Theme Toggle for Desktop */}
-                <div className="flex gap-0.5 p-1 bg-sidebar-accent/50 rounded-lg border border-sidebar-border/50 shrink-0 ml-2">
-                  {[
-                    { value: "light", icon: Sun },
-                    { value: "dark", icon: Moon },
-                    { value: "system", icon: Monitor },
-                  ].map(({ value, icon: Icon }) => (
-                    <Button
-                      key={value}
-                      variant={theme === value ? "default" : "ghost"}
-                      size="sm"
-                      onClick={() => setTheme(value as any)}
-                      className={`h-6 w-6 p-0 rounded-md transition-all duration-200 ${
-                        theme === value 
-                          ? "bg-background text-foreground shadow-sm scale-110" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-                      }`}
-                      title={value}
-                    >
-                      <Icon className="h-3 w-3" />
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 flex flex-col justify-between py-4">
-                {/* Notification Bell */}
-                <div className="px-4 pb-2">
-                  <button
-                    onClick={() => onNavigate("notifications")}
-                    className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-200 group ${
-                      currentPage === "notifications"
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25 scale-[1.02]"
-                        : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent hover:translate-x-1"
-                    }`}
-                  >
-                    <div className="relative">
-                      <Bell className={`w-5 h-5 mr-3 transition-transform duration-300 ${currentPage === "notifications" ? "rotate-12" : "group-hover:rotate-12"}`} />
-                      {unreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-0.5 bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center animate-pulse border-2 border-sidebar">
-                          {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
-                      )}
-                      {conflictBadgeCount > 0 && (
-                        <span className="absolute -bottom-1 -left-1 bg-red-500 rounded-full w-3 h-3 animate-pulse border-2 border-sidebar" />
-                      )}
-                    </div>
-                    <span className="font-medium">Notifications</span>
-                    {unreadCount > 0 && (
-                      <span className="ml-auto bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold rounded-full px-2 py-0.5 border border-amber-500/20">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                
-                <nav className="flex-1 px-4 space-y-4">
-                  {filteredNavGroups.map((group, groupIdx) => (
-                    <div key={groupIdx} className="space-y-1.5">
-                      <p className="px-4 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-2 mt-2">
-                        {group.group}
-                      </p>
-                      {group.items.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = currentPage === item.id;
-                        return (
-                          <button
-                            key={item.id}
-                            onClick={() => onNavigate(item.id)}
-                            className={`w-full flex items-center px-3 py-2.5 rounded-xl transition-all duration-200 group relative overflow-hidden ${
-                              isActive
-                                ? "bg-primary text-primary-foreground shadow-sm scale-[1.02]"
-                                : "text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 hover:translate-x-1"
-                            }`}
-                          >
-                            {isActive && (
-                                <div className="absolute inset-0 bg-white/10 dark:bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            )}
-                            <Icon className={`w-4 h-4 mr-3 transition-transform duration-300 ${isActive ? "scale-110" : "group-hover:scale-110 opacity-70"}`} />
-                            <span className="font-medium text-sm">{item.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </nav>
-
-                <div className="px-4 pt-4 mt-auto space-y-3">
-                    {/* PWA Install / Update button */}
-                    {showInstallBanner && !isPermanentlyInstalled() && (
-                      <Button
-                        onClick={handleInstallClick}
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start gap-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                      >
-                        <Download className="w-4 h-4" />
-                        Install App
-                      </Button>
-                    )}
-                    {showUpdateBtn && (
-                      <Button
-                        onClick={() => updateSW?.(true)}
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-start gap-2 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors animate-pulse"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Update Available
-                      </Button>
-                    )}
-
-                    <div className="p-4 rounded-xl bg-sidebar-accent/30 border border-sidebar-border/50">
-                        <div className="flex items-center gap-3 mb-3">
-                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs ring-2 ring-background" style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>
-                                {user?.name?.charAt(0) || "U"}
-                            </div>
-                            <div className="overflow-hidden">
-                                <p className="text-sm font-semibold truncate">{user?.name}</p>
-                                <p className="text-xs text-muted-foreground capitalize truncate">
-                                {user?.role}
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            onClick={logout}
-                            variant="outline"
-                            size="sm"
-                            className="w-full justify-start hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
-                        >
-                            <LogOut className="w-4 h-4 mr-2" />
-                            Log Out
-                        </Button>
-                        <p className="text-xs text-muted-foreground/50 text-center mt-2">v{APP_VERSION}</p>
-                    </div>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* Mobile Navigation Drawer */}
-          {mobileMenuOpen && (
-            <div
-              className="lg:hidden fixed inset-0 z-50 bg-background/80 backdrop-blur-sm animate-fade-in"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <div
-                className="fixed inset-y-0 left-0 w-[80%] max-w-[300px] bg-card border-r shadow-2xl animate-slide-in-left pt-safe pb-safe pl-safe flex flex-col"
-                onClick={(e) => e.stopPropagation()}
+              <button
+                onClick={() => onNavigate("notifications")}
+                aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+                className={cn(
+                  "relative flex size-9 items-center justify-center rounded-full transition-colors hover:bg-accent active:bg-accent",
+                  currentPage === "notifications" ? "text-primary" : "text-foreground"
+                )}
               >
-                  <div className="flex items-center justify-between px-6 py-5 border-b border-border/50 bg-sidebar/50">
-                    <div className="flex items-center gap-2">
-                      <img src="/newlogo.png" alt="logo" className="w-8 h-8 object-contain" />
-                      <h1 className="text-lg font-bold bg-clip-text text-transparent" style={{ backgroundImage: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>CoC.M</h1>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="rounded-full hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <X className="w-5 h-5" />
-                    </Button>
-                  </div>
+                <Bell className="size-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute right-0.5 top-0.5 flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+                {conflictBadgeCount > 0 && <span className="absolute bottom-1 left-1 size-2 rounded-full bg-warning ring-2 ring-card" />}
+              </button>
 
-                  <div className="flex-1 overflow-y-auto px-4 py-6">
-                    <nav className="space-y-4">
-                        {filteredNavGroups.map((group, groupIdx) => (
-                          <div key={groupIdx} className="space-y-1.5">
-                            <p className="px-4 text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mb-2 mt-2">
-                              {group.group}
-                            </p>
-                            {group.items.map((item) => {
-                              const Icon = item.icon;
-                              const isActive = currentPage === item.id;
-                              return (
-                                  <button
-                                  key={item.id}
-                                  onClick={() => {
-                                      onNavigate(item.id);
-                                      setMobileMenuOpen(false);
-                                  }}
-                                  className={`w-full flex items-center px-4 py-3 min-h-[44px] rounded-xl transition-all duration-200 ${
-                                      isActive
-                                      ? "bg-primary text-primary-foreground shadow-sm"
-                                      : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                                  }`}
-                                  >
-                                  <Icon className={`w-4 h-4 mr-3 ${isActive ? "animate-pulse" : "opacity-70"}`} />
-                                  <span className="font-medium text-sm">{item.label}</span>
-                                  </button>
-                              );
-                            })}
-                          </div>
-                        ))}
-                    </nav>
-                  </div>
-
-                  <div className="p-4 border-t border-border/50 bg-sidebar/30 space-y-3">
-                    {/* PWA Install / Update button — Mobile */}
-                    {showInstallBanner && !isPermanentlyInstalled() && (
-                      <Button
-                        onClick={() => { handleInstallClick(); setMobileMenuOpen(false); }}
-                        variant="outline"
-                        className="w-full justify-center gap-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                      >
-                        <Download className="w-4 h-4" />
-                        Install App
-                      </Button>
-                    )}
-                    {showUpdateBtn && (
-                      <Button
-                        onClick={() => updateSW?.(true)}
-                        variant="outline"
-                        className="w-full justify-center gap-2 border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 animate-pulse"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Update Available
-                      </Button>
-                    )}
-
-                    <div className="flex items-center gap-3 mb-4 px-2">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                            {user?.name?.charAt(0)}
-                        </div>
-                        <div>
-                            <p className="font-semibold text-sm">{user?.name}</p>
-                            <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                        </div>
-                    </div>
-                    <Button
-                      onClick={logout}
-                      variant="outline"
-                      className="w-full justify-center"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Logout
-                    </Button>
-                    <p className="text-xs text-muted-foreground/50 text-center mt-1">v{APP_VERSION}</p>
-                  </div>
-              </div>
-            </div>
-          )}
-
-          {/* Main Content */}
-          <div className="flex-1 lg:ml-64 overflow-x-clip content-watermark min-h-dvh pb-safe bg-muted/40 dark:bg-background">
-            {/* Desktop Top Bar */}
-            <div className="hidden lg:flex items-center justify-end px-8 py-3 border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20 no-print">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-accent transition-colors focus:outline-none group">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/50 transition-all" style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}>
-                      {user?.name?.charAt(0) || <User className="w-4 h-4" />}
-                    </div>
-                    <div className="text-left">
-                      <p className="text-sm font-semibold leading-none">{user?.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize mt-0.5">{user?.role}</p>
-                    </div>
+                  <button aria-label="Account" className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 lg:hidden">
+                    {avatar("size-8")}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuLabel className="font-normal">
-                    <p className="font-semibold text-sm truncate">{user?.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onNavigate("settings")} className="cursor-pointer">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout} className="cursor-pointer text-destructive focus:text-destructive">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Log Out
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-56">
+                  {accountMenu}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </header>
 
-            {/* PWA Install Banner — Desktop (between top bar and main) */}
-            {showInstallBanner && !sessionDismissed && (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
-                <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                  <Download className="w-4 h-4 shrink-0" />
-                  <span>📲 Install CoC.M — Get a faster, offline-capable experience</span>
-                </p>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Button size="sm" variant="default" className="h-7 text-xs bg-blue-600 hover:bg-blue-700 text-white" onClick={handleInstallClick}>
-                    Install
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissBanner}>
-                    <X className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* iOS Install Banner — Desktop */}
-            {showIosBanner && !showInstallBanner && (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-200 dark:border-blue-800 no-print">
-                <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                  <Share className="w-4 h-4 shrink-0" />
-                  <span>To install: tap the Share button then &ldquo;Add to Home Screen&rdquo;</span>
-                </p>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900" onClick={handleDismissIosBanner}>
-                  <X className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            )}
-
-            {/* Banner Block — Desktop (between install banner and main) */}
-            {!isOnline ? (
-              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-300 dark:border-amber-700 no-print">
-                <WifiOff className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <div className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
-                  <span className="font-semibold">⚠ You are offline</span>
-                  <span>—</span>
-                  {pendingCount === 0 ? (
-                    <span>changes will sync automatically when reconnected.</span>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                       <span className="bg-amber-500 text-white rounded-full px-2 py-0.5 text-xs font-bold shadow-sm">{pendingCount} pending changes</span>
-                       <span>will sync when reconnected.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : syncState === 'syncing' ? (
-              <div className="hidden lg:flex items-center gap-3 px-8 py-2.5 bg-blue-50 dark:bg-blue-950/40 border-b border-blue-300 dark:border-blue-700 no-print">
-                <Loader2 className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 animate-spin" />
-                <span className="text-sm text-blue-800 dark:text-blue-200">Back online — syncing {pendingCount} pending changes…</span>
-              </div>
-            ) : syncState === 'conflicts' ? (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-orange-50 dark:bg-orange-950/40 border-b border-orange-300 dark:border-orange-700 no-print">
-                <div className="flex items-center gap-2 text-sm text-orange-800 dark:text-orange-200">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-orange-600 dark:text-orange-400" />
-                  <span>⚠ Sync complete — {syncConflictCount} conflicts need your attention</span>
-                </div>
-                <Button size="sm" variant="outline" className="h-7 text-xs border-orange-400 text-orange-700 hover:bg-orange-100" onClick={() => onNavigate('notifications')}>
-                  Review Conflicts
-                </Button>
-              </div>
-            ) : syncState === 'fix-retry' ? (
-              <div className="hidden lg:flex items-center justify-between gap-3 px-8 py-2.5 bg-red-50 dark:bg-red-950/40 border-b border-red-300 dark:border-red-700 no-print">
-                <div className="flex items-center gap-2 text-sm text-red-800 dark:text-red-200">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 dark:text-red-400" />
-                  <span>Sync failed — {syncFailureReason}</span>
-                </div>
-                <Button size="sm" variant="default" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white" onClick={retrySyncNow}>
-                  Retry Now
-                </Button>
-              </div>
-            ) : null}
-
-            <main className="p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8 overflow-x-hidden max-w-[1600px] mx-auto">
-              {syncState === 'fix-retry' && (
-                <FixRetryPanel reason={syncFailureReason} onRetry={retrySyncNow} />
-              )}
-              <div
-                key={currentPage}
-                className="page-transition min-h-[calc(100dvh-4rem)]" // Ensure min height for transition
-              >
-                {children}
-              </div>
-            </main>
-          </div>
+          <main className="mx-auto max-w-[1400px] px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-8 lg:pb-8 lg:pt-6">
+            {notice ? <div className="mb-4">{notice}</div> : null}
+            {syncState === "fix-retry" && <FixRetryPanel reason={syncFailureReason} onRetry={retrySyncNow} />}
+            <div key={currentPage} className="page-transition">
+              {children}
+            </div>
+          </main>
         </div>
-      </div>
 
-      {/* Mobile FAB - Opens/Closes Left Nav (outside main container for proper fixed positioning) */}
-      <button
-        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        id="mobile-fab-nav"
-        className={`lg:hidden w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 ${
-          mobileMenuOpen
-            ? "bg-card text-foreground border-2"
-            : "bg-primary text-primary-foreground hover:scale-110 hover:shadow-2xl"
-        }`}
-        style={{
-          position: "fixed",
-          bottom: "24px",
-          right: "16px",
-          zIndex: 9999,
-        }}
-      >
-        {mobileMenuOpen ? (
-          <ArrowRight className="w-6 h-6" />
-        ) : (
-          <ArrowLeft className="w-6 h-6" />
-        )}
-      </button>
+        {/* Phone tab bar: translucent, with a hairline above, clear of the home indicator */}
+        <nav aria-label="Main" className="no-print ios-material hairline-t px-safe fixed inset-x-0 bottom-0 z-40 pb-safe lg:hidden">
+          <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabItems.length + 1}, minmax(0, 1fr))` }}>
+            {tabItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onNavigate(item.id)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "flex h-[49px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors active:opacity-60",
+                    isActive ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  <Icon className="size-[22px]" />
+                  <span className="max-w-full truncate px-1">{item.label}</span>
+                </button>
+              );
+            })}
+            <button
+              id="mobile-menu-btn"
+              onClick={() => setMobileMenuOpen(true)}
+              className={cn(
+                "flex h-[49px] flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors active:opacity-60",
+                mobileMenuOpen || !tabItems.some((item) => item.id === currentPage) ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              <MoreHorizontal className="size-[22px]" />
+              <span>More</span>
+            </button>
+          </div>
+        </nav>
+
+        {/* More: the rest of the destinations, as grouped lists */}
+        <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+          <SheetContent side="bottom" className="max-h-[88dvh] gap-0 overflow-y-auto bg-background p-0">
+            <SheetHeader className="px-4 pb-2 pt-5 text-left">
+              <SheetTitle className="text-[28px] font-bold leading-tight">More</SheetTitle>
+              <SheetDescription className="sr-only">All sections of the app, your account and appearance.</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-5 px-4 pb-6 pt-2">
+              {moreGroups.map((group) => (
+                <Group key={group.group} title={group.group}>
+                  {group.items.map((item) => (
+                    <GroupRow
+                      key={item.id}
+                      icon={item.icon}
+                      iconTone={currentPage === item.id ? "primary" : "gray"}
+                      title={item.label}
+                      selected={currentPage === item.id}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        setMobileMenuOpen(false);
+                      }}
+                    />
+                  ))}
+                </Group>
+              ))}
+
+              <Group title="Appearance">
+                <div className="p-2">
+                  <Tabs value={theme} onValueChange={(value) => setTheme(value as typeof theme)}>
+                    <TabsList className="w-full">
+                      {(["light", "dark", "system"] as const).map((value) => {
+                        const Icon = themeIcons[value];
+                        return (
+                          <TabsTrigger key={value} value={value} className="gap-1.5 capitalize">
+                            <Icon className="size-4" />
+                            {value}
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </Group>
+
+              {showInstall || showUpdateBtn ? (
+                <Group>
+                  {showInstall ? (
+                    <GroupRow
+                      icon={Download}
+                      iconTone="info"
+                      title="Install app"
+                      onClick={() => {
+                        handleInstallClick();
+                        setMobileMenuOpen(false);
+                      }}
+                    />
+                  ) : null}
+                  {showUpdateBtn ? <GroupRow icon={RefreshCw} iconTone="success" title="Update available" onClick={() => updateSW?.(true)} /> : null}
+                </Group>
+              ) : null}
+
+              <Group footer={`Signed in as ${user?.name ?? ""} · ${user?.role ?? ""} · Version ${APP_VERSION}`}>
+                <GroupRow icon={LogOut} iconTone="gray" title="Log out" destructive chevron={false} onClick={logout} />
+              </Group>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
     </>
   );
 }
