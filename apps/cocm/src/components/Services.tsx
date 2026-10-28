@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { LargeTitle } from './ui/ios';
+import { PullToRefresh } from './ui/ios-gestures';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
@@ -222,7 +224,7 @@ function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
             <div className="w-2 h-2 rounded-full bg-teal-500"></div>
             <div className="text-muted-foreground font-medium text-xs uppercase tracking-wider">Net Giving</div>
           </div>
-          <div className="text-2xl font-bold text-teal-600">{formatGhanaCedis(netGiving)}</div>
+          <div className="text-2xl font-bold text-success-text">{formatGhanaCedis(netGiving)}</div>
           <div className="text-xs text-muted-foreground mt-1">After {formatGhanaCedis(expensesTotal)} expenses</div>
         </div>
       )}
@@ -348,7 +350,7 @@ function GivingChart({ sr }: { sr: ServiceDateDetail }) {
         {expensesTotal > 0 && (
           <div className="mt-6 p-3 bg-secondary/10 border border-secondary/20 rounded-lg flex justify-between items-center text-sm">
             <span className="text-secondary/80 font-medium">Net Giving (after expenses)</span>
-            <span className="font-bold text-teal-600 dark:text-teal-400">{formatGhanaCedis(netGiving)}</span>
+            <span className="font-bold text-success-text dark:text-teal-400">{formatGhanaCedis(netGiving)}</span>
           </div>
         )}
       </CardContent>
@@ -651,7 +653,7 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
         </div>
         <div className="bg-teal-50 rounded-lg p-3 text-center border border-teal-100">
           <div className="text-sm font-bold text-teal-700">{formatGhanaCedis(childrenGivingTotal)}</div>
-          <div className="text-[10px] text-teal-600/80 uppercase font-semibold">Giving</div>
+          <div className="text-[10px] text-success-text/80 uppercase font-semibold">Giving</div>
         </div>
         <div className="bg-warning-soft rounded-lg p-3 text-center border border-warning/30">
           <div className="text-sm font-bold text-warning-text">{childrenVisitorsCount}</div>
@@ -892,18 +894,18 @@ function StatsBar({ records, totalServices, loading }: { records: ServiceDateSum
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="bg-card border rounded-xl p-4 flex flex-col justify-center shadow-sm">
-        <div className="text-2xl font-bold">{totalServices}</div>
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Total Services</div>
+    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="rounded-xl bg-card p-4">
+        <div className="text-2xl font-bold tabular-nums">{totalServices}</div>
+        <div className="mt-0.5 text-[13px] text-muted-foreground">Total Services</div>
       </div>
-      <div className="bg-card border rounded-xl p-4 flex flex-col justify-center shadow-sm">
-        <div className="text-2xl font-bold">{stats.avgAttendance}</div>
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Average Attendance</div>
+      <div className="rounded-xl bg-card p-4">
+        <div className="text-2xl font-bold tabular-nums">{stats.avgAttendance}</div>
+        <div className="mt-0.5 text-[13px] text-muted-foreground">Average Attendance</div>
       </div>
-      <div className="bg-card border rounded-xl p-4 flex flex-col justify-center shadow-sm">
-        <div className="text-2xl font-bold text-success-text">{formatGhanaCedis(stats.totalGiving)}</div>
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Total Giving</div>
+      <div className="rounded-xl bg-card p-4">
+        <div className="text-2xl font-bold tabular-nums">{formatGhanaCedis(stats.totalGiving)}</div>
+        <div className="mt-0.5 text-[13px] text-muted-foreground">Total Giving</div>
       </div>
     </div>
   );
@@ -915,7 +917,7 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
   const expenses = sr.expensesTotal || 0;
   
   return (
-    <div onClick={onClick} className="bg-card cursor-pointer transition-all border-l-4 border-l-secondary rounded-xl border-y border-r shadow-sm overflow-hidden">
+    <div onClick={onClick} className="cursor-pointer overflow-hidden rounded-xl bg-card transition-colors active:bg-accent">
       <div className="p-4">
         <div className="flex justify-between items-start mb-4">
           <div className="font-medium text-foreground">{formatDate(sr.serviceDate)}</div>
@@ -938,7 +940,7 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
             <span className="text-xs">absent</span>
           </div>
           <div className="flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-purple-500 shrink-0" />
+            <UserPlus className="w-4 h-4 text-info-text shrink-0" />
             <span className="font-medium text-foreground">{sr.visitorsCount}</span>
             <span className="text-xs">visitors</span>
           </div>
@@ -953,13 +955,13 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
         {expenses > 0 && (
           <div className="mt-4 pt-3 border-t border-dashed flex justify-between items-center text-sm">
             <span className="text-muted-foreground">Net Giving (after expenses)</span>
-            <span className="font-medium text-teal-600">{formatGhanaCedis((sr.totalGiving || 0) - expenses)}</span>
+            <span className="font-medium text-success-text">{formatGhanaCedis((sr.totalGiving || 0) - expenses)}</span>
           </div>
         )}
         
         {((sr.childrenAttendanceCount || 0) > 0 || (sr.childrenGivingTotal || 0) > 0 || (sr.childrenVisitorsCount || 0) > 0) && (
           <>
-            <hr className="my-3 border-border" />
+            <hr className="my-3 border-separator" />
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">CHILDREN</div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
@@ -967,11 +969,11 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
                 <span className="font-medium text-foreground">{sr.childrenAttendanceCount || 0}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Banknote className="w-4 h-4 text-teal-500 shrink-0" />
+                <Banknote className="w-4 h-4 text-success-text shrink-0" />
                 <span className="font-medium text-foreground">{formatGhanaCedis(sr.childrenGivingTotal || 0)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-purple-500 shrink-0" />
+                <UserPlus className="w-4 h-4 text-info-text shrink-0" />
                 <span className="font-medium text-foreground">{sr.childrenVisitorsCount || 0}</span>
               </div>
             </div>
@@ -1002,14 +1004,14 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
   return (
     <div className="space-y-6">
       {groups.length === 0 ? (
-        <div className="p-6 text-center text-muted-foreground bg-card border rounded-xl">No service records yet.</div>
+        <div className="rounded-xl bg-card p-6 text-center text-muted-foreground">No service records yet.</div>
       ) : (
         groups.map(group => (
           <div key={group.monthKey} className="relative">
-            <div className="sticky top-0 lg:top-14 z-10 bg-background/95 backdrop-blur-sm py-2 mb-2">
-              <h3 className="text-sm font-semibold text-muted-foreground">{group.label}</h3>
+            <div className="sticky top-12 z-10 mb-1 bg-background/90 px-4 py-1.5 backdrop-blur">
+              <h3 className="text-[13px] uppercase tracking-wide text-muted-foreground">{group.label}</h3>
             </div>
-            <div className="bg-card border rounded-xl divide-y divide-border overflow-hidden shadow-sm">
+            <div className="overflow-hidden rounded-xl bg-card divide-y divide-separator">
               {group.records.map((sr) => (
                 <button
                   key={`${sr.serviceDate}_${sr.serviceType || 'NA'}`}
@@ -1036,7 +1038,7 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
       
       {hasMore && (
         <div className="flex justify-center mt-6 pb-4">
-          <Button variant="outline" className="rounded-full px-8 shadow-sm" onClick={onLoadMore} disabled={loadingMore}>
+          <Button variant="soft" className="rounded-full px-8" onClick={onLoadMore} disabled={loadingMore}>
             {loadingMore && <RefreshCw className="w-4 h-4 mr-2 animate-spin text-warning-text" />}
             {loadingMore ? 'Loading...' : 'Load more'}
           </Button>
@@ -1049,7 +1051,7 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
 function SetupCard({ setup, onEdit }: { setup: any, onEdit: (setup: any) => void }) {
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   return (
-    <div className="bg-card border rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-4 mb-3">
+    <div className="mb-2 flex items-center justify-between overflow-hidden rounded-xl bg-card p-4">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <span className="font-semibold">{formatDate(setup.serviceDate)}</span>
@@ -1060,7 +1062,7 @@ function SetupCard({ setup, onEdit }: { setup: any, onEdit: (setup: any) => void
           <span className="font-medium text-foreground">Preacher:</span> {setup.preacherName || 'TBA'}
         </div>
       </div>
-      <Button variant="outline" size="sm" onClick={() => onEdit(setup)}>
+      <Button variant="soft" size="sm" onClick={() => onEdit(setup)}>
         View / Edit
       </Button>
     </div>
@@ -1208,32 +1210,36 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
   }
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex items-center justify-between">
-        <h1>Services</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="default" onClick={() => { setEditingSetup(null); setShowSetupForm(true); }}>
-            <Calendar className="w-4 h-4 mr-2" />
-            Service Setup
-          </Button>
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-warning-text' : ''}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title="Services"
+        subtitle="Service records, attendance and giving by date"
+        actions={
+          <>
+            <Button onClick={() => { setEditingSetup(null); setShowSetupForm(true); }}>
+              <Calendar className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Service Setup</span>
+              <span className="sr-only sm:hidden">Service Setup</span>
+            </Button>
+            <Button variant="soft" size="icon" aria-label="Refresh" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </>
+        }
+      />
 
       <StatsBar records={pastRecords} totalServices={total} loading={loading} />
 
       {/* Service Setups */}
       <div>
-        <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">
+        <h2 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-wide text-muted-foreground">
           Service Setups
         </h2>
         {loadingSetups ? (
           <Skeleton className="h-[72px] w-full rounded-xl mb-3" />
         ) : savedSetups.length === 0 ? (
-          <p className="text-sm text-muted-foreground bg-card border rounded-xl p-4 text-center">No service setups yet.</p>
+          <p className="rounded-xl bg-card p-4 text-center text-sm text-muted-foreground">No service setups yet.</p>
         ) : (
           savedSetups.map(setup => <SetupCard key={setup.id} setup={setup} onEdit={s => { setEditingSetup(s); setShowSetupForm(true); }} />)
         )}
@@ -1242,7 +1248,7 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
       {/* Today / Latest Services */}
       {todayRecords.length > 0 && (
         <div>
-          <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">
+          <h2 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-wide text-muted-foreground">
             {todayRecords[0]?.serviceDate === new Date().toISOString().split('T')[0] ? "Today's Service" : 'Latest Service'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger-children">
@@ -1259,7 +1265,7 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
 
       {/* Past Services List */}
       <div>
-        <h2 className="mb-3 text-muted-foreground text-sm font-medium uppercase tracking-wide">All Services</h2>
+        <h2 className="mb-1.5 px-4 text-[13px] font-normal uppercase tracking-wide text-muted-foreground">All Services</h2>
         <TimelineGroup 
           records={pastRecords} 
           onSelect={openDetail} 
@@ -1269,5 +1275,6 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
         />
       </div>
     </div>
+    </PullToRefresh>
   );
 }

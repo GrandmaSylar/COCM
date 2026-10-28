@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -83,7 +84,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
 
   const statusColorMap: Record<string, string> = {
     active: 'bg-success-soft text-success-text ',
-    inactive: 'bg-muted text-foreground '
+    inactive: 'bg-warning-soft text-warning-text'
   };
 
   const serviceTypeLabels: Record<string, string> = {
@@ -123,79 +124,67 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden shadow-sm">
-        <div className="from-secondary/15 via-secondary/5 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-white/50 dark:hover:bg-black/20">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground">Child Profile</span>
+      <div className="space-y-4">
+        <button type="button" onClick={onBack} className="-ml-1 flex items-center gap-0.5 text-[17px] text-primary-text active:opacity-60">
+          <ChevronLeft className="size-6" />
+          Children
+        </button>
+        <div className="flex flex-col items-center gap-3 rounded-xl bg-card p-5 text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
+          <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 sm:size-32">
+            {child.photo ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <img src={getCloudinaryUrl(child.photo, 'avatar') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="size-full cursor-pointer object-cover transition-opacity hover:opacity-90" />
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
+                  <DialogTitle className="sr-only">Profile Picture</DialogTitle>
+                  <DialogDescription className="sr-only">Full size profile picture of {child.firstName} {child.lastName}</DialogDescription>
+                  <img src={getCloudinaryUrl(child.photo, 'original') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm" />
+                </DialogContent>
+              </Dialog>
+            ) : (
+              <span className="text-4xl font-semibold text-primary-text">
+                {child.firstName[0]}{child.lastName[0]}
+              </span>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <div className="w-32 h-32 md:w-40 md:h-40 bg-card dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-sm ring-4 ring-white/50 dark:ring-card/50 shrink-0">
-              {child.photo ? (
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <img src={getCloudinaryUrl(child.photo, 'avatar') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" />
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
-                    <DialogTitle className="sr-only">Profile Picture</DialogTitle>
-                    <DialogDescription className="sr-only">Full size profile picture of {child.firstName} {child.lastName}</DialogDescription>
-                    <img src={getCloudinaryUrl(child.photo, 'original') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm" />
-                  </DialogContent>
-                </Dialog>
-              ) : (
-                <span className="text-5xl font-semibold text-primary">
-                  {child.firstName[0]}{child.lastName[0]}
-                </span>
-              )}
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[24px] font-bold leading-tight">{child.firstName} {child.otherNames && `${child.otherNames} `}{child.lastName}</h1>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:justify-start">
+              <Badge className={`border-0 ${statusColorMap[child.status] || ''}`}>{child.status}</Badge>
+              <span className="text-[15px] text-muted-foreground">
+                <span className="capitalize">{child.gender}</span> · {calculateAge(child.dateOfBirth)} yrs · Joined {new Date(child.joinDate).toLocaleDateString()}
+              </span>
             </div>
-            <div className="flex-1 text-center sm:text-left">
-              <h1 className="text-2xl font-bold">{child.firstName} {child.otherNames && `${child.otherNames} `}{child.lastName}</h1>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                <Badge className={statusColorMap[child.status] || ''}>
-                  {child.status}
-                </Badge>
-                <span className="text-sm text-muted-foreground capitalize">{child.gender}</span>
-                <span className="text-sm text-muted-foreground">&middot;</span>
-                <span className="text-sm text-muted-foreground">{calculateAge(child.dateOfBirth)} yrs</span>
-                <span className="text-sm text-muted-foreground">&middot;</span>
-                <span className="text-sm text-muted-foreground">Joined {new Date(child.joinDate).toLocaleDateString()}</span>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3 justify-center sm:justify-start">
-                {canAccess('edit_members') && (
-                  <Button size="sm" onClick={() => onEdit(child)}>
-                    <Edit className="w-3.5 h-3.5 mr-1.5" />
-                    Edit
-                  </Button>
-                )}
-                {isDev && (
-                  <Button size="sm" variant="outline" onClick={() => exportToPDF([childExportRow], `child-${child.id}`, `${child.firstName} ${child.lastName} — Profile`, childPdfColumns)}>
-                    <FileText className="w-3.5 h-3.5 mr-1.5" />
-                    Export PDF
-                  </Button>
-                )}
-                {canAccess('manage_members') && (
-                  <Button size="sm" className="bg-info hover:bg-info text-white" onClick={() => onPromoteToMember(child)}>
-                    <UserCheck className="w-3.5 h-3.5 mr-1.5" />
-                    Promote to Main Member
-                  </Button>
-                )}
-                {canAccess('delete_members') && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => setDeleteDialogOpen(true)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                    Delete
-                  </Button>
-                )}
-              </div>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+              {canAccess('edit_members') && (
+                <Button onClick={() => onEdit(child)}>
+                  <Edit className="w-4 h-4 mr-1.5" />
+                  Edit
+                </Button>
+              )}
+              {canAccess('manage_members') && (
+                <Button variant="soft" onClick={() => onPromoteToMember(child)}>
+                  <UserCheck className="w-4 h-4 mr-1.5" />
+                  Promote to Main Member
+                </Button>
+              )}
+              {isDev && (
+                <Button variant="soft" onClick={() => exportToPDF([childExportRow], `child-${child.id}`, `${child.firstName} ${child.lastName} — Profile`, childPdfColumns)}>
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  Export PDF
+                </Button>
+              )}
+              {canAccess('delete_members') && (
+                <Button variant="dangerSoft" onClick={() => setDeleteDialogOpen(true)}>
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Delete
+                </Button>
+              )}
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       <Tabs defaultValue="details">
         <TabsList>
