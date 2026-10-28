@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { LargeTitle, IconTile } from './ui/ios';
+import { MoreHorizontal } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
@@ -99,6 +101,17 @@ const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent
     </text>
   );
 };
+
+function StatTile({ icon, tone, value, label, children }: { icon: React.ComponentType<{ className?: string }>; tone: 'info' | 'success' | 'warning'; value: React.ReactNode; label: string; children?: React.ReactNode }) {
+  return (
+    <div className="rounded-xl bg-card p-3 sm:p-4">
+      <IconTile icon={icon} tone={tone} />
+      <div className="mt-2 truncate text-xl font-bold leading-none tracking-tight tabular-nums sm:text-2xl">{value}</div>
+      <div className="mt-1 text-[13px] text-muted-foreground">{label}</div>
+      {children}
+    </div>
+  );
+}
 
 export function Reports() {
   const requestCounterRef = useRef(0);
@@ -462,65 +475,68 @@ export function Reports() {
   return (
     <OfflineOverlay>
       <div className="space-y-6 relative">
-        {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground mb-2">
-            Church statistics and trends — {periodLabel}
-          </p>
-          {selectedScope !== 'main' && (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-info-soft text-info-text">
-              Viewing: {selectedScope === 'all' ? 'Merged (All)' : "Children's Data"}
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">This Month</SelectItem>
-              <SelectItem value="quarter">This Quarter</SelectItem>
-              <SelectItem value="6months">Last 6 Months</SelectItem>
-              <SelectItem value="year">This Year</SelectItem>
-              <SelectItem value="2years">Last 2 Years</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={selectedScope} onValueChange={(val) => { invalidateApiCache('/reports'); setSelectedScope(val); }}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="main">Main Data</SelectItem>
-              <SelectItem value="children">Children's Data</SelectItem>
-              <SelectItem value="all">Merged (All)</SelectItem>
-            </SelectContent>
-          </Select>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-                <ChevronDown className="w-3 h-3 ml-1" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>Export as CSV</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('xlsx')}>Export as Excel</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>Export as PDF</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button onClick={() => setDbReportDialogOpen(true)} className="bg-[#1b4d3e] hover:bg-[#143a2e] text-white">
-            <FileText className="w-4 h-4 mr-2" />
-            Generate Report
-          </Button>
-        </div>
+      <LargeTitle
+        title="Reports & Analytics"
+        subtitle={<>Church statistics and trends: {periodLabel}{selectedScope !== 'main' && <span className="ml-2 inline-flex items-center rounded-full bg-info-soft px-2 py-0.5 text-xs font-medium text-info-text">{selectedScope === 'all' ? 'Merged (All)' : "Children's Data"}</span>}</>}
+        actions={
+          <>
+            <Button onClick={() => setDbReportDialogOpen(true)}>
+              <FileText className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Generate Report</span>
+              <span className="sr-only sm:hidden">Generate Report</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('csv')}>
+                  <Download className="w-4 h-4" />
+                  Export as CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('xlsx')}>
+                  <Download className="w-4 h-4" />
+                  Export as Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                  <Download className="w-4 h-4" />
+                  Export as PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      <div className="flex gap-2">
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="flex-1 sm:w-44 sm:flex-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="quarter">This Quarter</SelectItem>
+            <SelectItem value="6months">Last 6 Months</SelectItem>
+            <SelectItem value="year">This Year</SelectItem>
+            <SelectItem value="2years">Last 2 Years</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={selectedScope} onValueChange={(val) => { invalidateApiCache('/reports'); setSelectedScope(val); }}>
+          <SelectTrigger className="flex-1 sm:w-44 sm:flex-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="main">Main Data</SelectItem>
+            <SelectItem value="children">Children's Data</SelectItem>
+            <SelectItem value="all">Merged (All)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* DB Report Dialog */}
@@ -576,7 +592,7 @@ export function Reports() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDbReportDialogOpen(false)} disabled={dbReportGenerating}>Cancel</Button>
-            <Button onClick={handleGenerateDbReport} disabled={dbReportGenerating} className="bg-[#1b4d3e] hover:bg-[#143a2e] text-white">
+            <Button onClick={handleGenerateDbReport} disabled={dbReportGenerating}>
               {dbReportGenerating ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
               ) : (
@@ -587,128 +603,36 @@ export function Reports() {
         </DialogContent>
       </Dialog>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Users className="w-16 h-16 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
-              <Users className="w-5 h-5" />
-            </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalMembers}</div>
-            <div className="text-xs font-medium text-muted-foreground">Total Members</div>
-            {summary.activeMembers > 0 && <div className="text-xs text-success-text mt-0.5">{summary.activeMembers} active</div>}
-            {selectedScope === 'all' && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Main: {summary.mainTotalMembers} &middot; Children: {summary.childrenTotalMembers}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-success-soft border border-success/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-16 h-16 text-success-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-success/40 flex items-center justify-center mb-3 text-success-text transition-transform duration-300">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.avgAttendance}</div>
-            <div className="text-xs font-medium text-muted-foreground">Avg Attendance</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{summary.servicesHeld} services</div>
-            {selectedScope === 'all' && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Main: {summary.mainAvgAttendance} &middot; Children: {summary.childrenAvgAttendance}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Banknote className="w-16 h-16 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
-              <Banknote className="w-5 h-5" />
-            </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving)}</div>
-            <div className="text-xs font-medium text-muted-foreground">Total Giving</div>
-            {summary.avgGivingPerService > 0 && <div className="text-xs text-muted-foreground mt-0.5">{formatGhanaCedis(summary.avgGivingPerService)}/service</div>}
-            {selectedScope === 'all' && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Main: {formatGhanaCedis(summary.mainTotalGiving)} &middot; Children: {formatGhanaCedis(summary.childrenTotalGiving)}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-warning-soft border border-warning/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-16 h-16 text-warning-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-warning/40 flex items-center justify-center mb-3 text-warning-text transition-transform duration-300">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.growthRate > 0 ? '+' : ''}{summary.growthRate.toFixed(1)}%</div>
-            <div className="text-xs font-medium text-muted-foreground">Growth Rate</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{summary.newMembersThisMonth} new this month</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-5 from-cyan-500/50 via-cyan-500/40 border border-cyan-500/50 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Smile className="w-16 h-16 text-cyan-600" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/40 flex items-center justify-center mb-3 text-cyan-600 transition-transform duration-300">
-              <Smile className="w-5 h-5" />
-            </div>
-            <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalVisitors || 0}</div>
-            <div className="text-xs font-medium text-muted-foreground">Total Visitors</div>
-            <div className="text-xs text-cyan-600 mt-0.5">{visitorConversionRate}% converted</div>
-            {selectedScope === 'all' && (
-              <div className="text-xs text-muted-foreground mt-0.5">
-                Main: {summary.mainTotalVisitors || 0} &middot; Children: {summary.childrenTotalVisitors || 0}
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-5 from-teal-500/50 via-teal-500/40 border border-teal-500/50 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Receipt className="w-16 h-16 text-teal-600" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/40 flex items-center justify-center mb-3 text-teal-600 transition-transform duration-300">
-              <Receipt className="w-5 h-5" />
-            </div>
-            {expensesLoading ? (
-              <>
-                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">
-                  <Skeleton className="h-8 w-16 md:w-24" />
-                </div>
-                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-              </>
-            ) : expensesError ? (
-              <>
-                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving || 0)}</div>
-                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-                <div className="text-xs bg-warning-soft text-warning-text rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(netGiving)}</div>
-                <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-                {scopeTotalExpenses > 0 && <div className="text-xs text-destructive mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
-              </>
-            )}
-          </div>
-        </div>
+      {/* Summary tiles */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatTile icon={Users} tone="info" value={summary.totalMembers} label="Total Members">
+          {summary.activeMembers > 0 && <div className="mt-0.5 text-xs text-success-text">{summary.activeMembers} active</div>}
+          {selectedScope === 'all' && (<div className="mt-0.5 text-xs text-muted-foreground">Main: {summary.mainTotalMembers} &middot; Children: {summary.childrenTotalMembers}</div>)}
+        </StatTile>
+        <StatTile icon={Calendar} tone="success" value={summary.avgAttendance} label="Avg Attendance">
+          <div className="mt-0.5 text-xs text-muted-foreground">{summary.servicesHeld} services</div>
+          {selectedScope === 'all' && (<div className="mt-0.5 text-xs text-muted-foreground">Main: {summary.mainAvgAttendance} &middot; Children: {summary.childrenAvgAttendance}</div>)}
+        </StatTile>
+        <StatTile icon={Banknote} tone="info" value={formatGhanaCedis(summary.totalGiving)} label="Total Giving">
+          {summary.avgGivingPerService > 0 && <div className="mt-0.5 text-xs text-muted-foreground">{formatGhanaCedis(summary.avgGivingPerService)}/service</div>}
+          {selectedScope === 'all' && (<div className="mt-0.5 text-xs text-muted-foreground">Main: {formatGhanaCedis(summary.mainTotalGiving)} &middot; Children: {formatGhanaCedis(summary.childrenTotalGiving)}</div>)}
+        </StatTile>
+        <StatTile icon={TrendingUp} tone="warning" value={`${summary.growthRate > 0 ? '+' : ''}${summary.growthRate.toFixed(1)}%`} label="Growth Rate">
+          <div className="mt-0.5 text-xs text-muted-foreground">{summary.newMembersThisMonth} new this month</div>
+        </StatTile>
+        <StatTile icon={Smile} tone="info" value={summary.totalVisitors || 0} label="Total Visitors">
+          <div className="mt-0.5 text-xs text-info-text">{visitorConversionRate}% converted</div>
+          {selectedScope === 'all' && (<div className="mt-0.5 text-xs text-muted-foreground">Main: {summary.mainTotalVisitors || 0} &middot; Children: {summary.childrenTotalVisitors || 0}</div>)}
+        </StatTile>
+        <StatTile
+          icon={Receipt}
+          tone="success"
+          value={expensesLoading ? <Skeleton className="h-7 w-20" /> : formatGhanaCedis(expensesError ? (summary.totalGiving || 0) : netGiving)}
+          label="Net Giving"
+        >
+          {expensesError && <div className="mt-1 inline-flex items-center gap-1 rounded bg-warning-soft px-1.5 py-0.5 text-xs text-warning-text">⚠ Expense data unavailable</div>}
+          {!expensesLoading && !expensesError && scopeTotalExpenses > 0 && <div className="mt-0.5 text-xs text-destructive">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
+        </StatTile>
       </div>
 
       {/* Row 1: Attendance + Giving Trends */}
