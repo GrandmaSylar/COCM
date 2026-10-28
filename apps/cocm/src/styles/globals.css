@@ -3,53 +3,63 @@
 @tailwind utilities;
 
 @layer base {
+  /* iOS look: grouped backgrounds, system label and separator colours, fills and a tint.
+     The values follow Apple system colours. Secondary text is slightly darker than the iOS
+     original so it stays above 4.5:1 on white. The brand red is the tint colour. */
   :root {
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    /* Light mode — defaults use hex so ThemeContext hex overrides work cleanly */
-    --background: #f5f6f8;
-    --foreground: #111827;
+    --background: #f2f2f7;            /* systemGroupedBackground */
+    --foreground: #000000;            /* label */
 
-    --card: #ffffff;
-    --card-foreground: #111827;
+    --card: #ffffff;                  /* secondarySystemGroupedBackground */
+    --card-foreground: #000000;
 
     --popover: #ffffff;
-    --popover-foreground: #111827;
+    --popover-foreground: #000000;
 
-    --primary: #dc2626;
+    --primary: #dc2626;               /* tint */
     --primary-foreground: #ffffff;
-    /* The primary colour as text on a card; a saved theme may need a more legible version. */
+    /* The tint as text on a card; a saved theme may need a more legible version. */
     --primary-text: var(--primary);
 
-    --secondary: #eef0f3;
-    --secondary-foreground: #111827;
+    --secondary: rgb(120 120 128 / 0.12);   /* systemFill */
+    --secondary-foreground: #000000;
 
-    --muted: #eef0f3;
-    --muted-foreground: #5b6473;
+    --muted: rgb(120 120 128 / 0.12);
+    --muted-foreground: rgb(60 60 67 / 0.72);   /* secondaryLabel */
 
-    --accent: #eef0f3;
-    --accent-foreground: #111827;
+    --accent: rgb(120 120 128 / 0.16);
+    --accent-foreground: #000000;
 
     --destructive: #dc2626;
     --destructive-foreground: #ffffff;
 
-    --border: #e3e6eb;
-    --input: #cdd2da;
+    --border: rgb(60 60 67 / 0.29);   /* separator */
+    --input: rgb(60 60 67 / 0.29);
     --ring: #dc2626;
 
+    /* Extra iOS tokens */
+    --separator: rgb(60 60 67 / 0.29);
+    --fill: rgb(120 120 128 / 0.12);
+    --fill-strong: rgb(120 120 128 / 0.2);
+    --material: rgb(249 249 249 / 0.78);        /* translucent bars */
+    --material-thick: rgb(249 249 249 / 0.92);
+    --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+
     /* Sidebar */
-    --sidebar: #f5f6f8;
-    --sidebar-foreground: #374151;
+    --sidebar: #f2f2f7;
+    --sidebar-foreground: rgb(60 60 67 / 0.85);
     --sidebar-primary: #dc2626;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #fef2f2;
-    --sidebar-accent-foreground: #374151;
-    --sidebar-border: #e3e6eb;
+    --sidebar-accent: rgb(120 120 128 / 0.16);
+    --sidebar-accent-foreground: #000000;
+    --sidebar-border: rgb(60 60 67 / 0.29);
     --sidebar-ring: #dc2626;
+    /* White text sits on the tint gradient, so both ends stay dark enough. */
     --primary-gradient-end: #b91c1c;
-  
 
-    /* Status colors (the theme editor overrides --success, --warning and --info).
+    /* Status colours (the theme editor overrides --success, --warning and --info).
        -soft is a tinted background, -text is legible on it. */
     --success: #22c55e;
     --warning: #f59e0b;
@@ -62,48 +72,50 @@
     --info-text: color-mix(in srgb, var(--info) 58%, #000000);
   }
 
-
   .dark {
-    /* Dark mode */
-    --background: #0f1115;
-    --foreground: #f2f4f7;
+    --background: #000000;            /* systemGroupedBackground (dark) */
+    --foreground: #ffffff;
 
-    --card: #171a21;
-    --card-foreground: #f2f4f7;
+    --card: #1c1c1e;                  /* secondarySystemGroupedBackground (dark) */
+    --card-foreground: #ffffff;
 
-    --popover: #171a21;
-    --popover-foreground: #f2f4f7;
+    --popover: #2c2c2e;
+    --popover-foreground: #ffffff;
 
     --primary: #f87171;
-    --primary-foreground: #171a21;
+    --primary-foreground: #1c1c1e;
 
-    --secondary: #1f232c;
-    --secondary-foreground: #f2f4f7;
+    --secondary: rgb(120 120 128 / 0.36);
+    --secondary-foreground: #ffffff;
 
-    --muted: #1f232c;
-    --muted-foreground: #a3acba;
+    --muted: rgb(120 120 128 / 0.36);
+    --muted-foreground: rgb(235 235 245 / 0.62);
 
-    --accent: #1f232c;
-    --accent-foreground: #f2f4f7;
+    --accent: rgb(120 120 128 / 0.32);
+    --accent-foreground: #ffffff;
 
-    --destructive: #ef4444;
-    --destructive-foreground: #171a21;
+    --destructive: #ff6961;
+    --destructive-foreground: #1c1c1e;
 
-    --border: #272c36;
-    --input: #363c48;
+    --border: rgb(84 84 88 / 0.65);
+    --input: rgb(84 84 88 / 0.65);
     --ring: #f87171;
 
-    /* Sidebar */
-    --sidebar: #0f1115;
-    --sidebar-foreground: #a3acba;
+    --separator: rgb(84 84 88 / 0.65);
+    --fill: rgb(120 120 128 / 0.36);
+    --fill-strong: rgb(120 120 128 / 0.5);
+    --material: rgb(28 28 30 / 0.72);
+    --material-thick: rgb(28 28 30 / 0.92);
+
+    --sidebar: #000000;
+    --sidebar-foreground: rgb(235 235 245 / 0.7);
     --sidebar-primary: #f87171;
-    --sidebar-primary-foreground: #171a21;
-    --sidebar-accent: #1f232c;
-    --sidebar-accent-foreground: #f2f4f7;
-    --sidebar-border: #272c36;
+    --sidebar-primary-foreground: #1c1c1e;
+    --sidebar-accent: rgb(120 120 128 / 0.32);
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: rgb(84 84 88 / 0.65);
     --sidebar-ring: #f87171;
     --primary-gradient-end: #fca5a5;
-  
 
     --success-soft: color-mix(in srgb, var(--success) 20%, var(--card));
     --warning-soft: color-mix(in srgb, var(--warning) 20%, var(--card));
@@ -156,15 +168,18 @@
     color-scheme: dark;
   }
   h1 {
-    @apply font-heading text-2xl font-bold leading-tight tracking-tight lg:text-3xl;
+    @apply font-heading text-2xl font-bold leading-tight lg:text-3xl;
+    letter-spacing: -0.012em;
     text-wrap: balance;
   }
   h2 {
-    @apply font-heading text-xl font-bold leading-snug tracking-tight;
+    @apply font-heading text-xl font-semibold leading-snug;
+    letter-spacing: -0.01em;
     text-wrap: balance;
   }
   h3 {
-    @apply font-heading text-lg font-semibold leading-snug tracking-tight lg:text-xl;
+    @apply font-heading text-lg font-semibold leading-snug lg:text-xl;
+    letter-spacing: -0.008em;
     text-wrap: balance;
   }
   p {
@@ -198,13 +213,9 @@
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
   
-  /* Text Gradients */
+  /* Accent text: a solid tint colour, not a gradient fill (iOS uses solid system colours). */
   .text-gradient {
-    background: linear-gradient(to right, var(--primary), var(--primary-gradient-end));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    color: transparent;
+    color: var(--primary-text);
     font-weight: 700;
   }
 }
@@ -240,5 +251,39 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@layer utilities {
+  /* Translucent bars and sheets, like iOS materials. Content scrolls underneath. */
+  .ios-material {
+    background: var(--material);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+  .ios-material-thick {
+    background: var(--material-thick);
+    -webkit-backdrop-filter: saturate(180%) blur(30px);
+    backdrop-filter: saturate(180%) blur(30px);
+  }
+  /* 0.5 px lines (1 px on standard-density screens). */
+  .hairline-b { box-shadow: inset 0 -0.5px 0 var(--separator); }
+  .hairline-t { box-shadow: inset 0 0.5px 0 var(--separator); }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ios-material, .ios-material-thick { background: var(--card); }
+}
+
+/* People who ask for less transparency get solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  .ios-material, .ios-material-thick {
+    background: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }

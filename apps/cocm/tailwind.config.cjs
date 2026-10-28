@@ -26,8 +26,9 @@ module.exports = {
       },
       extend: {
         fontFamily: {
-          sans: ["Inter", "system-ui", "sans-serif"],
-          heading: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
+          // San Francisco on Apple devices, Inter everywhere else.
+          sans: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", "system-ui", "sans-serif"],
+          heading: ["-apple-system", "BlinkMacSystemFont", "SF Pro Text", "SF Pro Display", "Inter", "Segoe UI", "system-ui", "sans-serif"],
         },
         fontSize: {
           "mobile-h1": ["1.5rem", { lineHeight: "1.2", fontWeight: "700" }],
@@ -63,6 +64,11 @@ module.exports = {
           accent: {
             DEFAULT: token("accent"),
             foreground: token("accent-foreground"),
+          },
+          separator: token("separator"),
+          fill: {
+            DEFAULT: token("fill"),
+            strong: token("fill-strong"),
           },
           success: {
             DEFAULT: token("success"),
@@ -100,8 +106,8 @@ module.exports = {
         },
         borderRadius: {
           lg: "var(--radius)",
-          md: "calc(var(--radius) - 4px)",
-          sm: "calc(var(--radius) - 8px)",
+          md: "calc(var(--radius) - 2px)",
+          sm: "calc(var(--radius) - 6px)",
         },
         keyframes: {
           "accordion-down": {
