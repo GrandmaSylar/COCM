@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
-import { Search, Plus, Phone, Mail, MapPin, Eye, Info, Users, UserPlus, UserCheck, UserMinus, ArrowUpDown, Download, RefreshCw, ChevronDown, Droplets, WifiOff } from 'lucide-react';
+import { EmptyState, Group, LargeTitle, SearchField } from './ui/ios';
+import { PullToRefresh, SwipeRow } from './ui/ios-gestures';
+import { Search, Plus, Phone, Eye, Info, Users, UserPlus, ArrowUpDown, Download, RefreshCw, ChevronDown, ChevronRight, MoreHorizontal, SlidersHorizontal, WifiOff } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { useAuth } from './AuthContext';
 import { api } from '../services/api';
@@ -19,6 +19,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
@@ -325,58 +326,21 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
   // Loading skeleton
   if (loading) {
     return (
-      <div className="space-y-6">
-        {/* Header Skeleton */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-10 w-36" />
-            <Skeleton className="h-10 w-40" />
-          </div>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-40 rounded-xl" />
+          <Skeleton className="h-4 w-28 rounded-lg" />
         </div>
-
-        {/* Search Skeleton */}
-        <Skeleton className="h-10 w-full" />
-
-        {/* Stats Skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="text-center space-y-2">
-                  <Skeleton className="h-8 w-16 mx-auto" />
-                  <Skeleton className="h-4 w-20 mx-auto" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Member Cards Skeleton */}
-        <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <Skeleton className="w-10 h-10 rounded-full" />
-                    <div className="space-y-2">
-                      <Skeleton className="h-5 w-40" />
-                      <div className="flex gap-2">
-                        <Skeleton className="h-5 w-24" />
-                        <Skeleton className="h-5 w-16" />
-                      </div>
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-48" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-9 w-20" />
-                </div>
-              </CardContent>
-            </Card>
+        <Skeleton className="h-9 w-full rounded-[10px]" />
+        <div className="overflow-hidden rounded-xl bg-card">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3">
+              <Skeleton className="size-11 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56 max-w-full" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -429,589 +393,302 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
     exportToXLSX(exportData, 'church_members', exportColumns);
   };
 
+  const filterFields: { label: string; value: string; set: (value: string) => void; options: [string, string][] }[] = [
+    { label: 'Zone', value: zoneFilter, set: setZoneFilter, options: [['all', 'All Zones'], ...Object.entries(ZONES).map(([code, name]): [string, string] => [code, `${code} - ${name}`])] },
+    {
+      label: 'Status',
+      value: statusFilter,
+      set: setStatusFilter,
+      options: [['all', 'All Status'], ['new', 'New'], ['active', 'Active'], ['semi-active', 'Semi-Active'], ['inactive', 'Inactive'], ['sick', 'Sick'], ['traveled', 'Traveled'], ['schooling', 'Schooling'], ['not baptised', 'Not Baptised'], ['blacklisted', 'Blacklisted']],
+    },
+    { label: 'Gender', value: genderFilter, set: setGenderFilter, options: [['all', 'All'], ['male', 'Male'], ['female', 'Female']] },
+    { label: 'Ministry', value: ministryFilter, set: setMinistryFilter, options: [['all', 'All Ministries'], ...MINISTRIES.map((ministry): [string, string] => [ministry, ministry])] },
+    {
+      label: 'Birth Month',
+      value: birthMonthFilter,
+      set: setBirthMonthFilter,
+      options: [['all', 'All Months'], ...['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, i): [string, string] => [String(i + 1).padStart(2, '0'), month])],
+    },
+    { label: 'Date of Birth', value: dateOfBirthFilter, set: setDateOfBirthFilter, options: [['all', 'All Dates'], ['today', "Today's Birthday"]] },
+    { label: 'Age Range', value: ageRangeFilter, set: setAgeRangeFilter, options: [['all', 'All Ages'], ['18-25', '18-25'], ['26-35', '26-35'], ['36-45', '36-45'], ['46-55', '46-55'], ['56-65', '56-65'], ['65+', '65+']] },
+  ];
+  const filtersActive = filterFields.some((field) => field.value !== 'all');
+  const clearFilters = () => {
+    setSearchTerm('');
+    filterFields.forEach((field) => field.set('all'));
+  };
+
+  const sortOptions: [Exclude<typeof sortBy, never>, 'asc' | 'desc', string][] = [
+    ['name', 'asc', 'Name (A-Z)'],
+    ['name', 'desc', 'Name (Z-A)'],
+    ['zone', 'asc', 'Zone (A-Z)'],
+    ['zone', 'desc', 'Zone (Z-A)'],
+    ['status', 'asc', 'Status (Active first)'],
+    ['status', 'desc', 'Status (Inactive first)'],
+    ['joinDate', 'desc', 'Join Date (Newest)'],
+    ['joinDate', 'asc', 'Join Date (Oldest)'],
+    ['baptismDate', 'desc', 'Baptism Date (Newest)'],
+    ['baptismDate', 'asc', 'Baptism Date (Oldest)'],
+    ['baptismYear', 'desc', 'Baptism Year (Newest)'],
+    ['baptismYear', 'asc', 'Baptism Year (Oldest)'],
+  ];
+
+  const countStatus = (...statuses: string[]) => members.filter((m) => statuses.includes(m.status)).length;
+  const statChips: { label: string; count: number; status?: string }[] = [
+    { label: 'Total', count: members.length, status: 'all' },
+    { label: 'New', count: countStatus('new'), status: 'new' },
+    { label: 'Active', count: countStatus('active'), status: 'active' },
+    { label: 'Semi-Active', count: countStatus('semi-active'), status: 'semi-active' },
+    { label: 'Inactive', count: countStatus('inactive'), status: 'inactive' },
+    { label: 'Excused', count: countStatus('sick', 'traveled', 'schooling') },
+    { label: 'Not Baptised', count: countStatus('not baptised'), status: 'not baptised' },
+  ];
+
+  const statusBadgeClass = (status: string) =>
+    status === 'new' ? 'bg-primary/10 text-primary-text' :
+    status === 'active' ? 'bg-success-soft text-success-text' :
+    status === 'semi-active' ? 'bg-info-soft text-info-text' :
+    status === 'inactive' ? 'bg-warning-soft text-warning-text' :
+    status === 'blacklisted' ? 'bg-destructive/10 text-destructive' :
+    'bg-fill text-foreground';
+
   return (
-    <div className="space-y-6 relative">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Members</h1>
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title={
+          <span className="flex items-center gap-2">
+            Members
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
+              <Badge variant="outline" className="bg-warning-soft text-warning-text border-0">
                 <WifiOff className="w-3 h-3 mr-1" />
-                Cached Data
+                Cached
               </Badge>
             )}
-          </div>
-          <p className="text-muted-foreground">
-            Manage your church members
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {/* Refresh Button */}
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {/* Export Button */}
-          {members.length > 0 && (
+          </span>
+        }
+        subtitle={`${members.length} ${members.length === 1 ? 'member' : 'members'}`}
+        actions={
+          <>
+            {canAddMembers && (
+              <Button onClick={onAddMember}>
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add New Member</span>
+                <span className="sr-only sm:hidden">Add New Member</span>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>
-                  Export as CSV
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>
-                  Export as Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>
-                  Export as PDF
-                </DropdownMenuItem>
+                {canAddMembers && onAddFromVisitor && (
+                  <DropdownMenuItem onClick={onAddFromVisitor}>
+                    <UserPlus className="w-4 h-4" />
+                    Add from Visitor
+                  </DropdownMenuItem>
+                )}
+                {members.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <Download className="w-4 h-4" />
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportXLSX}>
+                      <Download className="w-4 h-4" />
+                      Export as Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPDF}>
+                      <Download className="w-4 h-4" />
+                      Export as PDF
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-          {canAddMembers && (
-            <>
-              {onAddFromVisitor && (
-                <Button variant="outline" onClick={onAddFromVisitor}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Add from Visitor
-                </Button>
-              )}
-              <Button onClick={onAddMember}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add New Member
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Error Alert */}
       {error && (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      {/* Member Status Info - Collapsible */}
+      {/* Status counts: tap one to filter the list */}
+      {members.length > 0 && (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none]">
+          {statChips.map((chip) => {
+            const selectable = chip.status !== undefined;
+            const selected = selectable && statusFilter === chip.status;
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                disabled={!selectable}
+                onClick={() => chip.status && setStatusFilter(chip.status)}
+                aria-pressed={selectable ? selected : undefined}
+                className={`flex shrink-0 items-baseline gap-1.5 rounded-full px-3.5 py-1.5 text-[15px] transition-colors active:opacity-70 ${
+                  selected ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'
+                }`}
+              >
+                <span className="font-semibold tabular-nums">{chip.count}</span>
+                <span className={selected ? 'text-primary-foreground/80' : 'text-muted-foreground'}>{chip.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Search, filter and sort */}
+      <div className="flex items-center gap-2">
+        <SearchField className="flex-1" value={searchTerm} onChange={setSearchTerm} placeholder="Search name, zone, email or phone" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant={filtersActive ? 'default' : 'soft'} size="icon" aria-label="Filter">
+              <SlidersHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            <div className="p-2 space-y-3">
+              {filterFields.map((field) => (
+                <div key={field.label}>
+                  <label className="mb-1.5 block px-1 text-xs font-medium text-muted-foreground">{field.label}</label>
+                  <Select value={field.value} onValueChange={field.set}>
+                    <SelectTrigger className="w-full h-9 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options.map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+              {filtersActive && (
+                <Button variant="ghost" size="sm" className="w-full" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="soft" size="icon" aria-label="Sort">
+              <ArrowUpDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {sortOptions.map(([by, order, label]) => (
+              <DropdownMenuItem key={label} onClick={() => { setSortBy(by); setSortOrder(order); }} className={sortBy === by && sortOrder === order ? 'bg-accent font-medium' : ''}>
+                {label}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {(filtersActive || searchTerm) && members.length > 0 && (
+        <p className="px-1 text-[13px] text-muted-foreground">
+          Showing {filteredMembers.length} of {members.length}
+        </p>
+      )}
+
+      {/* Members list */}
+      {members.length === 0 ? (
+        <Group>
+          <EmptyState
+            icon={Users}
+            title="No Members Yet"
+            description="Start building your church member database by adding your first member."
+            action={canAddMembers ? <Button onClick={onAddMember}><Plus className="w-4 h-4 mr-2" />Add First Member</Button> : undefined}
+          />
+        </Group>
+      ) : filteredMembers.length === 0 ? (
+        <Group>
+          <EmptyState icon={Search} title="No results" description="No members match your search or filters." action={<Button variant="soft" onClick={clearFilters}>Clear filters</Button>} />
+        </Group>
+      ) : (
+        <div className="overflow-hidden rounded-xl bg-card">
+          {filteredMembers.map((member) => {
+            const row = (
+              <button
+                type="button"
+                onClick={() => onViewMember(member)}
+                className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent after:absolute after:bottom-0 after:left-[4.5rem] after:right-0 after:h-px after:bg-separator"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+                  {member.photo ? (
+                    <img src={getCloudinaryUrl(member.photo, 'thumbnail') ?? ''} alt="" className="size-full object-cover" />
+                  ) : (
+                    <span className="text-sm font-medium text-primary-text">
+                      {member.firstName[0]}{member.lastName[0]}
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[17px] leading-snug lg:text-[15px]">
+                    {member.firstName} {member.otherNames} {member.lastName}
+                  </span>
+                  <span className="block truncate text-[13px] text-muted-foreground">
+                    {member.zoneNumber} · Zone {member.zone} · {member.phone}
+                  </span>
+                  <span className="block truncate text-[13px] text-muted-foreground">
+                    {member.residenceLocation} ({ZONES[member.zone]})
+                  </span>
+                </span>
+                <Badge variant="secondary" className={`shrink-0 border-0 capitalize ${statusBadgeClass(member.status)}`}>
+                  {member.status}
+                </Badge>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
+              </button>
+            );
+            return (
+              <SwipeRow
+                key={member.id}
+                className="last:[&_button]:after:hidden"
+                actions={[
+                  { label: 'Call', icon: Phone, tone: 'success', onClick: () => { window.location.href = `tel:${member.phone}`; } },
+                  { label: 'View', icon: Eye, tone: 'info', onClick: () => onViewMember(member) },
+                ]}
+              >
+                {row}
+              </SwipeRow>
+            );
+          })}
+        </div>
+      )}
+
+      {/* What each status means */}
       <Collapsible open={statusInfoOpen} onOpenChange={setStatusInfoOpen}>
         <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              Member Status Definitions
-            </span>
-            <ChevronDown
-              className="h-4 w-4 transition-transform duration-300 ease-in-out"
-              style={{ transform: statusInfoOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            />
-          </Button>
+          <button type="button" className="flex w-full items-center gap-2 rounded-xl bg-card px-4 py-3 text-left text-[15px] active:bg-accent">
+            <Info className="size-4 text-muted-foreground" />
+            <span className="flex-1">Member status definitions</span>
+            <ChevronDown className="size-4 text-muted-foreground transition-transform duration-300" style={{ transform: statusInfoOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
-          <Alert>
-            <AlertDescription>
-              <strong>New:</strong> Recently registered, awaiting 4 Sunday Main Service records<br />
-              <strong>Active:</strong> Present in 3-4 of last 4 Sunday Main Services<br />
-              <strong>Semi-Active:</strong> Present in 1-2 of last 4 Sunday Main Services<br />
-              <strong>Inactive:</strong> Absent from all last 4 Sunday Main Services<br />
-              <strong>Sick/Traveled/Schooling:</strong> Absent for a long period due to verified reason<br />
-              <strong>Not Baptised:</strong> Excluded from normal status calculations<br />
-              <strong>Blacklisted:</strong> Sacked or removed
-            </AlertDescription>
-          </Alert>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Stats - Collapsible */}
-      <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Member Statistics ({members.length} Total)
-            </span>
-            <ChevronDown
-              className="h-4 w-4 transition-transform duration-300 ease-in-out"
-              style={{ transform: statsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-2">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-info-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Total</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 from-cyan-500/50 via-cyan-500/40 border border-cyan-500/50 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserPlus className="w-12 h-12 text-cyan-600" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/40 flex items-center justify-center mb-2 text-cyan-600 transition-transform duration-300">
-                  <UserPlus className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'new').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">New</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-success-soft border border-success/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserCheck className="w-12 h-12 text-success-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-success/40 flex items-center justify-center mb-2 text-success-text transition-transform duration-300">
-                  <UserCheck className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'active').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Active</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-info-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'semi-active').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Semi-Active</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-warning-soft border border-warning/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserMinus className="w-12 h-12 text-warning-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-warning/40 flex items-center justify-center mb-2 text-warning-text transition-transform duration-300">
-                  <UserMinus className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'inactive').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Inactive</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-info-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
-                  <Users className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => ['sick', 'traveled', 'schooling'].includes(m.status)).length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Excused</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-muted border border-border transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Droplets className="w-12 h-12 text-muted-foreground" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-fill-strong flex items-center justify-center mb-2 text-muted-foreground transition-transform duration-300">
-                  <Droplets className="w-4 h-4" />
-                </div>
-                <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'not baptised').length}</div>
-                <div className="text-xs font-medium text-muted-foreground mt-0.5">Not Baptised</div>
-              </div>
-            </div>
+          <div className="space-y-2 rounded-xl bg-card px-4 py-3 text-[13px] text-muted-foreground">
+            {Object.entries(MEMBER_STATUS_DEFINITIONS).map(([status, text]) => (
+              <p key={status}>
+                <strong className="font-semibold capitalize text-foreground">{status}:</strong> {text}
+              </p>
+            ))}
           </div>
         </CollapsibleContent>
       </Collapsible>
-
-      {/* Search and Filters */}
-      <div className="space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search members by name, zone, email, or phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        {/* Filter and Sort Buttons */}
-        <div className="flex flex-wrap gap-2 items-center">
-          {/* Filter Button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <Search className="w-4 h-4" />
-                Filter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <div className="p-3 space-y-3">
-                {/* Zone Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Zone</label>
-                  <Select value={zoneFilter} onValueChange={setZoneFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Zones</SelectItem>
-                      {Object.entries(ZONES).map(([code, name]) => (
-                        <SelectItem key={code} value={code}>{code} - {name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Status Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Status</label>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="semi-active">Semi-Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="sick">Sick</SelectItem>
-                      <SelectItem value="traveled">Traveled</SelectItem>
-                      <SelectItem value="schooling">Schooling</SelectItem>
-                      <SelectItem value="not baptised">Not Baptised</SelectItem>
-                      <SelectItem value="blacklisted">Blacklisted</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Gender Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Gender</label>
-                  <Select value={genderFilter} onValueChange={setGenderFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Ministry Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Ministry</label>
-                  <Select value={ministryFilter} onValueChange={setMinistryFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ministries</SelectItem>
-                      {MINISTRIES.map(ministry => (
-                        <SelectItem key={ministry} value={ministry}>{ministry}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Birth Month Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Birth Month</label>
-                  <Select value={birthMonthFilter} onValueChange={setBirthMonthFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Months</SelectItem>
-                      <SelectItem value="01">January</SelectItem>
-                      <SelectItem value="02">February</SelectItem>
-                      <SelectItem value="03">March</SelectItem>
-                      <SelectItem value="04">April</SelectItem>
-                      <SelectItem value="05">May</SelectItem>
-                      <SelectItem value="06">June</SelectItem>
-                      <SelectItem value="07">July</SelectItem>
-                      <SelectItem value="08">August</SelectItem>
-                      <SelectItem value="09">September</SelectItem>
-                      <SelectItem value="10">October</SelectItem>
-                      <SelectItem value="11">November</SelectItem>
-                      <SelectItem value="12">December</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Date of Birth Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Date of Birth</label>
-                  <Select value={dateOfBirthFilter} onValueChange={setDateOfBirthFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Dates</SelectItem>
-                      <SelectItem value="today">Today's Birthday</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Age Range Filter */}
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Age Range</label>
-                  <Select value={ageRangeFilter} onValueChange={setAgeRangeFilter}>
-                    <SelectTrigger className="w-full h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Ages</SelectItem>
-                      <SelectItem value="18-25">18-25</SelectItem>
-                      <SelectItem value="26-35">26-35</SelectItem>
-                      <SelectItem value="36-45">36-45</SelectItem>
-                      <SelectItem value="46-55">46-55</SelectItem>
-                      <SelectItem value="56-65">56-65</SelectItem>
-                      <SelectItem value="65+">65+</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Sort Button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <ArrowUpDown className="w-4 h-4" />
-                Sort
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <div className="p-3 space-y-2">
-                <div className="text-xs font-semibold text-muted-foreground px-2 py-1">Sort By</div>
-                
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('name'); setSortOrder('asc'); }}
-                  className={sortBy === 'name' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Name (A-Z)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('name'); setSortOrder('desc'); }}
-                  className={sortBy === 'name' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Name (Z-A)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('zone'); setSortOrder('asc'); }}
-                  className={sortBy === 'zone' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Zone (A-Z)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('zone'); setSortOrder('desc'); }}
-                  className={sortBy === 'zone' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Zone (Z-A)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('status'); setSortOrder('asc'); }}
-                  className={sortBy === 'status' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Status (Active first)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('status'); setSortOrder('desc'); }}
-                  className={sortBy === 'status' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Status (Inactive first)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('joinDate'); setSortOrder('desc'); }}
-                  className={sortBy === 'joinDate' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Join Date (Newest)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('joinDate'); setSortOrder('asc'); }}
-                  className={sortBy === 'joinDate' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Join Date (Oldest)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('baptismDate'); setSortOrder('desc'); }}
-                  className={sortBy === 'baptismDate' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Baptism Date (Newest)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('baptismDate'); setSortOrder('asc'); }}
-                  className={sortBy === 'baptismDate' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Baptism Date (Oldest)
-                </DropdownMenuItem>
-
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('baptismYear'); setSortOrder('desc'); }}
-                  className={sortBy === 'baptismYear' && sortOrder === 'desc' ? 'bg-accent' : ''}
-                >
-                  Baptism Year (Newest)
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => { setSortBy('baptismYear'); setSortOrder('asc'); }}
-                  className={sortBy === 'baptismYear' && sortOrder === 'asc' ? 'bg-accent' : ''}
-                >
-                  Baptism Year (Oldest)
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Active Filters Summary */}
-          {(zoneFilter !== 'all' || statusFilter !== 'all' || genderFilter !== 'all' || ministryFilter !== 'all' || birthMonthFilter !== 'all' || dateOfBirthFilter !== 'all' || ageRangeFilter !== 'all') && (
-            <div className="flex items-center gap-2 ml-auto">
-              <span className="text-xs text-muted-foreground">Showing {filteredMembers.length} of {members.length}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSearchTerm('');
-                  setZoneFilter('all');
-                  setStatusFilter('all');
-                  setGenderFilter('all');
-                  setMinistryFilter('all');
-                  setBirthMonthFilter('all');
-                  setDateOfBirthFilter('all');
-                  setAgeRangeFilter('all');
-                }}
-                className="h-6 text-xs"
-              >
-                Clear
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Members List */}
-      <div className="space-y-4 stagger-children">
-        {members.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Users className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">No Members Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start building your church member database by adding your first member.
-                </p>
-                {canAddMembers && (
-                  <Button onClick={onAddMember}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add First Member
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredMembers.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No members found matching your search.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredMembers.map((member) => (
-            <Card key={member.id} className="shadow-sm transition-all">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center overflow-hidden">
-                        {member.photo ? (
-                          <img
-                            src={getCloudinaryUrl(member.photo, 'thumbnail') ?? ''}
-                            alt={`${member.firstName} ${member.lastName}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-sm font-medium text-primary">
-                            {member.firstName[0]}{member.lastName[0]}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-medium">
-                          {member.firstName} {member.otherNames} {member.lastName}
-                        </h3>
-                        <div className="flex gap-2 mt-1">
-                          <Badge variant="outline" className="text-xs">
-                            {member.zoneNumber} - Zone {member.zone}
-                          </Badge>
-                          <Badge
-                            variant={member.status === 'active' ? 'default' : 'secondary'}
-                            className={
-                              member.status === 'new' ? 'bg-cyan-100 text-cyan-800' :
-                              member.status === 'active' ? 'bg-success-soft text-success-text' :
-                              member.status === 'semi-active' ? 'bg-info-soft text-info-text' :
-                              member.status === 'sick' || member.status === 'traveled' || member.status === 'schooling' ? 'bg-purple-100 text-purple-800' :
-                              member.status === 'not baptised' ? 'bg-muted text-foreground' :
-                              member.status === 'blacklisted' ? 'bg-destructive/10 text-destructive' : ''
-                            }
-                          >
-                            {member.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="w-4 h-4" />
-                        {member.phone}
-                        {member.secondPhone && <span className="text-xs">• {member.secondPhone}</span>}
-                      </div>
-                      {member.email && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="w-4 h-4" />
-                          {member.email}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        {member.residenceLocation} ({ZONES[member.zone]})
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onViewMember(member)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    View
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
     </div>
+    </PullToRefresh>
   );
 }
