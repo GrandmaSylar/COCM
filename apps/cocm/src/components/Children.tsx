@@ -1,4 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
+import { IconTile, LargeTitle } from './ui/ios';
+import { SwipeRow } from './ui/ios-gestures';
+import { MoreHorizontal, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Badge } from './ui/badge';
@@ -249,80 +252,60 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Members</h2>
-          <p className="text-muted-foreground">Manage children's ministry members</p>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={onRefresh} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {filteredChildren.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[20px] font-semibold">Members</h2>
+        <div className="flex items-center gap-2">
           {canAddMembers && (
             <Button onClick={onAddChild}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Child
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Child</span>
+              <span className="sr-only sm:hidden">Add Child</span>
             </Button>
           )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="soft" size="icon" aria-label="More actions">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={onRefresh} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </DropdownMenuItem>
+              {filteredChildren.length > 0 && (
+                <>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <Download className="w-4 h-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <Download className="w-4 h-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <Download className="w-4 h-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/20 rounded-full">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Children</p>
-                <h3 className="text-2xl font-bold">{totalChildren}</h3>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-success/5 border-success/30">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-success/20 rounded-full">
-                <CheckCircle className="w-6 h-6 text-success-text" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Active</p>
-                <h3 className="text-2xl font-bold">{activeChildren}</h3>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-info/5 border-info/30">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-info/20 rounded-full">
-                <UserPlus className="w-6 h-6 text-info-text" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">New This Month</p>
-                <h3 className="text-2xl font-bold">{newThisMonth}</h3>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { icon: Users, tone: 'primary' as const, value: totalChildren, label: 'Total' },
+          { icon: CheckCircle, tone: 'success' as const, value: activeChildren, label: 'Active' },
+          { icon: UserPlus, tone: 'info' as const, value: newThisMonth, label: 'New This Month' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-3 sm:p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 text-2xl font-bold leading-none tracking-tight tabular-nums">{stat.value}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -371,41 +354,37 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-xl bg-card">
           {filteredChildren.map(child => (
-            <Card key={child.id} className="hover:bg-accent/5 transition-all">
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden shadow-inner">
-                    {child.photo && sanitizeUrl(child.photo) !== 'about:blank' ? (
-                      <img src={sanitizeUrl(getCloudinaryUrl(child.photo, 'thumbnail') ?? '')} alt={child.firstName} className="w-full h-full object-cover" />
-                    ) : (
-                      `${child.firstName[0]}${child.lastName[0]}`
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg">{child.firstName} {child.lastName}</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <span>{child.parents?.[0] ? `${child.parents[0].firstName} ${child.parents[0].lastName}`.trim() || 'No parent info' : 'No parent info'}</span>
-                      <span className="text-muted-foreground/30">•</span>
-                      <span className="capitalize">{child.gender}</span>
-                      <span className="text-muted-foreground/30">•</span>
-                      <span>{calculateAge(child.dateOfBirth)} yrs</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <Badge variant={child.status === 'active' ? 'default' : 'secondary'} className="ml-auto sm:ml-0">
-                    {child.status}
-                  </Badge>
-
-                  <Button variant="outline" size="sm" onClick={() => onViewChild(child)}>
-                    <Eye className="w-4 h-4 mr-2" />
-                    View
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <SwipeRow
+              key={child.id}
+              className="last:[&_button]:after:hidden"
+              actions={[{ label: 'View', icon: Eye, tone: 'info', onClick: () => onViewChild(child) }]}
+            >
+              <button
+                type="button"
+                onClick={() => onViewChild(child)}
+                className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent after:absolute after:bottom-0 after:left-[4.5rem] after:right-0 after:h-px after:bg-separator"
+              >
+                <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-medium text-primary-text">
+                  {child.photo && sanitizeUrl(child.photo) !== 'about:blank' ? (
+                    <img src={sanitizeUrl(getCloudinaryUrl(child.photo, 'thumbnail') ?? '')} alt={child.firstName} className="size-full object-cover" />
+                  ) : (
+                    `${child.firstName[0]}${child.lastName[0]}`
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{child.firstName} {child.lastName}</span>
+                  <span className="block truncate text-[13px] text-muted-foreground">
+                    {child.parents?.[0] ? `${child.parents[0].firstName} ${child.parents[0].lastName}`.trim() || 'No parent info' : 'No parent info'} · <span className="capitalize">{child.gender}</span> · {calculateAge(child.dateOfBirth)} yrs
+                  </span>
+                </span>
+                <Badge variant="secondary" className={`shrink-0 border-0 capitalize ${child.status === 'active' ? 'bg-success-soft text-success-text' : 'bg-fill text-muted-foreground'}`}>
+                  {child.status}
+                </Badge>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
+              </button>
+            </SwipeRow>
           ))}
         </div>
       )}
@@ -1044,43 +1023,33 @@ export function Children({
 
   return (
     <OfflineOverlay>
-    <div className="space-y-8 animate-fade-in max-w-[1200px] mx-auto">
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Children's Ministry</h1>
-        <p className="text-muted-foreground">
-          Manage children records, visitors, attendance, and giving.
-        </p>
-      </div>
+    <div className="space-y-4 animate-fade-in max-w-[1200px] mx-auto">
+      <LargeTitle title="Children's Ministry" subtitle="Children records, visitors, attendance and giving" />
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none]">
         {[
-          { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-info-soft text-info-text' },
-          { id: 'visitors', title: 'Visitors', label: 'New & visiting children', icon: UserPlus, color: 'bg-warning-soft text-warning-text' },
-          { id: 'attendance', title: 'Attendance', label: 'Service attendance records', icon: Calendar, color: 'bg-success-soft text-success-text' },
-          { id: 'giving', title: 'Giving', label: "Children's giving records", icon: Banknote, color: 'bg-success-soft text-success-text' },
-          { id: 'analytics', title: 'Analytics', label: "Children's insights", icon: BarChart3, color: 'bg-info-soft text-info-text' },
+          { id: 'members', title: 'Members', icon: Users },
+          { id: 'visitors', title: 'Visitors', icon: UserPlus },
+          { id: 'attendance', title: 'Attendance', icon: Calendar },
+          { id: 'giving', title: 'Giving', icon: Banknote },
+          { id: 'analytics', title: 'Analytics', icon: BarChart3 },
         ].map((tab) => (
           <button
             key={tab.id}
-            className={`rounded-xl p-3 flex items-center gap-3 w-full text-left transition-all ${
-              currentTab === tab.id
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'bg-card border hover:bg-accent/50'
+            type="button"
+            aria-pressed={currentTab === tab.id}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[15px] transition-colors active:opacity-70 ${
+              currentTab === tab.id ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'
             }`}
             onClick={() => handleTabChange(tab.id as 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics')}
           >
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${currentTab === tab.id ? 'bg-white/20' : tab.color}`}>
-              <tab.icon className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-semibold text-sm">{tab.title}</div>
-              <div className={`text-xs ${currentTab === tab.id ? 'opacity-75' : 'text-muted-foreground'}`}>{tab.label}</div>
-            </div>
+            <tab.icon className="size-4" />
+            {tab.title}
           </button>
         ))}
       </div>
 
-      <div className="mt-6 min-h-[400px]">
+      <div className="min-h-[400px]">
         {currentTab === 'members' && (
           <ChildMembersList 
             refreshKey={membersRefreshKey} 
