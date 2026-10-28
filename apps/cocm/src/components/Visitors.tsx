@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
+import { Skeleton } from './ui/skeleton';
+import { EmptyState, Group, IconTile, LargeTitle, SearchField } from './ui/ios';
+import { PullToRefresh, SwipeRow } from './ui/ios-gestures';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -10,7 +13,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import {
   Search, Plus, Phone, Mail, MapPin, Eye, Pencil, Users, UserPlus,
-  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw, ChevronDown, CheckCircle
+  ArrowLeft, Calendar, Clock, UserCheck, RefreshCw, ChevronDown, ChevronRight, CheckCircle
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Zone, ZONES } from './Members';
@@ -109,253 +112,157 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
   if (loading) {
     return (
       <OfflineOverlay>
-      <div className="space-y-6">
-        <div>
-          <h1>Visitors</h1>
-          <p className="text-muted-foreground">Loading visitors data...</p>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-40 rounded-xl" />
+            <Skeleton className="h-4 w-56 rounded-lg" />
+          </div>
+          <Skeleton className="h-9 w-full rounded-[10px]" />
+          <div className="overflow-hidden rounded-xl bg-card">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <Skeleton className="size-11 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-56 max-w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </div>
       </OfflineOverlay>
     );
   }
 
+  const interestChips: [string, string][] = [['all', 'All'], ['interested', 'Interested'], ['not-interested', 'Not interested']];
+
   return (
     <OfflineOverlay>
-    <div className="space-y-6 relative">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1>Visitors</h1>
-          <p className="text-muted-foreground">
-            Manage church visitors and potential members
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {canManageVisitors && (
-            <Button onClick={onAddVisitor}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Visitor
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title="Visitors"
+        subtitle="Church visitors and potential members"
+        actions={
+          <>
+            {canManageVisitors && (
+              <Button onClick={onAddVisitor}>
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Add Visitor</span>
+                <span className="sr-only sm:hidden">Add Visitor</span>
+              </Button>
+            )}
+            <Button variant="soft" size="icon" aria-label="Refresh" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
             </Button>
-          )}
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {/* Statistics - Collapsible */}
-      <Collapsible open={statsOpen} onOpenChange={setStatsOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="outline" className="w-full justify-between">
-            <span className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Visitor Statistics ({totalVisitors} Total)
-            </span>
-            <ChevronDown
-              className="h-4 w-4 transition-transform duration-300 ease-in-out"
-              style={{ transform: statsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
-            />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-16 h-16 text-info-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{totalVisitors}</div>
-                <div className="text-sm font-medium text-muted-foreground">Total Visitors</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-success-soft border border-success/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserPlus className="w-16 h-16 text-success-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-success/40 flex items-center justify-center mb-3 text-success-text transition-transform duration-300">
-                  <UserPlus className="w-5 h-5" />
-                </div>
-                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{interestedInMembership}</div>
-                <div className="text-sm font-medium text-muted-foreground">Interested in Membership</div>
-              </div>
-            </div>
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-warning-soft border border-warning/30 transition-all duration-300 ">
-              <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Calendar className="w-16 h-16 text-warning-text" />
-              </div>
-              <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-warning/40 flex items-center justify-center mb-3 text-warning-text transition-transform duration-300">
-                  <Calendar className="w-5 h-5" />
-                </div>
-                <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{thisMonthVisitors}</div>
-                <div className="text-sm font-medium text-muted-foreground">This Month</div>
-              </div>
-            </div>
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { icon: Users, tone: 'info' as const, value: totalVisitors, label: 'Visitors' },
+          { icon: UserPlus, tone: 'success' as const, value: interestedInMembership, label: 'Interested' },
+          { icon: Calendar, tone: 'warning' as const, value: thisMonthVisitors, label: 'This Month' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-3 sm:p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 text-2xl font-bold leading-none tracking-tight tabular-nums">{stat.value}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground">{stat.label}</div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      {/* Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search visitors by name, phone, email, or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={selectedMembershipInterest} onValueChange={setSelectedMembershipInterest}>
-          <SelectTrigger className="w-full lg:max-w-xs lg:flex-shrink-0">
-              <SelectValue placeholder="Membership interest" />
-            </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="interested">Interested</SelectItem>
-            <SelectItem value="not-interested">Not Interested</SelectItem>
-          </SelectContent>
-        </Select>
+        ))}
       </div>
 
-      {/* Visitors List */}
-      <div className="space-y-4">
-        {visitors.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Users className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">No Visitors Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start tracking church visitors and potential members.
-                </p>
-                {canManageVisitors && (
-                  <Button onClick={onAddVisitor}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add First Visitor
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredVisitors.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No visitors found matching your filters.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredVisitors.map((visitor) => (
-            <Card key={visitor.id} className={`shadow-sm transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 icon-bg-pink rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium">
-                          {visitor.firstName[0]}{visitor.lastName[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <h3 className="font-medium">
-                          {visitor.firstName} {visitor.otherNames} {visitor.lastName}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 mt-1">
+      <SearchField value={searchTerm} onChange={setSearchTerm} placeholder="Search name, phone, email or location" />
+
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [scrollbar-width:none]">
+        {interestChips.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={selectedMembershipInterest === value}
+            onClick={() => setSelectedMembershipInterest(value)}
+            className={`shrink-0 rounded-full px-3.5 py-1.5 text-[15px] transition-colors active:opacity-70 ${selectedMembershipInterest === value ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {visitors.length === 0 ? (
+        <Group>
+          <EmptyState
+            icon={Users}
+            title="No Visitors Yet"
+            description="Start tracking church visitors and potential members."
+            action={canManageVisitors ? <Button onClick={onAddVisitor}><Plus className="w-4 h-4 mr-2" />Add First Visitor</Button> : undefined}
+          />
+        </Group>
+      ) : filteredVisitors.length === 0 ? (
+        <Group>
+          <EmptyState icon={Search} title="No results" description="No visitors match your search or filter." />
+        </Group>
+      ) : (
+        <div className="overflow-hidden rounded-xl bg-card">
+          {filteredVisitors.map((visitor) => {
+            const canConvert = canManageVisitors && !visitor.convertedToMember;
+            return (
+              <SwipeRow
+                key={visitor.id}
+                className="last:[&_button]:after:hidden"
+                actions={[
+                  ...(canConvert ? [{ label: 'Convert', icon: UserPlus, tone: 'success' as const, onClick: () => onConvertToMember(visitor) }] : []),
+                  { label: 'View', icon: Eye, tone: 'info' as const, onClick: () => onViewVisitor(visitor) },
+                ]}
+              >
+                <div className={`flex items-stretch ${visitor.convertedToMember ? 'opacity-60' : ''}`}>
+                  <button
+                    type="button"
+                    onClick={() => onViewVisitor(visitor)}
+                    className="relative flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent after:absolute after:bottom-0 after:left-[4.5rem] after:right-0 after:h-px after:bg-separator"
+                  >
+                    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary-text">
+                      {visitor.firstName[0]}{visitor.lastName[0]}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[17px] leading-snug lg:text-[15px]">
+                        {visitor.firstName} {visitor.otherNames} {visitor.lastName}
+                      </span>
+                      <span className="block truncate text-[13px] text-muted-foreground">{visitor.phone} · {visitor.residenceLocation}</span>
+                      <span className="block truncate text-[13px] text-muted-foreground">
+                        Visited {formatDate(visitor.visitDate)} ({visitor.serviceType}){visitor.referredBy ? ` · Referred by ${visitor.referredBy}` : ''}
+                      </span>
+                      {(visitor.interestedInMembership && !visitor.convertedToMember) || visitor.convertedToMember || visitor.potentialZone ? (
+                        <span className="mt-1 flex flex-wrap gap-1.5">
                           {visitor.interestedInMembership && !visitor.convertedToMember && (
-                            <Badge variant="outline" className="badge-success">
-                              <UserPlus className="w-3 h-3 mr-1" />
-                              Interested in Membership
-                            </Badge>
+                            <Badge variant="secondary" className="border-0 bg-success-soft text-success-text">Interested</Badge>
                           )}
                           {visitor.convertedToMember && (
-                            <Badge variant="outline" className="bg-muted text-muted-foreground">
-                              <UserCheck className="w-3 h-3 mr-1" />
-                              Converted to Member
+                            <Badge variant="secondary" className="border-0 bg-fill text-muted-foreground">
+                              <UserCheck className="mr-1 size-3" />
+                              Member
                             </Badge>
                           )}
-                          {visitor.potentialZone && (
-                            <Badge variant="outline">
-                              Potential Zone {visitor.potentialZone}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1 mb-3">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Phone className="w-4 h-4" />
-                        {visitor.phone}
-                        {visitor.secondPhone && <span className="text-xs">• {visitor.secondPhone}</span>}
-                      </div>
-                      {visitor.email && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Mail className="w-4 h-4" />
-                          {visitor.email}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="w-4 h-4" />
-                        {visitor.residenceLocation}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        Visited on {formatDate(visitor.visitDate)} ({visitor.serviceType})
-                      </div>
-                      {visitor.referredBy && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <UserCheck className="w-4 h-4" />
-                          Referred by {visitor.referredBy}
-                        </div>
-                      )}
-                    </div>
-
-                    {visitor.notes && (
-                      <div className="text-sm text-muted-foreground box-muted p-2 rounded">
-                        <strong>Notes:</strong> {visitor.notes}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex flex-col gap-2 ml-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onViewVisitor(visitor)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      View
+                          {visitor.potentialZone && <Badge variant="secondary" className="border-0 bg-fill text-foreground">Zone {visitor.potentialZone}</Badge>}
+                        </span>
+                      ) : null}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
+                  </button>
+                  {canConvert && (
+                    <Button variant="soft" size="sm" className="mr-3 hidden self-center sm:inline-flex" onClick={() => onConvertToMember(visitor)}>
+                      <UserPlus className="mr-1.5 size-4" />
+                      Convert
                     </Button>
-                    {canManageVisitors && !visitor.convertedToMember && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => onConvertToMember(visitor)}
-                        className="bg-success hover:bg-success"
-                      >
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Convert
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
+              </SwipeRow>
+            );
+          })}
+        </div>
+      )}
     </div>
+    </PullToRefresh>
     </OfflineOverlay>
   );
 }
