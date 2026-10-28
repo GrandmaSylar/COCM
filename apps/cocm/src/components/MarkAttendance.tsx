@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -267,9 +268,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div>
             <h1 className="flex items-center gap-2">
               Mark Attendance

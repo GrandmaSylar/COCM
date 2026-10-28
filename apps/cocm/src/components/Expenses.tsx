@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { IconTile, LargeTitle } from './ui/ios';
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from './ui/button';
@@ -496,7 +497,7 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="w-4 h-4" /></Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Manage Payment Methods</h1>
           <p className="text-muted-foreground">Configure payment methods for requisitions</p>

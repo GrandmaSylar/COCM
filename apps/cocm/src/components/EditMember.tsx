@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -416,9 +417,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
+        <Button variant="soft" size="icon" onClick={onBack} aria-label="Back"><ChevronLeft className="size-5" /></Button>
         <div>
           <h1>Edit Member</h1>
           <p className="text-muted-foreground">

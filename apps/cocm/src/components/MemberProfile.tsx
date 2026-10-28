@@ -3,7 +3,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
-import { ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ArrowLeft, Edit, Trash2, Phone, Mail, MapPin, Calendar, User, FileText, Users, CreditCard, Church, CheckCircle, ExternalLink } from 'lucide-react';
 import { exportToPDF } from '../utils/export';
 import { Skeleton } from './ui/skeleton';
 import { Member, FamilyMember, ZONES, normaliseBaptismInfo } from './Members';
@@ -216,13 +216,13 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
   const normalisedBaptism = member.baptismInfo ? normaliseBaptismInfo(member.baptismInfo) : undefined;
 
   const statusColorMap: Record<string, string> = {
-    new: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
+    new: 'bg-primary/10 text-primary-text',
     active: 'bg-success-soft text-success-text ',
     'semi-active': 'bg-info-soft text-info-text ',
-    inactive: 'bg-muted text-foreground ',
-    sick: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-    traveled: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-    schooling: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
+    inactive: 'bg-warning-soft text-warning-text',
+    sick: 'bg-fill text-foreground',
+    traveled: 'bg-fill text-foreground',
+    schooling: 'bg-fill text-foreground',
     'not baptised': 'bg-muted text-foreground ',
     blacklisted: 'bg-destructive/10 text-destructive ',
   };
@@ -244,24 +244,21 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
 
   return (
     <div className="space-y-6">
-      {/* Hero Header */}
-      <Card className="overflow-hidden shadow-sm">
-        <div className="from-secondary/15 via-secondary/5 p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-white/50 dark:hover:bg-black/20">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground">Member Profile</span>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          <div className="w-32 h-32 md:w-40 md:h-40 bg-card dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-sm ring-4 ring-white/50 dark:ring-card/50 shrink-0">
+      {/* Profile header */}
+      <div className="space-y-4">
+        <button type="button" onClick={onBack} className="-ml-1 flex items-center gap-0.5 text-[17px] text-primary-text active:opacity-60">
+          <ChevronLeft className="size-6" />
+          Members
+        </button>
+        <div className="flex flex-col items-center gap-3 rounded-xl bg-card p-5 text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
+          <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 sm:size-32">
             {member.photo ? (
               <Dialog>
                 <DialogTrigger asChild>
-                   <img 
-                    src={getCloudinaryUrl(member.photo, 'avatar') ?? ''} 
-                    alt={`${member.firstName} ${member.lastName}`} 
-                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity" 
+                  <img
+                    src={getCloudinaryUrl(member.photo, 'avatar') ?? ''}
+                    alt={`${member.firstName} ${member.lastName}`}
+                    className="size-full cursor-pointer object-cover transition-opacity hover:opacity-90"
                   />
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
@@ -270,66 +267,66 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                     Full size profile picture of {member.firstName} {member.lastName}
                   </DialogDescription>
                   <div className="relative w-full h-full flex items-center justify-center">
-                    <img 
-                      src={getCloudinaryUrl(member.photo, 'original') ?? ''} 
-                      alt={`${member.firstName} ${member.lastName}`} 
-                      className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm" 
+                    <img
+                      src={getCloudinaryUrl(member.photo, 'original') ?? ''}
+                      alt={`${member.firstName} ${member.lastName}`}
+                      className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm"
                     />
                   </div>
                 </DialogContent>
               </Dialog>
             ) : (
-              <span className="text-5xl font-semibold text-primary">
+              <span className="text-4xl font-semibold text-primary-text">
                 {member.firstName[0]}{member.lastName[0]}
               </span>
             )}
           </div>
-            <div className="flex-1 text-center sm:text-left">
-              <h1 className="text-2xl font-bold">{member.firstName} {member.otherNames && `${member.otherNames} `}{member.lastName}</h1>
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                <Badge className={statusColorMap[member.status] || ''}>
-                  {member.status}
-                </Badge>
-                <span className="text-sm text-muted-foreground">Zone {member.zone}</span>
-                <span className="text-sm text-muted-foreground">&middot;</span>
-                <span className="text-sm text-muted-foreground capitalize">{member.gender}</span>
-                <span className="text-sm text-muted-foreground">&middot;</span>
-                <span className="text-sm text-muted-foreground">{calculateAge(member.dateOfBirth)} yrs</span>
-              </div>
-              <div className="flex gap-2 mt-3 justify-center sm:justify-start">
-                {canEdit && (
-                  <Button size="sm" onClick={() => onEdit(member)}>
-                    <Edit className="w-3.5 h-3.5 mr-1.5" />
-                    Edit
-                  </Button>
-                )}
-                {isDev && (
-                  <Button size="sm" variant="outline" onClick={() => exportToPDF([{ ...member, age: calculateAge(member.dateOfBirth) }], `member-${member.id}`, `${member.firstName} ${member.lastName} — Profile`, memberPdfColumns)}>
-                    <FileText className="w-3.5 h-3.5 mr-1.5" />
-                    Export PDF
-                  </Button>
-                )}
-                {canDelete && onDelete && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={!isOnline}
-                    title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
-                    onClick={() => {
-                      if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
-                        onDelete(member);
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                    Delete
-                  </Button>
-                )}
-              </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[24px] font-bold leading-tight">{member.firstName} {member.otherNames && `${member.otherNames} `}{member.lastName}</h1>
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:justify-start">
+              <Badge className={`border-0 ${statusColorMap[member.status] || ''}`}>{member.status}</Badge>
+              <span className="text-[15px] text-muted-foreground">
+                Zone {member.zone} · <span className="capitalize">{member.gender}</span> · {calculateAge(member.dateOfBirth)} yrs
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+              {canEdit && (
+                <Button onClick={() => onEdit(member)}>
+                  <Edit className="w-4 h-4 mr-1.5" />
+                  Edit
+                </Button>
+              )}
+              <Button variant="soft" asChild>
+                <a href={`tel:${member.phone}`}>
+                  <Phone className="w-4 h-4 mr-1.5" />
+                  Call
+                </a>
+              </Button>
+              {isDev && (
+                <Button variant="soft" onClick={() => exportToPDF([{ ...member, age: calculateAge(member.dateOfBirth) }], `member-${member.id}`, `${member.firstName} ${member.lastName} — Profile`, memberPdfColumns)}>
+                  <FileText className="w-4 h-4 mr-1.5" />
+                  Export PDF
+                </Button>
+              )}
+              {canDelete && onDelete && (
+                <Button
+                  variant="dangerSoft"
+                  disabled={!isOnline}
+                  title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to delete ${member.firstName} ${member.lastName}? This action cannot be undone.`)) {
+                      onDelete(member);
+                    }
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1.5" />
+                  Delete
+                </Button>
+              )}
             </div>
           </div>
         </div>
-      </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         {/* Member Information */}
