@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { api } from '../services/api';
 import { supabase } from '@cms/shared';
+import { ensureContrast, readableOn } from '@cms/shared/design';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -171,6 +172,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (customColors) {
         // Main colors
         root.style.setProperty('--primary', customColors.primary);
+        // Text on the primary color, the focus ring and the sidebar highlight follow it.
+        const onPrimary = readableOn(customColors.primary);
+        root.style.setProperty('--primary-foreground', onPrimary);
+        root.style.setProperty('--ring', customColors.primary);
+        root.style.setProperty('--sidebar-primary', customColors.primary);
+        root.style.setProperty('--sidebar-primary-foreground', onPrimary);
+        root.style.setProperty('--sidebar-ring', customColors.primary);
+        // As text on a card the primary colour may need to be darker (light mode) or lighter (dark mode).
+        const card = getComputedStyle(root).getPropertyValue('--card').trim();
+        root.style.setProperty('--primary-text', card ? ensureContrast(customColors.primary, card) : customColors.primary);
         root.style.setProperty('--secondary', customColors.secondary);
         root.style.setProperty('--accent', customColors.accent);
 
@@ -209,7 +220,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           '--success', '--warning', '--error', '--info',
           '--muted-custom', '--border-custom',
           '--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5',
-          '--primary-hsl', '--secondary-hsl', '--primary-gradient-end'
+          '--primary-hsl', '--secondary-hsl', '--primary-gradient-end',
+          '--primary-foreground', '--primary-text', '--ring', '--sidebar-primary', '--sidebar-primary-foreground', '--sidebar-ring'
         ];
         props.forEach(prop => root.style.removeProperty(prop));
       }
@@ -235,7 +247,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Keep the browser and installed-app title bar in step with the header colour (--card).
   useEffect(() => {
-    const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || (isDark ? '#1a1d27' : '#ffffff');
+    const card = getComputedStyle(document.documentElement).getPropertyValue('--card').trim() || (isDark ? '#171a21' : '#ffffff');
     document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.remove());
     const meta = document.createElement('meta');
     meta.name = 'theme-color';

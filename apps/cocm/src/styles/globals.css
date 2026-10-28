@@ -7,7 +7,7 @@
     --radius: 1rem;
 
     /* Light mode — defaults use hex so ThemeContext hex overrides work cleanly */
-    --background: #f8f9fc;
+    --background: #f5f6f8;
     --foreground: #111827;
 
     --card: #ffffff;
@@ -18,75 +18,99 @@
 
     --primary: #dc2626;
     --primary-foreground: #ffffff;
+    /* The primary colour as text on a card; a saved theme may need a more legible version. */
+    --primary-text: var(--primary);
 
-    --secondary: #f3f4f6;
-    --secondary-foreground: #374151;
+    --secondary: #eef0f3;
+    --secondary-foreground: #111827;
 
-    --muted: #f3f4f6;
-    --muted-foreground: #6b7280;
+    --muted: #eef0f3;
+    --muted-foreground: #5b6473;
 
-    --accent: #f3f4f6;
-    --accent-foreground: #374151;
+    --accent: #eef0f3;
+    --accent-foreground: #111827;
 
     --destructive: #dc2626;
     --destructive-foreground: #ffffff;
 
-    --border: #e5e7eb;
-    --input: #e5e7eb;
+    --border: #e3e6eb;
+    --input: #cdd2da;
     --ring: #dc2626;
 
     /* Sidebar */
-    --sidebar: #f8f9fc;
+    --sidebar: #f5f6f8;
     --sidebar-foreground: #374151;
     --sidebar-primary: #dc2626;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #fef2f2;
     --sidebar-accent-foreground: #374151;
-    --sidebar-border: #e5e7eb;
+    --sidebar-border: #e3e6eb;
     --sidebar-ring: #dc2626;
-    --primary-gradient-end: #f87171;
+    --primary-gradient-end: #b91c1c;
+  
+
+    /* Status colors (the theme editor overrides --success, --warning and --info).
+       -soft is a tinted background, -text is legible on it. */
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --info: #0ea5e9;
+    --success-soft: color-mix(in srgb, var(--success) 14%, var(--card));
+    --warning-soft: color-mix(in srgb, var(--warning) 16%, var(--card));
+    --info-soft: color-mix(in srgb, var(--info) 14%, var(--card));
+    --success-text: color-mix(in srgb, var(--success) 58%, #000000);
+    --warning-text: color-mix(in srgb, var(--warning) 58%, #000000);
+    --info-text: color-mix(in srgb, var(--info) 58%, #000000);
   }
+
 
   .dark {
     /* Dark mode */
-    --background: #0f1117;
-    --foreground: #f9fafb;
+    --background: #0f1115;
+    --foreground: #f2f4f7;
 
-    --card: #1a1d27;
-    --card-foreground: #f9fafb;
+    --card: #171a21;
+    --card-foreground: #f2f4f7;
 
-    --popover: #1a1d27;
-    --popover-foreground: #f9fafb;
+    --popover: #171a21;
+    --popover-foreground: #f2f4f7;
 
     --primary: #f87171;
-    --primary-foreground: #1a1d27;
+    --primary-foreground: #171a21;
 
-    --secondary: #1f2335;
-    --secondary-foreground: #f9fafb;
+    --secondary: #1f232c;
+    --secondary-foreground: #f2f4f7;
 
-    --muted: #1f2335;
-    --muted-foreground: #9ca3af;
+    --muted: #1f232c;
+    --muted-foreground: #a3acba;
 
-    --accent: #1f2335;
-    --accent-foreground: #f9fafb;
+    --accent: #1f232c;
+    --accent-foreground: #f2f4f7;
 
     --destructive: #ef4444;
-    --destructive-foreground: #ffffff;
+    --destructive-foreground: #171a21;
 
-    --border: #2a2d3e;
-    --input: #2a2d3e;
+    --border: #272c36;
+    --input: #363c48;
     --ring: #f87171;
 
     /* Sidebar */
-    --sidebar: #0f1117;
-    --sidebar-foreground: #9ca3af;
+    --sidebar: #0f1115;
+    --sidebar-foreground: #a3acba;
     --sidebar-primary: #f87171;
-    --sidebar-primary-foreground: #f9fafb;
-    --sidebar-accent: #1f2335;
-    --sidebar-accent-foreground: #f9fafb;
-    --sidebar-border: #2a2d3e;
+    --sidebar-primary-foreground: #171a21;
+    --sidebar-accent: #1f232c;
+    --sidebar-accent-foreground: #f2f4f7;
+    --sidebar-border: #272c36;
     --sidebar-ring: #f87171;
     --primary-gradient-end: #fca5a5;
+  
+
+    --success-soft: color-mix(in srgb, var(--success) 20%, var(--card));
+    --warning-soft: color-mix(in srgb, var(--warning) 20%, var(--card));
+    --info-soft: color-mix(in srgb, var(--info) 20%, var(--card));
+    --success-text: color-mix(in srgb, var(--success) 70%, #ffffff);
+    --warning-text: color-mix(in srgb, var(--warning) 70%, #ffffff);
+    --info-text: color-mix(in srgb, var(--info) 70%, #ffffff);
   }
 }
 
@@ -125,17 +149,31 @@
       font-size: 16px !important;
     }
   }
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
   h1 {
-    @apply text-2xl font-bold leading-tight lg:text-3xl;
+    @apply font-heading text-2xl font-bold leading-tight tracking-tight lg:text-3xl;
+    text-wrap: balance;
   }
   h2 {
-    @apply text-xl font-bold leading-snug;
+    @apply font-heading text-xl font-bold leading-snug tracking-tight;
+    text-wrap: balance;
   }
   h3 {
-    @apply text-lg font-semibold leading-snug lg:text-xl;
+    @apply font-heading text-lg font-semibold leading-snug tracking-tight lg:text-xl;
+    text-wrap: balance;
   }
   p {
     @apply text-base leading-relaxed;
+    text-wrap: pretty;
+  }
+  /* Figures line up in columns. */
+  td, th {
+    font-variant-numeric: tabular-nums;
   }
 }
 
