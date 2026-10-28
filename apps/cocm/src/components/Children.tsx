@@ -478,35 +478,43 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh, onConvertVisit
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Visitors</h2>
-          <p className="text-muted-foreground">Manage children's ministry visitors</p>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={onRefresh} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {filteredVisitors.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[20px] font-semibold">Visitors</h2>
+        <div className="flex items-center gap-2">
           <Button onClick={onAddVisitor}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Visitor
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Visitor</span>
+            <span className="sr-only sm:hidden">Add Visitor</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="soft" size="icon" aria-label="More actions">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={onRefresh} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </DropdownMenuItem>
+              {filteredVisitors.length > 0 && (
+                <>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <Download className="w-4 h-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <Download className="w-4 h-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <Download className="w-4 h-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -536,52 +544,34 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh, onConvertVisit
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-xl bg-card">
           {filteredVisitors.map(visitor => (
-            <Card key={visitor.id} className={`hover:bg-accent/5 transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center font-bold text-secondary-foreground shrink-0 shadow-inner">
-                    {visitor.firstName[0]}{visitor.lastName[0]}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg">{visitor.firstName} {visitor.lastName}</h4>
-                    <div className="flex flex-wrap gap-2 mt-1 mb-2">
-                      {visitor.convertedToMember && (
-                        <Badge variant="outline" className="bg-muted text-muted-foreground">
-                          <CheckCircle className="w-3 h-3 mr-1" />
-                          Converted to Member
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(visitor.visitDate).toLocaleDateString()}</span>
-                      <span className="text-muted-foreground/30">•</span>
-                      <span className="capitalize">{visitor.gender ?? '—'}</span>
-                      <span className="text-muted-foreground/30">•</span>
-                      <span>{visitor.dateOfBirth ? calculateAge(visitor.dateOfBirth) + ' yrs' : '—'}</span>
-                      <span className="text-muted-foreground/30">•</span>
-                      <span className="truncate max-w-[200px]" title={visitor.guardians?.map(g => g.fullName).join(', ')}>
-                        Guardians: {visitor.guardians?.map(g => g.fullName).join(', ') || '—'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                  {!visitor.convertedToMember && onConvertVisitor && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => onConvertVisitor(visitor)}
-                      className="bg-success hover:bg-success"
-                    >
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Convert
-                    </Button>
+            <div key={visitor.id} className={`flex items-center ${visitor.convertedToMember ? 'opacity-60' : ''}`}>
+              <div className="relative flex w-full items-center gap-3 px-4 py-3 text-left after:absolute after:bottom-0 after:left-[4.5rem] after:right-0 after:h-px after:bg-separator flex-1 min-w-0">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary-text">
+                  {visitor.firstName[0]}{visitor.lastName[0]}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{visitor.firstName} {visitor.lastName}</span>
+                  <span className="block truncate text-[13px] text-muted-foreground">
+                    {new Date(visitor.visitDate).toLocaleDateString()} · <span className="capitalize">{visitor.gender ?? '—'}</span> · {visitor.dateOfBirth ? calculateAge(visitor.dateOfBirth) + ' yrs' : '—'}
+                  </span>
+                  <span className="block truncate text-[13px] text-muted-foreground">Guardians: {visitor.guardians?.map(g => g.fullName).join(', ') || '—'}</span>
+                  {visitor.convertedToMember && (
+                    <Badge variant="secondary" className="mt-1 border-0 bg-fill text-muted-foreground">
+                      <CheckCircle className="mr-1 size-3" />
+                      Member
+                    </Badge>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </span>
+              </div>
+              {!visitor.convertedToMember && onConvertVisitor && (
+                <Button variant="soft" size="sm" className="mr-3 shrink-0" onClick={() => onConvertVisitor(visitor)}>
+                  <UserPlus className="mr-1.5 size-4" />
+                  Convert
+                </Button>
+              )}
+            </div>
           ))}
         </div>
       )}
@@ -639,35 +629,43 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance, onRefresh }: { r
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Attendance</h2>
-          <p className="text-muted-foreground">View children's attendance records</p>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={onRefresh} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {records && records.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[20px] font-semibold">Attendance</h2>
+        <div className="flex items-center gap-2">
           <Button onClick={onMarkAttendance}>
-            <Calendar className="w-4 h-4 mr-2" />
-            Mark Attendance
+            <Calendar className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Mark Attendance</span>
+            <span className="sr-only sm:hidden">Mark Attendance</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="soft" size="icon" aria-label="More actions">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={onRefresh} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </DropdownMenuItem>
+              {records && records.length > 0 && (
+                <>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <Download className="w-4 h-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <Download className="w-4 h-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <Download className="w-4 h-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -685,30 +683,19 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance, onRefresh }: { r
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-xl bg-card">
           {records.map(record => (
-            <Card key={record.id} className="hover:bg-accent/5 transition-all">
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg">{new Date(record.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{record.serviceType}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6 w-full sm:w-auto">
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">Present</p>
-                    <p className="text-lg font-bold text-success-text">{record.totalCount}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <div key={record.id} className="relative flex w-full items-center gap-3 px-4 py-3 text-left after:absolute after:bottom-0 after:left-[3.25rem] after:right-0 after:h-px after:bg-separator">
+              <IconTile icon={Calendar} tone="primary" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{new Date(record.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                <span className="block truncate text-[13px] text-muted-foreground">{record.serviceType}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block text-xl font-bold leading-none tabular-nums">{record.totalCount}</span>
+                <span className="text-[11px] text-muted-foreground">present</span>
+              </span>
+            </div>
           ))}
         </div>
       )}
@@ -839,35 +826,43 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">Giving</h2>
-          <p className="text-muted-foreground">View children's giving records</p>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={onRefresh} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          {records && records.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>Export as CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>Export as PDF</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>Export as Excel</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-[20px] font-semibold">Giving</h2>
+        <div className="flex items-center gap-2">
           <Button onClick={openCreateDialog}>
-            <Banknote className="w-4 h-4 mr-2" />
-            Record Giving
+            <Banknote className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Record Giving</span>
+            <span className="sr-only sm:hidden">Record Giving</span>
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="soft" size="icon" aria-label="More actions">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={onRefresh} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </DropdownMenuItem>
+              {records && records.length > 0 && (
+                <>
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <Download className="w-4 h-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <Download className="w-4 h-4" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportXLSX}>
+                    <Download className="w-4 h-4" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -885,35 +880,26 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="overflow-hidden rounded-xl bg-card">
           {records.map(record => (
-            <Card key={record.id} className="hover:bg-accent/5 transition-all">
-              <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center text-success-text shrink-0">
-                    <Banknote className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-lg">{new Date(record.serviceDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{record.serviceType}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">Total Amount</p>
-                    <p className="text-xl font-bold text-success-text">GH₵ {record.totalAmount.toFixed(2)}</p>
-                  </div>
-                  {canEdit && (
-                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(record)}>
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            <div key={record.id} className="flex items-center">
+              <div className="relative flex w-full items-center gap-3 px-4 py-3 text-left after:absolute after:bottom-0 after:left-[3.25rem] after:right-0 after:h-px after:bg-separator flex-1 min-w-0">
+                <IconTile icon={Banknote} tone="success" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{new Date(record.serviceDate).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span className="block truncate text-[13px] text-muted-foreground">{record.serviceType}</span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block text-lg font-bold leading-none tabular-nums">GH₵ {record.totalAmount.toFixed(2)}</span>
+                  <span className="text-[11px] text-muted-foreground">Total</span>
+                </span>
+              </div>
+              {canEdit && (
+                <Button variant="ghost" size="icon" className="mr-1 shrink-0" aria-label="Edit record" onClick={() => openEditDialog(record)}>
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           ))}
         </div>
       )}
