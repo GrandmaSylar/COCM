@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { EmptyState } from './EmptyState';
-import { Users, Calendar, Banknote, Plus, TrendingUp, UserPlus, ChevronRight, RefreshCw, LayoutDashboard } from 'lucide-react';
+import { EmptyState, Group, GroupRow, IconTile, LargeTitle } from './ui/ios';
+import { PullToRefresh } from './ui/ios-gestures';
+import { Users, Calendar, Banknote, TrendingUp, ChevronRight, RefreshCw, LayoutDashboard, Lock } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis } from './ui/utils';
 import { useState, useEffect } from 'react';
@@ -178,255 +178,146 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
   // Loading skeleton
   if (loading) {
     return (
-      <div className="space-y-8 animate-fade-in">
-        {/* Welcome Header Skeleton */}
-        <div className="flex justify-between items-end">
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-64 rounded-xl" />
-            <Skeleton className="h-4 w-96 rounded-lg" />
-          </div>
-          <Skeleton className="h-10 w-28 rounded-lg" />
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-64 rounded-xl" />
+          <Skeleton className="h-4 w-72 max-w-full rounded-lg" />
         </div>
-
-        {/* Summary Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {[...Array(3)].map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-2xl" />
+            <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
-
-        {/* Quick Actions Skeleton */}
-        <div className="space-y-4">
-          <Skeleton className="h-7 w-40 rounded-lg" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-24 rounded-xl" />
-            ))}
-          </div>
-        </div>
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }
 
+  const statTiles = [
+    {
+      id: 'widget_total_members',
+      tab: 'members',
+      icon: Users,
+      tone: 'info' as const,
+      label: 'Total Members',
+      value: String(stats.totalMembers),
+      extra: stats.newMembersThisMonth > 0 ? `+${stats.newMembersThisMonth} this month` : null,
+    },
+    {
+      id: 'widget_attendance_week',
+      tab: 'attendance',
+      icon: Calendar,
+      tone: 'warning' as const,
+      label: 'Attendance This Week',
+      value: String(stats.attendanceThisWeek),
+      extra: null,
+    },
+    {
+      id: 'widget_giving_month',
+      tab: 'giving',
+      icon: Banknote,
+      tone: 'success' as const,
+      label: 'Giving This Month',
+      value: formatGhanaCedis(stats.givingThisMonth),
+      extra: null,
+    },
+  ].filter((tile) => isWidgetVisible(tile.id));
+
   return (
-    <div className="space-y-8 pb-10">
-      {/* Welcome Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 animate-fade-in">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
-            {timeOfDay}, <span className="text-gradient">{user?.name}</span>
-          </h1>
-          <p className="text-muted-foreground mt-1 text-base lg:text-lg leading-relaxed">
-            Here's an overview of your church's activity today.
-          </p>
-        </div>
-        <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh} 
-            disabled={refreshing}
-            className="hidden sm:flex hover:bg-primary/5 hover:text-primary transition-colors border-primary/20"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh Data
-        </Button>
-      </div>
-
-      {/* Summary Cards */}
-      <div id="dashboard-stats" className="grid grid-cols-1 md:grid-cols-3 gap-6 stagger-children">
-        {/* Members Card */}
-        {isWidgetVisible('widget_total_members') && (
-          hasTabAccess('members') ? (
-            <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 cursor-pointer transition-all duration-300 ">
-                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Users className="w-24 h-24 text-info-text" />
-                </div>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-info/20 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-                        <Users className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                        {stats.totalMembers}
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Total Members</div>
-                    {stats.newMembersThisMonth > 0 && (
-                      <div className="mt-3 inline-flex items-center text-xs font-semibold text-success-text bg-success/10 px-2 py-1 rounded-full border border-success/30">
-                        <TrendingUp className="w-3 h-3 mr-1" />
-                        +{stats.newMembersThisMonth} this month
-                      </div>
-                    )}
-                </div>
-            </div>
-          ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300">
-                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Users className="w-24 h-24 text-info-text" />
-                </div>
-                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
-                    🔒 Restricted
-                </span>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-info/20 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-                        <Users className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
-                        —
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Total Members</div>
-                </div>
-            </div>
-          )
-        )}
-
-        {/* Attendance Card */}
-        {isWidgetVisible('widget_attendance_week') && (
-          hasTabAccess('attendance') ? (
-            <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 cursor-pointer transition-all duration-300 ">
-                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Calendar className="w-24 h-24 text-warning-text" />
-                </div>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-warning/20 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
-                        <Calendar className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                        {stats.attendanceThisWeek}
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
-                </div>
-            </div>
-          ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 transition-all duration-300">
-                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Calendar className="w-24 h-24 text-warning-text" />
-                </div>
-                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
-                    🔒 Restricted
-                </span>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-warning/20 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
-                        <Calendar className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
-                        —
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Attendance This Week</div>
-                </div>
-            </div>
-          )
-        )}
-
-        {/* Giving Card */}
-        {isWidgetVisible('widget_giving_month') && (
-          hasTabAccess('giving') ? (
-            <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 cursor-pointer transition-all duration-300 ">
-                <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Banknote className="w-24 h-24 text-success-text" />
-                </div>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
-                        <Banknote className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
-                        {formatGhanaCedis(stats.givingThisMonth)}
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
-                </div>
-            </div>
-          ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300">
-                <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Banknote className="w-24 h-24 text-success-text" />
-                </div>
-                <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
-                    🔒 Restricted
-                </span>
-                <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
-                        <Banknote className="w-6 h-6" />
-                    </div>
-                    <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
-                        —
-                    </div>
-                    <div className="text-sm font-medium text-muted-foreground">Giving This Month</div>
-                </div>
-            </div>
-          )
-        )}
-      </div>
-
-      {/* Quick Actions */}
-      {isWidgetVisible('widget_quick_actions') && (
-      <div id="dashboard-quick-actions" className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-        <h2 className="text-xl font-bold mb-5 flex items-center text-foreground/90">
-            Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 stagger-children">
-          {filteredQuickActions.map((action) => {
-            const Icon = action.icon;
-            return (
-              <button
-                key={action.id}
-                onClick={() => onQuickAction(action.id)}
-                className="group flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:bg-accent/50 hover:border-primary/20 transition-all duration-300 text-left relative overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform duration-300 z-10 shadow-sm">
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0 z-10">
-                  <div className="font-semibold text-base text-foreground group-hover:text-primary transition-colors">{action.label}</div>
-                  <div className="text-sm leading-snug text-muted-foreground mt-1 truncate group-hover:text-muted-foreground/80">
-                    {action.description}
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-muted-foreground/50 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 z-10" />
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      )}
-
-      {/* Empty state for custom role users with no widgets configured */}
-      {isCustomRoleUser && visibleWidgets!.size === 0 && (
-        <EmptyState
-          title="No dashboard widgets configured"
-          description="No dashboard widgets are configured for your role."
-          icon={LayoutDashboard}
-          className="border border-border/50 rounded-2xl bg-card/50 backdrop-blur-sm py-8"
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="space-y-6 pb-6">
+        <LargeTitle
+          title={
+            <>
+              {timeOfDay}, <span className="text-primary-text">{user?.name}</span>
+            </>
+          }
+          subtitle="Here's an overview of your church's activity today."
+          actions={
+            <Button variant="soft" size="sm" onClick={handleRefresh} disabled={refreshing} className="hidden sm:inline-flex">
+              <RefreshCw className={`mr-2 size-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          }
         />
-      )}
 
-      {/* Recent Activity */}
-      <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <h2 className="text-xl font-bold mb-5 text-foreground/90">Recent Activity</h2>
-          {recentActivity.length > 0 ? (
-            <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden shadow-sm">
-              {recentActivity.map((activity, index) => (
-                <div
-                  key={activity.id}
-                  className={`p-5 flex items-start gap-4 hover:bg-accent/30 transition-colors ${
-                    index !== recentActivity.length - 1 ? 'border-b border-border/50' : ''
-                  }`}
-                >
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full mt-2 flex-shrink-0 shadow-sm" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>
+        {statTiles.length > 0 && (
+          <div id="dashboard-stats" className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {statTiles.map((tile) => {
+              const allowed = hasTabAccess(tile.tab);
+              const body = (
+                <>
+                  <div className="flex items-start justify-between">
+                    <IconTile icon={tile.icon} tone={tile.tone} />
+                    {allowed ? (
+                      <ChevronRight className="size-4 text-muted-foreground/60" />
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Lock className="size-3" />
+                        Restricted
+                      </span>
+                    )}
                   </div>
+                  <div className="mt-3 text-[32px] font-bold leading-none tracking-tight tabular-nums">{allowed ? tile.value : '—'}</div>
+                  <div className="mt-1 text-[15px] text-muted-foreground">{tile.label}</div>
+                  {allowed && tile.extra ? (
+                    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-text">
+                      <TrendingUp className="size-3" />
+                      {tile.extra}
+                    </div>
+                  ) : null}
+                </>
+              );
+              return allowed ? (
+                <button
+                  key={tile.id}
+                  type="button"
+                  onClick={() => onNavigate(tile.tab)}
+                  className="rounded-xl bg-card p-4 text-left transition-colors active:bg-accent"
+                >
+                  {body}
+                </button>
+              ) : (
+                <div key={tile.id} className="rounded-xl bg-card p-4">
+                  {body}
                 </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isWidgetVisible('widget_quick_actions') && filteredQuickActions.length > 0 && (
+          <div id="dashboard-quick-actions">
+            <Group title="Quick Actions">
+              {filteredQuickActions.map((action) => (
+                <GroupRow
+                  key={action.id}
+                  icon={action.icon}
+                  iconTone="primary"
+                  title={action.label}
+                  subtitle={action.description}
+                  onClick={() => onQuickAction(action.id)}
+                />
               ))}
-            </div>
+            </Group>
+          </div>
+        )}
+
+        {/* Empty state for custom role users with no widgets configured */}
+        {isCustomRoleUser && visibleWidgets!.size === 0 && (
+          <Group>
+            <EmptyState icon={LayoutDashboard} title="No dashboard widgets configured" description="No dashboard widgets are configured for your role." />
+          </Group>
+        )}
+
+        <Group title="Recent Activity">
+          {recentActivity.length > 0 ? (
+            recentActivity.map((activity) => <GroupRow key={activity.id} title={activity.message} subtitle={activity.time} className="[&_span:first-child]:whitespace-normal" />)
           ) : (
-            <EmptyState 
-                title="No recent activity" 
-                description="Recent actions performed by you or your team will appear here." 
-                icon={TrendingUp}
-                className="border border-border/50 rounded-2xl bg-card/50 backdrop-blur-sm py-8"
-            />
+            <EmptyState icon={TrendingUp} title="No recent activity" description="Recent actions performed by you or your team will appear here." className="py-8" />
           )}
+        </Group>
       </div>
-    </div>
+    </PullToRefresh>
   );
 }
