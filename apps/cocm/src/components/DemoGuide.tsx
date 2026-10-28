@@ -85,7 +85,7 @@ export function DemoGuide() {
   const roleInfo = [
     {
       role: 'Developer',
-      color: 'bg-purple-100 text-purple-800',
+      color: 'bg-primary/10 text-primary-text',
       icon: Shield,
       description: 'Supreme access - Role management & theme customization',
       permissions: ['All Permissions', 'Create Custom Roles', 'Assign Roles', 'Customize Theme Colors']

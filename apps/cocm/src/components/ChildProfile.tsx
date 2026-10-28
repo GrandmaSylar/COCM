@@ -97,7 +97,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
 
   const serviceTypeColors: Record<string, string> = {
     sunday_morning: 'bg-info-soft text-info-text',
-    sunday_evening: 'bg-purple-100 text-purple-800',
+    sunday_evening: 'bg-primary/10 text-primary-text',
     midweek: 'bg-success-soft text-success-text',
     special: 'bg-warning-soft text-warning-text',
     other: 'bg-muted text-foreground'

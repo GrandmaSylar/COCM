@@ -259,7 +259,7 @@ export function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, 
                   onClick={() => toggleWidget(widget.id)}
                   className={`px-3 py-1.5 rounded-full border text-xs transition-colors ${
                     selectedWidgets.includes(widget.id) 
-                      ? 'bg-purple-100 border-purple-200 text-purple-800 dark:bg-purple-900/40 dark:border-purple-800 dark:text-purple-300' 
+                      ? 'bg-primary/10 border-primary/30 text-primary-text ' 
                       : 'bg-transparent border-border text-muted-foreground hover:bg-muted'
                   }`}
                 >

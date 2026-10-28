@@ -18,7 +18,7 @@ export function SystemRoleCard({ role, label, permissions, users, isExpanded, on
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-3">
             <Badge className={(roleColors as any)[role]}>{label}</Badge>
-            {isDevRole && <span className="text-sm text-purple-600 dark:text-purple-400">Supreme Access</span>}
+            {isDevRole && <span className="text-sm text-primary-text">Supreme Access</span>}
           </div>
           <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80" onClick={onToggleExpand}>
             <Users className="w-3 h-3 mr-1" />
@@ -51,7 +51,7 @@ export function SystemRoleCard({ role, label, permissions, users, isExpanded, on
                 <span className={`text-xs truncate ${hasPermission ? 'text-success-text' : 'text-muted-foreground'}`}>
                   {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </span>
-                {isDevRole && <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />}
+                {isDevRole && <Crown className="w-3 h-3 text-primary-text ml-auto flex-shrink-0" />}
               </div>
             );
           })}

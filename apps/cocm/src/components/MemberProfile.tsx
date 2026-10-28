@@ -544,10 +544,10 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                             onClick={() => isFamilyMemberClickable(parent) && handleFamilyMemberClick(parent)}
                           >
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                              parent.relationship === 'father' ? 'bg-info-soft' : 'bg-pink-100 dark:bg-pink-900'
+                              parent.relationship === 'father' ? 'bg-info-soft' : 'bg-primary/10'
                             } ${parent.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                               <span className={`text-lg font-medium ${
-                                parent.relationship === 'father' ? 'text-info-text' : 'text-pink-600 dark:text-pink-400'
+                                parent.relationship === 'father' ? 'text-info-text' : 'text-primary-text'
                               }`}>
                                 {parent.firstName[0]}{parent.lastName[0]}
                               </span>
@@ -635,10 +635,10 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                           onClick={() => isFamilyMemberClickable(spouse) && handleFamilyMemberClick(spouse)}
                         >
                           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                            member.gender === 'male' ? 'bg-pink-100 dark:bg-pink-900' : 'bg-info-soft'
+                            member.gender === 'male' ? 'bg-primary/10' : 'bg-info-soft'
                           } ${spouse.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                             <span className={`text-lg font-medium ${
-                              member.gender === 'male' ? 'text-pink-600 dark:text-pink-400' : 'text-info-text'
+                              member.gender === 'male' ? 'text-primary-text' : 'text-info-text'
                             }`}>
                               {spouse.firstName[0]}{spouse.lastName[0]}
                             </span>

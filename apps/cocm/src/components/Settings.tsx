@@ -863,8 +863,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center gap-2">
-                      <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                        <Crown className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <Crown className="w-5 h-5 text-primary-text" />
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'dev').length}</p>

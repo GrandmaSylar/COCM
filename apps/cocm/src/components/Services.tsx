@@ -70,7 +70,7 @@ interface ServicesProps {
 function getServiceTypeBadgeClass(serviceType: string): string {
   if (!serviceType) return 'bg-info-soft text-info-text hover:bg-info-soft border-none';
   const t = serviceType.toLowerCase();
-  if (t.includes('sunday')) return 'bg-purple-100 text-purple-700 hover:bg-purple-100 border-none';
+  if (t.includes('sunday')) return 'bg-primary/10 text-primary-text hover:bg-primary/10 border-none';
   if (t.includes('midweek')) return 'bg-warning-soft text-warning-text hover:bg-warning-soft border-none';
   if (t.includes('prayer')) return 'bg-success-soft text-success-text hover:bg-success-soft border-none';
   return 'bg-info-soft text-info-text hover:bg-info-soft border-none';
@@ -221,7 +221,7 @@ function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
       {expensesTotal > 0 && (
         <div className="bg-card rounded-xl p-4 shadow-sm border">
           <div className="flex items-center gap-2 mb-1">
-            <div className="w-2 h-2 rounded-full bg-teal-500"></div>
+            <div className="w-2 h-2 rounded-full bg-success"></div>
             <div className="text-muted-foreground font-medium text-xs uppercase tracking-wider">Net Giving</div>
           </div>
           <div className="text-2xl font-bold text-success-text">{formatGhanaCedis(netGiving)}</div>
@@ -245,7 +245,7 @@ function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
       {/* Visitors Card */}
       <div className="bg-card rounded-xl p-4 shadow-sm border">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+          <div className="w-2 h-2 rounded-full bg-primary"></div>
           <div className="text-muted-foreground font-medium text-xs uppercase tracking-wider">Visitors</div>
         </div>
         <div className="text-2xl font-bold">{sr.visitors?.length ?? 0}</div>
@@ -350,7 +350,7 @@ function GivingChart({ sr }: { sr: ServiceDateDetail }) {
         {expensesTotal > 0 && (
           <div className="mt-6 p-3 bg-secondary/10 border border-secondary/20 rounded-lg flex justify-between items-center text-sm">
             <span className="text-secondary/80 font-medium">Net Giving (after expenses)</span>
-            <span className="font-bold text-success-text dark:text-teal-400">{formatGhanaCedis(netGiving)}</span>
+            <span className="font-bold text-success-text">{formatGhanaCedis(netGiving)}</span>
           </div>
         )}
       </CardContent>
@@ -497,7 +497,7 @@ function PersonList({
               );
             } else if (type === 'visitor') {
               initials = `${item.firstName?.[0] || ''}${item.lastName?.[0] || ''}`.toUpperCase() || 'V';
-              avatarClass = 'bg-purple-100 text-purple-700';
+              avatarClass = 'bg-primary/10 text-primary-text';
               nameContent = <span className="font-medium truncate">{item.firstName} {item.lastName}</span>;
             } else if (type === 'member') {
               initials = `${item.firstName?.[0] || ''}${item.lastName?.[0] || ''}`.toUpperCase() || 'M';
@@ -639,7 +639,7 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
   });
   
   const givingCategories = [
-    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-purple-600' },
+    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-primary' },
     { key: 'cash', label: 'Cash', amount: cash, color: 'bg-success' },
     { key: 'mobileMoney', label: 'Mobile Money', amount: mobileMoney, color: 'bg-info' }
   ].filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
@@ -647,12 +647,12 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-purple-50 rounded-lg p-3 text-center border border-purple-100">
-          <div className="text-sm font-bold text-purple-700">{childrenAttendanceCount}</div>
-          <div className="text-[10px] text-purple-600/80 uppercase font-semibold">Attended</div>
+        <div className="bg-primary/10 rounded-lg p-3 text-center border border-primary/30">
+          <div className="text-sm font-bold text-primary-text">{childrenAttendanceCount}</div>
+          <div className="text-[10px] text-primary-text uppercase font-semibold">Attended</div>
         </div>
-        <div className="bg-teal-50 rounded-lg p-3 text-center border border-teal-100">
-          <div className="text-sm font-bold text-teal-700">{formatGhanaCedis(childrenGivingTotal)}</div>
+        <div className="bg-success-soft rounded-lg p-3 text-center border border-success/30">
+          <div className="text-sm font-bold text-success-text">{formatGhanaCedis(childrenGivingTotal)}</div>
           <div className="text-[10px] text-success-text/80 uppercase font-semibold">Giving</div>
         </div>
         <div className="bg-warning-soft rounded-lg p-3 text-center border border-warning/30">
@@ -681,7 +681,7 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {filteredAttendance.map((e: any) => (
                 <div key={e.id} className="flex items-center gap-3 py-1 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-primary-text flex items-center justify-center text-[10px] font-bold shrink-0">
                     {e.childName?.substring(0, 2).toUpperCase() || 'CH'}
                   </div>
                   <span>{e.childName}</span>
