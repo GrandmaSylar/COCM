@@ -62,7 +62,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
     <div className="min-h-dvh flex items-center justify-center bg-background relative overflow-hidden">
       {/* Animated Background Blobs */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/20 blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-500/20 blur-[100px] animate-pulse" style={{ animationDelay: '1s', animationDuration: '10s' }} />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/15 blur-[100px] animate-pulse" style={{ animationDelay: '1s', animationDuration: '10s' }} />
       
       {/* Theme Toggle (Absolute) */}
       <div className="absolute top-6 right-6 z-50">
@@ -175,7 +175,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
 
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl text-base font-medium shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-0 text-white"
+              className="w-full h-11 rounded-xl text-base font-medium shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-0 text-primary-foreground"
               style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}
               disabled={isLoading}
             >

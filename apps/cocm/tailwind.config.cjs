@@ -1,4 +1,13 @@
 /** @type {import('tailwindcss').Config} */
+// The theme colours are plain CSS variables (hex, so the theme editor can override them), which
+// Tailwind cannot apply an opacity to: `bg-primary/10` or `hover:bg-primary/90` generated nothing.
+// The solid colour stays a plain var(); only the opacity variants use color-mix.
+const token = (name) => ({ opacityValue }) => {
+  if (opacityValue === undefined) return `var(--${name})`;
+  const percent = /^[\d.]+$/.test(String(opacityValue)) ? `${Number(opacityValue) * 100}%` : `calc(${opacityValue} * 100%)`;
+  return `color-mix(in srgb, var(--${name}) ${percent}, transparent)`;
+};
+
 module.exports = {
     darkMode: ["class"],
     future: { hoverOnlyWhenSupported: true },
@@ -29,54 +38,70 @@ module.exports = {
           "mobile-caption": ["0.75rem", { lineHeight: "1.4" }],
         },
         colors: {
-          border: "var(--border)",
-          input: "var(--input)",
-          ring: "var(--ring)",
-          background: "var(--background)",
-          foreground: "var(--foreground)",
+          border: token("border"),
+          input: token("input"),
+          ring: token("ring"),
+          background: token("background"),
+          foreground: token("foreground"),
           primary: {
-            DEFAULT: "var(--primary)",
-            foreground: "var(--primary-foreground)",
+            DEFAULT: token("primary"),
+            foreground: token("primary-foreground"),
+            text: token("primary-text"),
           },
           secondary: {
-            DEFAULT: "var(--secondary)",
-            foreground: "var(--secondary-foreground)",
+            DEFAULT: token("secondary"),
+            foreground: token("secondary-foreground"),
           },
           destructive: {
-            DEFAULT: "var(--destructive)",
-            foreground: "var(--destructive-foreground)",
+            DEFAULT: token("destructive"),
+            foreground: token("destructive-foreground"),
           },
           muted: {
-            DEFAULT: "var(--muted)",
-            foreground: "var(--muted-foreground)",
+            DEFAULT: token("muted"),
+            foreground: token("muted-foreground"),
           },
           accent: {
-            DEFAULT: "var(--accent)",
-            foreground: "var(--accent-foreground)",
+            DEFAULT: token("accent"),
+            foreground: token("accent-foreground"),
+          },
+          success: {
+            DEFAULT: token("success"),
+            soft: token("success-soft"),
+            text: token("success-text"),
+          },
+          warning: {
+            DEFAULT: token("warning"),
+            soft: token("warning-soft"),
+            text: token("warning-text"),
+          },
+          info: {
+            DEFAULT: token("info"),
+            soft: token("info-soft"),
+            text: token("info-text"),
           },
           popover: {
-            DEFAULT: "var(--popover)",
-            foreground: "var(--popover-foreground)",
+            DEFAULT: token("popover"),
+            foreground: token("popover-foreground"),
           },
           card: {
-            DEFAULT: "var(--card)",
-            foreground: "var(--card-foreground)",
+            DEFAULT: token("card"),
+            foreground: token("card-foreground"),
           },
           sidebar: {
-            DEFAULT: "var(--sidebar)",
-            foreground: "var(--sidebar-foreground)",
-            primary: "var(--sidebar-primary)",
-            "primary-foreground": "var(--sidebar-primary-foreground)",
-            accent: "var(--sidebar-accent)",
-            "accent-foreground": "var(--sidebar-accent-foreground)",
-            border: "var(--sidebar-border)",
-            ring: "var(--sidebar-ring)",
+            DEFAULT: token("sidebar"),
+            foreground: token("sidebar-foreground"),
+            primary: token("sidebar-primary"),
+            "primary-foreground": token("sidebar-primary-foreground"),
+            accent: token("sidebar-accent"),
+            "accent-foreground": token("sidebar-accent-foreground"),
+            border: token("sidebar-border"),
+            ring: token("sidebar-ring"),
           },
         },
         borderRadius: {
           lg: "var(--radius)",
-          md: "calc(var(--radius) - 2px)",
-          sm: "calc(var(--radius) - 4px)",
+          md: "calc(var(--radius) - 4px)",
+          sm: "calc(var(--radius) - 8px)",
         },
         keyframes: {
           "accordion-down": {
