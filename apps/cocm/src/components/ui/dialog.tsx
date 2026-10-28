@@ -38,7 +38,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50 backdrop-blur-sm",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/40",
       className,
     )}
     {...props}
@@ -57,7 +57,7 @@ const DialogContent = React.forwardRef<
       data-slot="dialog-content"
       aria-describedby={props["aria-describedby"] || undefined}
       className={cn(
-        "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-xl border border-border/50 p-4 sm:p-6 shadow-2xl duration-200 sm:max-w-lg",
+        "bg-card data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-2xl p-5 sm:p-6 shadow-2xl ring-1 ring-black/5 dark:ring-white/10 duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] sm:max-w-lg max-sm:top-auto max-sm:bottom-0 max-sm:left-0 max-sm:max-w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:pb-[max(1.25rem,env(safe-area-inset-bottom))] max-sm:max-h-[92dvh] max-sm:overflow-y-auto max-sm:data-[state=open]:zoom-in-100 max-sm:data-[state=closed]:zoom-out-100 max-sm:data-[state=open]:slide-in-from-bottom max-sm:data-[state=closed]:slide-out-to-bottom max-sm:before:mx-auto max-sm:before:block max-sm:before:h-[5px] max-sm:before:w-9 max-sm:before:rounded-full max-sm:before:bg-fill-strong max-sm:before:content-['']",
         className,
       )}
       {...props}
