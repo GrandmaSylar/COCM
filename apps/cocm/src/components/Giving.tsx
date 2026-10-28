@@ -6,6 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { EmptyState, Group, IconTile, LargeTitle, SearchField } from './ui/ios';
+import { PullToRefresh } from './ui/ios-gestures';
+import { DropdownMenuSeparator } from './ui/dropdown-menu';
+import { ChevronRight, MoreHorizontal } from 'lucide-react';
 import { Banknote, Plus, TrendingUp, TrendingDown, Calendar, Search, ArrowLeft, Edit, Trash2, X, Settings, Church, Download, Eye, Lock, Unlock, RefreshCw, WifiOff } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { formatGhanaCedis, getExpenseKey } from './ui/utils';
@@ -362,135 +366,87 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
   }
 
   return (
-    <div className="space-y-6 relative">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Giving</h1>
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title={
+          <span className="flex items-center gap-2">
+            Giving
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
+              <Badge variant="outline" className="bg-warning-soft text-warning-text border-0">
                 <WifiOff className="w-3 h-3 mr-1" />
-                Cached Data
+                Cached
               </Badge>
             )}
-          </div>
-          <p className="text-muted-foreground">
-            Track offerings, donations, and thanksgiving per service
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap w-full sm:w-auto">
-          {/* Refresh Button */}
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          {/* Export Button */}
-          {records.length > 0 && (
+          </span>
+        }
+        subtitle="Offerings, donations and thanksgiving per service"
+        actions={
+          <>
+            {canRecordGiving && (
+              <Button onClick={onRecordGiving}>
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Record Giving</span>
+                <span className="sr-only sm:hidden">Record Giving</span>
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="text-xs sm:text-sm">
-                  <Download className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Export</span>
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportCSV}>
-                  Export as CSV
+              <DropdownMenuContent align="end" className="w-56">
+                {canManageCustomTypes && (
+                  <DropdownMenuItem onClick={() => setShowCustomTypeManager(true)}>
+                    <Settings className="w-4 h-4" />
+                    Manage Types
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportXLSX}>
-                  Export as Excel
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportPDF}>
-                  Export as PDF
-                </DropdownMenuItem>
+                {records.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <Download className="w-4 h-4" />
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportXLSX}>
+                      <Download className="w-4 h-4" />
+                      Export as Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportPDF}>
+                      <Download className="w-4 h-4" />
+                      Export as PDF
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-          {canManageCustomTypes && (
-            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowCustomTypeManager(true)}>
-              <Settings className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Manage Types</span>
-              <span className="sm:hidden">Types</span>
-            </Button>
-          )}
-          {canRecordGiving && (
-            <Button size="sm" className="text-xs sm:text-sm" onClick={onRecordGiving}>
-              <Plus className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Record Giving</span>
-              <span className="sm:hidden">Record</span>
-            </Button>
-          )}
-        </div>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        {[
+          { icon: Banknote, tone: 'success' as const, value: totalGiving, label: 'Total Giving' },
+          { icon: Calendar, tone: 'info' as const, value: thisMonthGiving, label: 'This Month' },
+          { icon: TrendingUp, tone: 'info' as const, value: thisWeekGiving, label: 'This Week' },
+          { icon: TrendingDown, tone: 'warning' as const, value: netGiving, label: 'Net Giving' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-3 sm:p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 truncate text-xl font-bold leading-none tracking-tight tabular-nums sm:text-2xl">{formatAmount(stat.value)}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground sm:text-[15px]">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Banknote className="w-20 h-20 text-success-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-success/40 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
-              <Banknote className="w-5 h-5" />
-            </div>
-            <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(totalGiving)}</div>
-            <div className="text-sm font-medium text-muted-foreground">Total Giving</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-20 h-20 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisMonthGiving)}</div>
-            <div className="text-sm font-medium text-muted-foreground">This Month</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisWeekGiving)}</div>
-            <div className="text-sm font-medium text-muted-foreground">This Week</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingDown className="w-20 h-20 text-warning-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-warning/40 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
-              <TrendingDown className="w-5 h-5" />
-            </div>
-            <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(netGiving)}</div>
-            <div className="text-sm font-medium text-muted-foreground">Net Giving</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by service name or notes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <SearchField className="flex-1" value={searchTerm} onChange={setSearchTerm} placeholder="Search service name or notes" />
         <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
           <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filter by service" />
@@ -504,192 +460,123 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
         </Select>
       </div>
 
-      {/* Giving Records */}
-      <div className="space-y-4">
-        <h2>Service Giving Records</h2>
-        {records.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Church className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">No Giving Records Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start tracking your church's offerings, donations, and thanksgiving by service.
-                </p>
-                {canRecordGiving && (
-                  <Button onClick={onRecordGiving}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Record First Service Giving
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredRecords.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No giving records found matching your filters.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredRecords.map((record) => (
-            <Card key={record.id} className="transition-shadow overflow-hidden">
-              <CardContent className="p-3 sm:p-4">
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 icon-bg-pink rounded-full flex items-center justify-center flex-shrink-0">
-                        <Church className="w-5 h-5 sm:w-6 sm:h-6" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceName}</h3>
-                        <div className="flex flex-wrap items-center gap-1 mt-1">
-                          <Badge className={`text-[10px] sm:text-xs ${getServiceTypeColor(record.serviceType)}`}>
-                            {record.serviceName}
-                          </Badge>
-                        </div>
-                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                          {formatDate(record.serviceDate)}
-                        </p>
-                      </div>
-                    </div>
+      {records.length === 0 ? (
+        <Group>
+          <EmptyState
+            icon={Church}
+            title="No Giving Records Yet"
+            description="Start tracking your church's offerings, donations and thanksgiving by service."
+            action={canRecordGiving ? <Button onClick={onRecordGiving}><Plus className="w-4 h-4 mr-2" />Record First Service Giving</Button> : undefined}
+          />
+        </Group>
+      ) : filteredRecords.length === 0 ? (
+        <Group>
+          <EmptyState icon={Search} title="No results" description="No giving records match your filters." />
+        </Group>
+      ) : (
+        <div className="space-y-3">
+          <h2 className="px-4 text-[13px] uppercase tracking-wide text-muted-foreground">Service giving records</h2>
+          {filteredRecords.map((record) => {
+            const key = getExpenseKey(record.serviceDate, record.serviceType);
+            const recordExpenses = expensesByKey.get(key) ?? 0;
+            const editInfo = getEditWindowInfo(record.createdAt);
+            const editable = editInfo.canEdit || isDev;
+            const customTotal = Object.values(record.offerings.customTypes).reduce((a, b) => a + b, 0);
+            const parts: [string, number][] = [
+              ['Offering', record.offerings.offering],
+              ...((record.offerings.donation ?? 0) > 0 ? [['Donation', record.offerings.donation ?? 0] as [string, number]] : []),
+              ['Thanksgiving', record.offerings.thanksgiving],
+              ...(Object.keys(record.offerings.customTypes).length > 0 ? [['Other', customTotal] as [string, number]] : []),
+            ];
+            return (
+              <article key={record.id} className="overflow-hidden rounded-xl bg-card">
+                <button
+                  type="button"
+                  disabled={!onViewRecord}
+                  onClick={() => onViewRecord?.(record.id)}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors enabled:hover:bg-accent/60 enabled:active:bg-accent"
+                >
+                  <IconTile icon={Church} tone="primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{record.serviceName}</span>
+                    <span className="block text-[13px] text-muted-foreground">{formatDate(record.serviceDate)}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-xl font-bold leading-none tabular-nums text-foreground">{formatAmount(record.totalAmount)}</span>
+                    <span className="text-[11px] text-muted-foreground">Total</span>
+                  </span>
+                  {onViewRecord ? <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" /> : null}
+                </button>
 
-                    <div className="text-left sm:text-right flex sm:block items-center gap-2 ml-13 sm:ml-0">
-                      <div className="text-xl sm:text-2xl font-bold text-primary">
-                        {formatAmount(record.totalAmount)}
+                <div className="space-y-3 border-t border-separator px-4 py-3">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                    {parts.map(([label, amount]) => (
+                      <div key={label}>
+                        <dt className="text-xs text-muted-foreground">{label}</dt>
+                        <dd className="font-medium tabular-nums">{formatAmount(amount)}</dd>
                       </div>
-                      <p className="text-xs text-muted-foreground">Total</p>
-                    </div>
-                  </div>
+                    ))}
+                  </dl>
 
-                  {/* Breakdown */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 sm:p-3 box-muted rounded-lg">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Offering</p>
-                      <p className="font-medium">{formatAmount(record.offerings.offering)}</p>
-                    </div>
-                    {(record.offerings.donation ?? 0) > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Donation</p>
-                      <p className="font-medium">{formatAmount(record.offerings.donation ?? 0)}</p>
-                    </div>
-                    )}
-                    <div>
-                      <p className="text-xs text-muted-foreground">Thanksgiving</p>
-                      <p className="font-medium">{formatAmount(record.offerings.thanksgiving)}</p>
-                    </div>
-                    {Object.keys(record.offerings.customTypes).length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Other</p>
-                        <p className="font-medium">
-                          {formatAmount(Object.values(record.offerings.customTypes).reduce((a, b) => a + b, 0))}
-                        </p>
+                  {recordExpenses > 0 && (
+                    <div className="space-y-1 rounded-lg bg-muted px-3 py-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Gross Giving</span>
+                        <span className="font-medium tabular-nums">{formatAmount(record.totalAmount)}</span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Net Giving Breakdown (when expenses exist for this record) */}
-                  {(() => {
-                    const key = getExpenseKey(record.serviceDate, record.serviceType);
-                    const recordExpenses = expensesByKey.get(key) ?? 0;
-                    if (recordExpenses <= 0) return null;
-                    return (
-                      <div className="p-2 sm:p-3 box-muted rounded-lg space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">Gross Giving</span>
-                          <span className="text-sm font-medium">{formatAmount(record.totalAmount)}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-muted-foreground">Total Expenses</span>
-                          <span className="text-sm font-medium text-destructive">−{formatAmount(recordExpenses)}</span>
-                        </div>
-                        <div className="flex justify-between items-center border-t pt-1">
-                          <span className="text-xs font-semibold">Net Giving</span>
-                          <span className="text-sm font-bold text-success-text">{formatAmount(record.totalAmount - recordExpenses)}</span>
-                        </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Expenses</span>
+                        <span className="font-medium tabular-nums text-destructive">−{formatAmount(recordExpenses)}</span>
                       </div>
-                    );
-                  })()}
+                      <div className="flex justify-between border-t border-separator pt-1">
+                        <span className="font-semibold">Net Giving</span>
+                        <span className="font-bold tabular-nums text-success-text">{formatAmount(record.totalAmount - recordExpenses)}</span>
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Custom Types */}
-                  {Object.entries(record.offerings.customTypes).length > 0 && (
-                    <div className="flex flex-wrap gap-1 sm:gap-2">
+                  {(Object.keys(record.offerings.customTypes).length > 0 || Object.values(record.paymentBreakdown).some((v) => typeof v === 'number' && v > 0) || (record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0)) && (
+                    <div className="flex flex-wrap gap-1.5">
                       {Object.entries(record.offerings.customTypes).map(([type, amount]) => (
-                        <Badge key={type} variant="outline" className="badge-purple text-[10px] sm:text-xs">
+                        <Badge key={type} variant="secondary" className="border-0 bg-primary/10 text-primary-text">
                           {type}: {formatAmount(amount)}
                         </Badge>
                       ))}
-                    </div>
-                  )}
-
-                  {/* Payment Breakdown */}
-                  <div className="flex flex-wrap gap-1 sm:gap-2">
-                    {Object.entries(record.paymentBreakdown)
-                      .filter(([key, value]) => key !== 'foreign_currency' && (value as number) > 0)
-                      .map(([method, amount]) => (
-                        <Badge key={method} variant="outline" className="text-[10px] sm:text-xs">
-                          {paymentMethodLabels[method as keyof typeof paymentMethodLabels]}: {formatAmount(amount as number)}
+                      {Object.entries(record.paymentBreakdown)
+                        .filter(([k, value]) => k !== 'foreign_currency' && (value as number) > 0)
+                        .map(([method, amount]) => (
+                          <Badge key={method} variant="secondary" className="border-0 bg-fill text-foreground">
+                            {paymentMethodLabels[method as keyof typeof paymentMethodLabels]}: {formatAmount(amount as number)}
+                          </Badge>
+                        ))}
+                      {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
+                        <Badge variant="secondary" className="border-0 bg-warning-soft text-warning-text">
+                          Foreign: GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)}
                         </Badge>
-                      ))}
-                    {record.paymentBreakdown.foreign_currency && record.paymentBreakdown.foreign_currency.amount > 0 && (
-                      <Badge variant="outline" className="box-warning text-[10px] sm:text-xs border-none">
-                        Foreign: GH₵{record.paymentBreakdown.foreign_currency.ghs_equivalent.toFixed(2)}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Notes */}
-                  {record.notes && (
-                    <p className="text-xs sm:text-sm text-muted-foreground italic truncate">
-                      Note: {record.notes}
-                    </p>
+                      )}
+                    </div>
                   )}
 
-                  {/* Footer */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t pt-2">
-                    <div className="text-xs text-muted-foreground space-y-0.5 min-w-0">
-                      {record.createdBy && record.createdAt && (
-                        <div className="truncate">Recorded by {record.createdBy} on {formatDate(record.createdAt)}</div>
-                      )}
-                      {record.editedBy && record.editedAt && (
-                        <div className="truncate">Edited by {record.editedBy} on {formatDate(record.editedAt)}</div>
-                      )}
+                  {record.notes && <p className="truncate text-sm italic text-muted-foreground">Note: {record.notes}</p>}
+
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <div className="min-w-0 space-y-0.5">
+                      {record.createdBy && record.createdAt && <div className="truncate">Recorded by {record.createdBy} on {formatDate(record.createdAt)}</div>}
+                      {record.editedBy && record.editedAt && <div className="truncate">Edited by {record.editedBy} on {formatDate(record.editedAt)}</div>}
                     </div>
-                    <div className="flex items-center gap-2">
-                      {(() => {
-                        const editInfo = getEditWindowInfo(record.createdAt);
-                        const editable = editInfo.canEdit || isDev;
-                        return (
-                          <>
-                            <Badge variant="outline" className={editable ? 'badge-success' : 'badge-muted'}>
-                              {editable ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
-                              {editable ? (isDev && !editInfo.canEdit ? 'Dev' : editInfo.label) : 'Locked'}
-                            </Badge>
-                            {onViewRecord && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => onViewRecord(record.id)}
-                              >
-                                {editable ? <><Edit className="w-3 h-3 mr-1" /> Edit</> : <><Eye className="w-3 h-3 mr-1" /> View</>}
-                              </Button>
-                            )}
-                          </>
-                        );
-                      })()}
-                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1">
+                      {editable ? <Unlock className="size-3" /> : <Lock className="size-3" />}
+                      {editable ? (isDev && !editInfo.canEdit ? 'Dev' : editInfo.label) : 'Locked'}
+                    </span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
+              </article>
+            );
+          })}
+        </div>
+      )}
     </div>
+    </PullToRefresh>
   );
 }
 
