@@ -298,7 +298,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           <div className="flex items-center gap-2">
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Attendance</h1>
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
                 <WifiOff className="w-3 h-3 mr-1" />
                 Cached Data
               </Badge>
@@ -352,12 +352,12 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-20 h-20 text-blue-600" />
+            <Calendar className="w-20 h-20 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
               <Calendar className="w-5 h-5" />
             </div>
             <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{totalServices}</div>
@@ -365,12 +365,12 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Users className="w-20 h-20 text-emerald-600" />
+            <Users className="w-20 h-20 text-success-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-success/40 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
               <Users className="w-5 h-5" />
             </div>
             <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{averageAttendance}</div>
@@ -378,12 +378,12 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-blue-600" />
+            <TrendingUp className="w-20 h-20 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{thisWeekAttendance}</div>
@@ -430,27 +430,27 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
       {liveSessions.length > 0 && canRecordAttendance && (
         <div className="space-y-3">
           {liveSessions.map((session: any) => (
-            <Card key={session.id} className="border-green-500/50 bg-gradient-to-r from-green-500/10 via-green-500/5 to-transparent">
+            <Card key={session.id} className="border-success/30 bg-success-soft">
               <CardContent className="p-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-green-600" />
+                      <div className="w-10 h-10 bg-success/20 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-success-text" />
                       </div>
-                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-success rounded-full animate-pulse" />
                     </div>
                     <div>
                       <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
                         {session.serviceType}
-                        <Badge className="bg-green-600 text-white text-[10px]">LIVE</Badge>
+                        <Badge className="bg-success text-white text-[10px]">LIVE</Badge>
                       </h3>
                       <p className="text-xs sm:text-sm text-muted-foreground">
                         {session.attendees?.length || 0} marked present so far
                       </p>
                     </div>
                   </div>
-                  <Button size="sm" className="bg-green-600 hover:bg-green-700 w-full sm:w-auto" onClick={() => onMarkAttendance({ date: session.date, serviceType: session.serviceType })}>
+                  <Button size="sm" className="bg-success hover:bg-success w-full sm:w-auto" onClick={() => onMarkAttendance({ date: session.date, serviceType: session.serviceType })}>
                     <UserCheck className="w-4 h-4 mr-2" />
                     Join Session
                   </Button>
@@ -498,7 +498,7 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
           </Card>
         ) : (
           filteredRecords.map((record) => (
-            <Card key={record.id} className="hover:shadow-md transition-shadow overflow-hidden">
+            <Card key={record.id} className="transition-shadow overflow-hidden">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div className="flex items-start sm:items-center gap-3">
@@ -1329,9 +1329,9 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
             <div className="flex items-center gap-2">
               <h1>{record.serviceType}</h1>
               {record.attendanceType === 'general' ? (
-                <Badge className="bg-blue-100 text-blue-800 border-blue-200">Head Count</Badge>
+                <Badge className="bg-info-soft text-info-text border-info/30">Head Count</Badge>
               ) : (
-                <Badge className="bg-orange-100 text-orange-800 border-orange-200">Individual</Badge>
+                <Badge className="bg-warning-soft text-warning-text border-warning/30">Individual</Badge>
               )}
             </div>
             <p className="text-muted-foreground">
@@ -1456,9 +1456,9 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-t pt-6">
-                  <div className="text-center p-3 rounded-lg bg-blue-50/50">
-                    <div className="text-xl font-semibold text-blue-700">{record.menCount || 0}</div>
-                    <p className="text-xs text-blue-600/70 font-medium uppercase tracking-wider">Men</p>
+                  <div className="text-center p-3 rounded-lg bg-info-soft/50">
+                    <div className="text-xl font-semibold text-info-text">{record.menCount || 0}</div>
+                    <p className="text-xs text-info-text font-medium uppercase tracking-wider">Men</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-pink-50/50">
                     <div className="text-xl font-semibold text-pink-700">{record.womenCount || 0}</div>
@@ -1468,9 +1468,9 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     <div className="text-xl font-semibold text-purple-700">{record.childrenCount || 0}</div>
                     <p className="text-xs text-purple-600/70 font-medium uppercase tracking-wider">Children</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-orange-50/50">
-                    <div className="text-xl font-semibold text-orange-700">{record.visitorsCount || 0}</div>
-                    <p className="text-xs text-orange-600/70 font-medium uppercase tracking-wider">Visitors</p>
+                  <div className="text-center p-3 rounded-lg bg-warning-soft/50">
+                    <div className="text-xl font-semibold text-warning-text">{record.visitorsCount || 0}</div>
+                    <p className="text-xs text-warning-text font-medium uppercase tracking-wider">Visitors</p>
                   </div>
                 </div>
               </div>
@@ -1486,7 +1486,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4">
             <Card>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-bold text-success-text">
                   {isEditing ? editAttendees.length : record.attendees.length}
                 </div>
                 <p className="text-sm text-muted-foreground">Present</p>
@@ -1494,7 +1494,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-2xl font-bold text-destructive">
                   {members.length - (isEditing ? editAttendees.length : record.attendees.length)}
                 </div>
                 <p className="text-sm text-muted-foreground">Absent</p>
@@ -1529,8 +1529,8 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     return (
                       <div key={member.id} className="flex items-center justify-between p-3 hover:bg-muted/50">
                         <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isPresent ? 'bg-green-100' : 'bg-red-100'}`}>
-                            <span className={`text-xs font-medium ${isPresent ? 'text-green-700' : 'text-red-700'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isPresent ? 'bg-success-soft' : 'bg-destructive/10'}`}>
+                            <span className={`text-xs font-medium ${isPresent ? 'text-success-text' : 'text-destructive'}`}>
                               {member.firstName[0]}{member.lastName[0]}
                             </span>
                           </div>
@@ -1566,7 +1566,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-green-600" />
+                    <UserCheck className="w-5 h-5 text-success-text" />
                     Present ({presentMembers.length})
                   </CardTitle>
                 </CardHeader>
@@ -1577,8 +1577,8 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     <div className="max-h-64 overflow-y-auto divide-y">
                       {presentMembers.map((member) => (
                         <div key={member.id} className="flex items-center gap-3 py-2">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-medium text-green-700">
+                          <div className="w-8 h-8 bg-success-soft rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-success-text">
                               {member.firstName[0]}{member.lastName[0]}
                             </span>
                           </div>
@@ -1598,7 +1598,7 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
-                      <X className="w-5 h-5 text-red-600" />
+                      <X className="w-5 h-5 text-destructive" />
                       Absent ({absentMembers.length})
                     </CardTitle>
                     {canEdit && absentMembers.length > 0 && (
@@ -1615,8 +1615,8 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     <div className="max-h-64 overflow-y-auto divide-y">
                       {absentMembers.map((member) => (
                         <div key={member.id} className="flex items-center gap-3 py-2">
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                            <span className="text-xs font-medium text-red-700">
+                          <div className="w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center">
+                            <span className="text-xs font-medium text-destructive">
                               {member.firstName[0]}{member.lastName[0]}
                             </span>
                           </div>

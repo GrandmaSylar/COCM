@@ -29,7 +29,7 @@ export function EmptyState({
     >
       {Icon && (
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted/50 mb-6 group hover:bg-muted/80 transition-colors duration-300">
-          <Icon className="h-10 w-10 text-muted-foreground/50 group-hover:text-primary/60 group-hover:scale-110 transition-all duration-300" />
+          <Icon className="h-10 w-10 text-muted-foreground/50 group-hover:text-primary/60 transition-all duration-300" />
         </div>
       )}
       <h3 className="text-lg font-semibold leading-snug tracking-tight mb-2 text-foreground">
@@ -39,7 +39,7 @@ export function EmptyState({
         {description}
       </p>
       {action && (
-        <Button onClick={action.onClick} variant="default" className="shadow-lg shadow-primary/20">
+        <Button onClick={action.onClick} variant="default" className="shadow-sm">
           {action.label}
         </Button>
       )}

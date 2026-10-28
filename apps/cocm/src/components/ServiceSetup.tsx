@@ -65,7 +65,7 @@ function MemberCombobox({ label, value, onChange, members, hideLabel = false }: 
       </div>
 
       {showDropdown && searchTerm && filteredMembers.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 max-h-60 overflow-auto bg-popover text-popover-foreground border rounded-md shadow-md animate-in fade-in-80 zoom-in-95">
+        <ul className="absolute z-50 w-full mt-1 max-h-60 overflow-auto bg-popover text-popover-foreground border rounded-md shadow-sm animate-in fade-in-80 zoom-in-95">
           {filteredMembers.map(m => {
             const fullName = `${m.firstName} ${m.lastName}`;
             return (
@@ -85,7 +85,7 @@ function MemberCombobox({ label, value, onChange, members, hideLabel = false }: 
         </ul>
       )}
       {showDropdown && searchTerm && filteredMembers.length === 0 && (
-        <div className="absolute z-50 w-full mt-1 p-3 text-sm text-muted-foreground text-center bg-popover border rounded-md shadow-md animate-in fade-in-80">
+        <div className="absolute z-50 w-full mt-1 p-3 text-sm text-muted-foreground text-center bg-popover border rounded-md shadow-sm animate-in fade-in-80">
           No members found.
         </div>
       )}
@@ -609,7 +609,7 @@ export function ServiceSetup({ onBack, onSaved, initialSetup }: ServiceSetupProp
 
       {showOverwriteDialog && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-sm rounded-xl border shadow-lg overflow-hidden animate-in zoom-in-95 fade-in-0 p-6">
+          <div className="bg-card w-full max-w-sm rounded-xl border shadow-sm overflow-hidden animate-in zoom-in-95 fade-in-0 p-6">
             <h3 className="text-lg font-semibold mb-2">Setup Already Exists</h3>
             <p className="text-sm text-muted-foreground mb-6">
               A service setup for {formData.serviceDate} ({formData.serviceType}) already exists. 
@@ -625,7 +625,7 @@ export function ServiceSetup({ onBack, onSaved, initialSetup }: ServiceSetupProp
 
       {previewPdfUrl && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-4xl h-[90vh] rounded-xl border shadow-lg flex flex-col overflow-hidden animate-in zoom-in-95 fade-in-0">
+          <div className="bg-card w-full max-w-4xl h-[90vh] rounded-xl border shadow-sm flex flex-col overflow-hidden animate-in zoom-in-95 fade-in-0">
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">PDF Preview</h3>
               <div className="flex items-center gap-2">
@@ -636,7 +636,7 @@ export function ServiceSetup({ onBack, onSaved, initialSetup }: ServiceSetupProp
               </div>
             </div>
             <div className="flex-1 bg-muted p-4">
-              <iframe src={previewPdfUrl} className="w-full h-full rounded border bg-white shadow-sm" />
+              <iframe src={previewPdfUrl} className="w-full h-full rounded border bg-card shadow-sm" />
             </div>
           </div>
         </div>

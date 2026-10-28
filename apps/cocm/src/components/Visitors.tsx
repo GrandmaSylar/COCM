@@ -163,36 +163,36 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-16 h-16 text-blue-600" />
+                <Users className="w-16 h-16 text-info-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
                   <Users className="w-5 h-5" />
                 </div>
                 <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{totalVisitors}</div>
                 <div className="text-sm font-medium text-muted-foreground">Total Visitors</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-success-soft border border-success/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserPlus className="w-16 h-16 text-emerald-600" />
+                <UserPlus className="w-16 h-16 text-success-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-10 h-10 rounded-xl bg-success/40 flex items-center justify-center mb-3 text-success-text transition-transform duration-300">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{interestedInMembership}</div>
                 <div className="text-sm font-medium text-muted-foreground">Interested in Membership</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+            <div className="group relative overflow-hidden rounded-2xl p-5 bg-warning-soft border border-warning/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Calendar className="w-16 h-16 text-amber-600" />
+                <Calendar className="w-16 h-16 text-warning-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/40 flex items-center justify-center mb-3 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-10 h-10 rounded-xl bg-warning/40 flex items-center justify-center mb-3 text-warning-text transition-transform duration-300">
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div className="text-3xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{thisMonthVisitors}</div>
@@ -256,7 +256,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
           </Card>
         ) : (
           filteredVisitors.map((visitor) => (
-            <Card key={visitor.id} className={`shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
+            <Card key={visitor.id} className={`shadow-sm transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -341,7 +341,7 @@ export function Visitors({ onAddVisitor, onViewVisitor, onConvertToMember }: Vis
                         variant="default"
                         size="sm"
                         onClick={() => onConvertToMember(visitor)}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="bg-success hover:bg-success"
                       >
                         <UserPlus className="w-4 h-4 mr-2" />
                         Convert
@@ -601,7 +601,7 @@ export function AddVisitor({ onBack, onSave }: AddVisitorProps) {
                     placeholder="Search member name..."
                   />
                   {showReferrerSuggestions && referrerSearchQuery && filteredMembers.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-sm max-h-40 overflow-y-auto">
                       {filteredMembers.map(member => (
                         <div
                           key={member.id}
@@ -925,7 +925,7 @@ export function EditVisitor({ visitor, onBack, onSave }: EditVisitorProps) {
                     placeholder="Search member name..."
                   />
                   {showReferrerSuggestions && referrerSearchQuery && filteredMembers.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-sm max-h-40 overflow-y-auto">
                       {filteredMembers.map(member => (
                         <div
                           key={member.id}
@@ -1072,7 +1072,7 @@ export function VisitorProfile({ visitor, onBack, onEdit, onConvertToMember, onV
               visitor.interestedInMembership && (
                 <Button 
                   onClick={() => onConvertToMember(visitor)} 
-                  className="flex-1 sm:flex-none h-9 sm:h-10 bg-green-600 hover:bg-green-700 shadow-sm"
+                  className="flex-1 sm:flex-none h-9 sm:h-10 bg-success hover:bg-success shadow-sm"
                 >
                   <UserPlus className="w-4 h-4 mr-2" />
                   <span className="whitespace-nowrap">Convert to Member</span>

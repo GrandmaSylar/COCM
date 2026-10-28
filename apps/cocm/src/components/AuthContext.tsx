@@ -780,10 +780,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           <AlertDialogContent className="border-t-4 border-t-primary max-w-md">
             <div className="flex flex-col items-center text-center space-y-4 pt-4">
               <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                alertConfig.variant === 'success' ? 'bg-green-50 text-green-600 dark:bg-green-950/50 dark:text-green-400' :
-                alertConfig.variant === 'error' ? 'bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-400' :
-                alertConfig.variant === 'warning' ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400' :
-                'bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400'
+                alertConfig.variant === 'success' ? 'bg-success-soft text-success-text ' :
+                alertConfig.variant === 'error' ? 'bg-destructive/10 text-destructive ' :
+                alertConfig.variant === 'warning' ? 'bg-warning-soft text-warning-text ' :
+                'bg-info-soft text-info-text '
               }`}>
                 {alertConfig.variant === 'success' && <CheckCircle2 className="w-8 h-8" />}
                 {alertConfig.variant === 'error' && <XCircle className="w-8 h-8" />}

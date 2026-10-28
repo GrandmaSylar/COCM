@@ -35,18 +35,18 @@ const typeIcons: Record<string, any> = {
 
 const typeColors: Record<string, string> = {
   member_status_change: 'text-secondary',
-  member_registered: 'text-emerald-500',
-  giving_record: 'text-emerald-500',
-  attendance_record: 'text-amber-500',
+  member_registered: 'text-success-text',
+  giving_record: 'text-success-text',
+  attendance_record: 'text-warning-text',
   birthday: 'text-pink-500',
   system: 'text-secondary',
 };
 
 const typeBgColors: Record<string, string> = {
   member_status_change: 'bg-secondary/10',
-  member_registered: 'bg-emerald-500/10',
-  giving_record: 'bg-emerald-500/10',
-  attendance_record: 'bg-amber-500/10',
+  member_registered: 'bg-success/10',
+  giving_record: 'bg-success/10',
+  attendance_record: 'bg-warning/10',
   birthday: 'bg-pink-500/10',
   system: 'bg-secondary/10',
 };
@@ -146,7 +146,7 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-secondary/20 to-secondary/5 flex items-center justify-center shadow-sm">
+          <div className="w-10 h-10 rounded-xl from-secondary/20 to-secondary/5 flex items-center justify-center shadow-sm">
             <Bell className="w-5 h-5 text-secondary" />
           </div>
           <div>
@@ -196,13 +196,13 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
         <div className="space-y-2 stagger-children">
           {notifications.map((n) => {
             const IconComp = typeIcons[n.type] || Bell;
-            const iconColor = typeColors[n.type] || 'text-gray-500';
-            const iconBg = typeBgColors[n.type] || 'bg-gray-500/10';
+            const iconColor = typeColors[n.type] || 'text-muted-foreground';
+            const iconBg = typeBgColors[n.type] || 'bg-fill-strong';
             const isClickable = !!onNotificationClick;
             return (
               <Card
                 key={n.id}
-                className={`transition-all shadow-sm hover:shadow-md ${!n.isRead ? 'border-l-4 border-l-amber-500 bg-amber-500/5' : ''} ${isClickable ? 'cursor-pointer hover:-translate-y-0.5' : ''}`}
+                className={`transition-all shadow-sm ${!n.isRead ? 'border-l-4 border-l-amber-500 bg-warning/5' : ''} ${isClickable ? 'cursor-pointer' : ''}`}
                 onClick={() => isClickable && handleNotificationClick(n)}
               >
                 <CardContent className="p-4 flex items-start gap-3">

@@ -437,7 +437,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
           <div className="flex items-center gap-2">
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Members</h1>
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
                 <WifiOff className="w-3 h-3 mr-1" />
                 Cached Data
               </Badge>
@@ -544,84 +544,84 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-2">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 stagger-children">
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-md hover:shadow-blue-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-blue-600" />
+                <Users className="w-12 h-12 text-info-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/40 flex items-center justify-center mb-2 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Total</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-cyan-500/50 via-cyan-500/40 to-transparent border border-cyan-500/50 transition-all duration-300 hover:shadow-md hover:shadow-cyan-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 from-cyan-500/50 via-cyan-500/40 border border-cyan-500/50 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
                 <UserPlus className="w-12 h-12 text-cyan-600" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-cyan-500/40 flex items-center justify-center mb-2 text-cyan-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/40 flex items-center justify-center mb-2 text-cyan-600 transition-transform duration-300">
                   <UserPlus className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'new').length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">New</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-md hover:shadow-emerald-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-success-soft border border-success/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserCheck className="w-12 h-12 text-emerald-600" />
+                <UserCheck className="w-12 h-12 text-success-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-emerald-500/40 flex items-center justify-center mb-2 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-success/40 flex items-center justify-center mb-2 text-success-text transition-transform duration-300">
                   <UserCheck className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'active').length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Active</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-sky-500/50 via-sky-500/40 to-transparent border border-sky-500/50 transition-all duration-300 hover:shadow-md hover:shadow-sky-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-sky-600" />
+                <Users className="w-12 h-12 text-info-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-sky-500/40 flex items-center justify-center mb-2 text-sky-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'semi-active').length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Semi-Active</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-md hover:shadow-amber-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-warning-soft border border-warning/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <UserMinus className="w-12 h-12 text-amber-600" />
+                <UserMinus className="w-12 h-12 text-warning-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/40 flex items-center justify-center mb-2 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-warning/40 flex items-center justify-center mb-2 text-warning-text transition-transform duration-300">
                   <UserMinus className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'inactive').length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Inactive</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-md hover:shadow-blue-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-info-soft border border-info/30 transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Users className="w-12 h-12 text-blue-600" />
+                <Users className="w-12 h-12 text-info-text" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/40 flex items-center justify-center mb-2 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-info/40 flex items-center justify-center mb-2 text-info-text transition-transform duration-300">
                   <Users className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => ['sick', 'traveled', 'schooling'].includes(m.status)).length}</div>
                 <div className="text-xs font-medium text-muted-foreground mt-0.5">Excused</div>
               </div>
             </div>
-            <div className="group relative overflow-hidden rounded-2xl p-4 bg-gradient-to-br from-slate-500/50 via-slate-500/40 to-transparent border border-slate-500/50 transition-all duration-300 hover:shadow-md hover:shadow-slate-500/50 hover:-translate-y-0.5">
+            <div className="group relative overflow-hidden rounded-2xl p-4 bg-muted border border-border transition-all duration-300 ">
               <div className="absolute top-0 right-0 p-2 opacity-15 group-hover:opacity-30 transition-opacity">
-                <Droplets className="w-12 h-12 text-slate-600" />
+                <Droplets className="w-12 h-12 text-muted-foreground" />
               </div>
               <div className="relative z-10">
-                <div className="w-8 h-8 rounded-lg bg-slate-500/40 flex items-center justify-center mb-2 text-slate-600 group-hover:scale-110 transition-transform duration-300">
+                <div className="w-8 h-8 rounded-lg bg-fill-strong flex items-center justify-center mb-2 text-muted-foreground transition-transform duration-300">
                   <Droplets className="w-4 h-4" />
                 </div>
                 <div className="text-2xl font-bold tracking-tighter text-foreground group-hover:translate-x-0.5 transition-transform">{members.filter(m => m.status === 'not baptised').length}</div>
@@ -935,7 +935,7 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
           </Card>
         ) : (
           filteredMembers.map((member) => (
-            <Card key={member.id} className="shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <Card key={member.id} className="shadow-sm transition-all">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
@@ -965,11 +965,11 @@ export function Members({ onAddMember, onViewMember, onAddFromVisitor }: Members
                             variant={member.status === 'active' ? 'default' : 'secondary'}
                             className={
                               member.status === 'new' ? 'bg-cyan-100 text-cyan-800' :
-                              member.status === 'active' ? 'bg-green-100 text-green-800' :
-                              member.status === 'semi-active' ? 'bg-blue-100 text-blue-800' :
+                              member.status === 'active' ? 'bg-success-soft text-success-text' :
+                              member.status === 'semi-active' ? 'bg-info-soft text-info-text' :
                               member.status === 'sick' || member.status === 'traveled' || member.status === 'schooling' ? 'bg-purple-100 text-purple-800' :
-                              member.status === 'not baptised' ? 'bg-slate-100 text-slate-800' :
-                              member.status === 'blacklisted' ? 'bg-red-100 text-red-800' : ''
+                              member.status === 'not baptised' ? 'bg-muted text-foreground' :
+                              member.status === 'blacklisted' ? 'bg-destructive/10 text-destructive' : ''
                             }
                           >
                             {member.status}

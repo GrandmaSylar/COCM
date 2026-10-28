@@ -172,7 +172,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
           <div className="flex items-center gap-2">
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Finance &amp; Expenses</h1>
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
                 <WifiOff className="w-3 h-3 mr-1" />
                 Cached Data
               </Badge>
@@ -199,23 +199,23 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-red-500/10 to-transparent border-red-500/20">
+        <Card className="bg-destructive/10 border-destructive/30">
           <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Receipt className="w-16 h-16 text-red-500" /></div>
+            <div className="absolute top-0 right-0 p-4 opacity-10"><Receipt className="w-16 h-16 text-destructive" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (All Time)</p>
             <p className="text-xl sm:text-3xl font-bold">GH₵ {totalAllTime.toFixed(2)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-orange-500/10 to-transparent border-orange-500/20">
+        <Card className="bg-warning-soft border-warning/30">
           <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Calendar className="w-16 h-16 text-orange-500" /></div>
+            <div className="absolute top-0 right-0 p-4 opacity-10"><Calendar className="w-16 h-16 text-warning-text" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (This Month)</p>
             <p className="text-xl sm:text-3xl font-bold">GH₵ {totalThisMonth.toFixed(2)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-transparent border-blue-500/20">
+        <Card className="bg-info-soft border-info/30">
           <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Banknote className="w-16 h-16 text-blue-500" /></div>
+            <div className="absolute top-0 right-0 p-4 opacity-10"><Banknote className="w-16 h-16 text-info-text" /></div>
             <p className="text-sm font-medium text-muted-foreground mb-1">Total Requisitions</p>
             <p className="text-xl sm:text-3xl font-bold">{expenses.length}</p>
           </CardContent>
@@ -282,7 +282,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                         </div>
                         <div className="line-clamp-2 text-sm">{exp.details}</div>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="font-bold text-red-600">GH₵ {exp.amount?.toFixed(2)}</span>
+                          <span className="font-bold text-destructive">GH₵ {exp.amount?.toFixed(2)}</span>
                           <Badge variant="outline">{exp.paymentMethodName}</Badge>
                         </div>
                         {exp.requestedByName && (
@@ -290,16 +290,16 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                         )}
                         <div className="flex gap-1 justify-end mt-2">
                           <Button variant="ghost" size="icon" onClick={() => onViewReceipt(exp.id)} title="View Receipt">
-                            <Eye className="w-4 h-4 text-blue-500" />
+                            <Eye className="w-4 h-4 text-info-text" />
                           </Button>
                           {isDevOrAdmin && (
                             <Button variant="ghost" size="icon" onClick={() => onEditExpense(exp.id)} title="Edit">
-                              <Edit className="w-4 h-4 text-slate-500" />
+                              <Edit className="w-4 h-4 text-muted-foreground" />
                             </Button>
                           )}
                           {isDevOrAdmin && (
                             <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
-                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
                           )}
                         </div>
@@ -333,7 +333,7 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                               <div className="line-clamp-2">{exp.details}</div>
                               {exp.requestedByName && <div className="text-xs text-muted-foreground mt-1">Req: {exp.requestedByName}</div>}
                             </td>
-                            <td className="px-4 py-3 align-top font-bold text-red-600">
+                            <td className="px-4 py-3 align-top font-bold text-destructive">
                               GH₵ {exp.amount?.toFixed(2)}
                             </td>
                             <td className="px-4 py-3 align-top">
@@ -341,16 +341,16 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                             </td>
                             <td className="px-4 py-3 align-top text-right space-x-2">
                               <Button variant="ghost" size="icon" onClick={() => onViewReceipt(exp.id)} title="View Receipt">
-                                <Eye className="w-4 h-4 text-blue-500" />
+                                <Eye className="w-4 h-4 text-info-text" />
                               </Button>
                               {isDevOrAdmin && (
                                 <Button variant="ghost" size="icon" onClick={() => onEditExpense(exp.id)} title="Edit">
-                                  <Edit className="w-4 h-4 text-slate-500" />
+                                  <Edit className="w-4 h-4 text-muted-foreground" />
                                 </Button>
                               )}
                               {isDevOrAdmin && (
                                 <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
-                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                  <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               )}
                             </td>
@@ -373,12 +373,12 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                         <div className="flex flex-wrap gap-2 sm:gap-6 sm:items-center text-sm">
                           {group.relatedGiving > 0 && (
                             <div className="flex items-center space-x-2">
-                              <span className="text-green-600 font-medium">+ Giving: GH₵ {group.relatedGiving.toFixed(2)}</span>
+                              <span className="text-success-text font-medium">+ Giving: GH₵ {group.relatedGiving.toFixed(2)}</span>
                             </div>
                           )}
-                          <div className="font-bold text-red-600">- Exp: GH₵ {group.subtotal.toFixed(2)}</div>
+                          <div className="font-bold text-destructive">- Exp: GH₵ {group.subtotal.toFixed(2)}</div>
                           {group.relatedGiving > 0 && (
-                            <div className={`font-bold border px-2 py-1 rounded ${group.net >= 0 ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`}>
+                            <div className={`font-bold border px-2 py-1 rounded ${group.net >= 0 ? 'bg-success-soft text-success-text border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}`}>
                               Net: GH₵ {group.net.toFixed(2)}
                             </div>
                           )}
@@ -395,18 +395,18 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold tabular-nums text-red-600">GH₵ {exp.amount?.toFixed(2)}</span>
+                              <span className="font-semibold tabular-nums text-destructive">GH₵ {exp.amount?.toFixed(2)}</span>
                               <Button variant="ghost" size="icon" onClick={() => onViewReceipt(exp.id)} title="View Receipt">
-                                <Eye className="w-4 h-4 text-blue-500" />
+                                <Eye className="w-4 h-4 text-info-text" />
                               </Button>
                               {isDevOrAdmin && (
                                 <Button variant="ghost" size="icon" onClick={() => onEditExpense(exp.id)} title="Edit">
-                                  <Edit className="w-4 h-4 text-slate-500" />
+                                  <Edit className="w-4 h-4 text-muted-foreground" />
                                 </Button>
                               )}
                               {isDevOrAdmin && (
                                 <Button variant="ghost" size="icon" disabled={isDeleting === exp.id || !isOnline} onClick={() => handleDelete(exp.id, exp.formId)} title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}>
-                                  <Trash2 className="w-4 h-4 text-red-500" />
+                                  <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               )}
                             </div>
@@ -540,7 +540,7 @@ function CustomTypeManager({ customTypes, onBack, onRefresh }: { customTypes: an
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeleteMethod(m.id)}
-                    className="text-red-500"
+                    className="text-destructive"
                     disabled={!isOnline}
                     title={!isOnline ? 'Reconnect to delete records.' : 'Delete'}
                   >

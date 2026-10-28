@@ -237,12 +237,12 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
         {/* Members Card */}
         {isWidgetVisible('widget_total_members') && (
           hasTabAccess('members') ? (
-            <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 hover:-translate-y-1">
+            <div onClick={() => onNavigate('members')} className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 cursor-pointer transition-all duration-300 ">
                 <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Users className="w-24 h-24 text-blue-600" />
+                    <Users className="w-24 h-24 text-info-text" />
                 </div>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-info/20 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
                         <Users className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
@@ -250,7 +250,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     </div>
                     <div className="text-sm font-medium text-muted-foreground">Total Members</div>
                     {stats.newMembersThisMonth > 0 && (
-                      <div className="mt-3 inline-flex items-center text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                      <div className="mt-3 inline-flex items-center text-xs font-semibold text-success-text bg-success/10 px-2 py-1 rounded-full border border-success/30">
                         <TrendingUp className="w-3 h-3 mr-1" />
                         +{stats.newMembersThisMonth} this month
                       </div>
@@ -258,15 +258,15 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 </div>
             </div>
           ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/30 via-blue-500/15 to-transparent border border-blue-500/25 transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300">
                 <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Users className="w-24 h-24 text-blue-600" />
+                    <Users className="w-24 h-24 text-info-text" />
                 </div>
                 <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
                     🔒 Restricted
                 </span>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center mb-4 text-blue-600 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-info/20 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
                         <Users className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
@@ -281,12 +281,12 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
         {/* Attendance Card */}
         {isWidgetVisible('widget_attendance_week') && (
           hasTabAccess('attendance') ? (
-            <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/25 hover:-translate-y-1">
+            <div onClick={() => onNavigate('attendance')} className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 cursor-pointer transition-all duration-300 ">
                 <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Calendar className="w-24 h-24 text-amber-600" />
+                    <Calendar className="w-24 h-24 text-warning-text" />
                 </div>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-warning/20 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
                         <Calendar className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
@@ -296,15 +296,15 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 </div>
             </div>
           ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/30 via-amber-500/15 to-transparent border border-amber-500/25 transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 transition-all duration-300">
                 <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Calendar className="w-24 h-24 text-amber-600" />
+                    <Calendar className="w-24 h-24 text-warning-text" />
                 </div>
                 <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
                     🔒 Restricted
                 </span>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center mb-4 text-amber-600 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-warning/20 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
                         <Calendar className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
@@ -319,12 +319,12 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
         {/* Giving Card */}
         {isWidgetVisible('widget_giving_month') && (
           hasTabAccess('giving') ? (
-            <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-1">
+            <div onClick={() => onNavigate('giving')} className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 cursor-pointer transition-all duration-300 ">
                 <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-                    <Banknote className="w-24 h-24 text-emerald-600" />
+                    <Banknote className="w-24 h-24 text-success-text" />
                 </div>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
                         <Banknote className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">
@@ -334,15 +334,15 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                 </div>
             </div>
           ) : (
-            <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/30 via-emerald-500/15 to-transparent border border-emerald-500/25 transition-all duration-300">
+            <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300">
                 <div className="absolute top-0 right-0 p-4 opacity-15 transition-opacity">
-                    <Banknote className="w-24 h-24 text-emerald-600" />
+                    <Banknote className="w-24 h-24 text-success-text" />
                 </div>
                 <span className="absolute top-3 right-3 text-xs font-medium text-muted-foreground bg-secondary/80 backdrop-blur-sm px-2 py-1 rounded-full z-20 shadow-sm">
                     🔒 Restricted
                 </span>
                 <div className="relative z-10">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mb-4 text-emerald-600 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-xl bg-success/20 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
                         <Banknote className="w-6 h-6" />
                     </div>
                     <div className="text-3xl lg:text-4xl font-bold tracking-tighter text-foreground mb-1 transition-transform">
@@ -368,10 +368,10 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
               <button
                 key={action.id}
                 onClick={() => onQuickAction(action.id)}
-                className="group flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:bg-accent/50 hover:border-primary/20 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 text-left relative overflow-hidden"
+                className="group flex items-center gap-4 p-4 rounded-xl border border-border/60 bg-card hover:bg-accent/50 hover:border-primary/20 transition-all duration-300 text-left relative overflow-hidden"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:scale-110 transition-transform duration-300 z-10 shadow-sm">
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0 transition-transform duration-300 z-10 shadow-sm">
                   <Icon className="w-6 h-6" />
                 </div>
                 <div className="flex-1 min-w-0 z-10">
@@ -410,7 +410,7 @@ export function Dashboard({ onNavigate, onQuickAction }: DashboardProps) {
                     index !== recentActivity.length - 1 ? 'border-b border-border/50' : ''
                   }`}
                 >
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full mt-2 flex-shrink-0 shadow-sm shadow-primary/50" />
+                  <div className="w-2.5 h-2.5 bg-primary rounded-full mt-2 flex-shrink-0 shadow-sm" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground">{activity.message}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{activity.time}</p>

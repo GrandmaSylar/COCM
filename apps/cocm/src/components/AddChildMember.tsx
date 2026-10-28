@@ -354,17 +354,17 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
         >
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              status.complete && hasRequired ? 'bg-green-100 dark:bg-green-900' : 'bg-muted'
+              status.complete && hasRequired ? 'bg-success-soft' : 'bg-muted'
             }`}>
               {status.complete && hasRequired ? (
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <Check className="w-5 h-5 text-success-text" />
               ) : (
                 <Icon className="w-5 h-5 text-muted-foreground" />
               )}
             </div>
             <div className="text-left flex items-center gap-2">
               <h3 className="font-semibold">{title}</h3>
-              {hasRequired && <span className="text-xs text-red-500 font-medium">Required</span>}
+              {hasRequired && <span className="text-xs text-destructive font-medium">Required</span>}
               {hasRequired && status.total > 0 && (
                 <p className="text-xs text-muted-foreground ml-2">
                   {status.filled} of {status.total} filled
@@ -385,7 +385,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
     <div className="space-y-4 pt-32 lg:pt-36 animate-fade-in">
       {/* Floating Progress Bar at Top */}
       <div className="fixed top-2 left-2 right-2 sm:left-4 sm:right-4 lg:left-[calc(16rem+1.5rem)] lg:right-6 z-50">
-        <Card className="border-2 border-primary/20 shadow-lg">
+        <Card className="border-2 border-primary/20 shadow-sm">
           <CardContent className="p-3 sm:p-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -396,7 +396,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
               </div>
 
               {/* Progress bar track and fill */}
-              <div className="relative h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="relative h-3 sm:h-4 bg-fill rounded-full overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -418,7 +418,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                     variant={field.filled ? 'default' : 'outline'}
                     className={`text-xs transition-all duration-300 ${
                       field.filled
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-300'
+                        ? 'bg-success-soft text-success-text border-success/30'
                         : 'text-muted-foreground'
                     }`}
                   >
@@ -522,7 +522,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                       onChange={(e) => handleInputChange('firstName', e.target.value)}
                       placeholder="Enter first name"
                       required
-                      className={formData.firstName ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.firstName ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -542,7 +542,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                       onChange={(e) => handleInputChange('lastName', e.target.value)}
                       placeholder="Enter last name"
                       required
-                      className={formData.lastName ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.lastName ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                 </div>
@@ -551,7 +551,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                   <div className="space-y-2">
                     <Label htmlFor="gender">Gender *</Label>
                     <Select value={formData.gender} onValueChange={(value: string) => handleInputChange('gender', value)}>
-                      <SelectTrigger className={formData.gender ? 'border-green-500' : ''}>
+                      <SelectTrigger className={formData.gender ? 'border-success/30' : ''}>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
                       <SelectContent>
@@ -568,9 +568,9 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                       value={formData.dateOfBirth}
                       onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                       required
-                      className={ageError ? 'border-red-500 focus:border-red-500' : formData.dateOfBirth ? 'border-green-500 focus:border-green-500' : ''}
+                      className={ageError ? 'border-destructive/30 focus:border-destructive/30' : formData.dateOfBirth ? 'border-success/30 focus:border-success/30' : ''}
                     />
-                    {ageError && <p className="text-sm text-red-500 mt-1">{ageError}</p>}
+                    {ageError && <p className="text-sm text-destructive mt-1">{ageError}</p>}
                   </div>
                 </div>
 
@@ -657,7 +657,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                     onChange={(e) => handleInputChange('residenceLocation', e.target.value)}
                     placeholder="Enter specific residence location"
                     required
-                    className={formData.residenceLocation ? 'border-green-500 focus:border-green-500' : ''}
+                    className={formData.residenceLocation ? 'border-success/30 focus:border-success/30' : ''}
                   />
                 </div>
 
@@ -710,7 +710,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                               <div className="flex items-center gap-2">
                                 <Label>Parent / Guardian {index + 1}</Label>
                                 {parent.isLinked && (
-                                  <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                                  <Badge variant="secondary" className="gap-1 bg-success-soft text-success-text ">
                                     <CheckCircle className="w-3 h-3" />
                                     Linked Member
                                   </Badge>
@@ -721,7 +721,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => removeParent(parent.id)}
-                                className="text-red-500 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/30"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -761,7 +761,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
                                   </Button>
                                 </div>
                                 {(parentSearchStates[parent.id]?.results || []).length > 0 && (
-                                  <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto bg-background shadow-md">
+                                  <div className="border rounded-lg p-2 space-y-1 max-h-40 overflow-y-auto bg-background shadow-sm">
                                     {parentSearchStates[parent.id].results.map((result: any) => (
                                       <div
                                         key={result.id}
@@ -899,7 +899,7 @@ export function AddChildMember({ onBack, onSave, childVisitorData, initialData }
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setPendingRemovalId(null)}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                className="bg-red-500 hover:bg-red-600 text-white"
+                className="bg-destructive hover:bg-destructive text-white"
                 onClick={() => {
                   if (pendingRemovalId) {
                     setParents(parents.filter(p => p.id !== pendingRemovalId));

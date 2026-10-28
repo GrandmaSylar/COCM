@@ -217,7 +217,7 @@ export function ImportMembers() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-medium">Preview ({parsedRows.length} rows)</h3>
-              <Badge variant={validRowsCount > 0 ? 'default' : 'destructive'} className={validRowsCount > 0 ? 'bg-green-100 text-green-800' : ''}>
+              <Badge variant={validRowsCount > 0 ? 'default' : 'destructive'} className={validRowsCount > 0 ? 'bg-success-soft text-success-text' : ''}>
                 {validRowsCount} valid row{validRowsCount !== 1 ? 's' : ''}
               </Badge>
             </div>
@@ -245,16 +245,16 @@ export function ImportMembers() {
                       </td>
                       <td className="px-4 py-2">
                         {row.errors.length === 0 ? (
-                          <span className="flex items-center text-green-600">
+                          <span className="flex items-center text-success-text">
                             <CheckCircle className="w-4 h-4 mr-1" /> OK
                           </span>
                         ) : (
-                          <span className="flex items-center text-red-600">
+                          <span className="flex items-center text-destructive">
                             <XCircle className="w-4 h-4 mr-1" /> Err
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-2 text-red-600 text-xs max-w-xs truncate" title={row.errors.join(', ')}>
+                      <td className="px-4 py-2 text-destructive text-xs max-w-xs truncate" title={row.errors.join(', ')}>
                         {row.errors.length > 0 ? row.errors.join(', ') : '-'}
                       </td>
                     </tr>
@@ -302,11 +302,11 @@ export function ImportMembers() {
           <div className="bg-muted p-4 rounded-lg space-y-4">
             <h3 className="font-medium text-lg border-b pb-2">Import Summary</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="bg-green-50 p-3 rounded border border-green-200 text-green-800">
+              <div className="bg-success-soft p-3 rounded border border-success/30 text-success-text">
                 <span className="block text-2xl font-bold">{results.success}</span>
                 <span className="text-sm">Successfully Imported</span>
               </div>
-              <div className="bg-red-50 p-3 rounded border border-red-200 text-red-800">
+              <div className="bg-destructive/10 p-3 rounded border border-destructive/30 text-destructive">
                 <span className="block text-2xl font-bold">{results.failed}</span>
                 <span className="text-sm">Failed to Import</span>
               </div>
@@ -314,8 +314,8 @@ export function ImportMembers() {
 
             {results.failedRows.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-medium mb-2 text-red-700">Failed Rows Details</h4>
-                <ul className="text-sm text-red-600 bg-white p-3 rounded border border-red-100 max-h-40 overflow-y-auto space-y-1">
+                <h4 className="font-medium mb-2 text-destructive">Failed Rows Details</h4>
+                <ul className="text-sm text-destructive bg-card p-3 rounded border border-destructive/30 max-h-40 overflow-y-auto space-y-1">
                   {results.failedRows.map((f, i) => (
                     <li key={i}><strong>Row {f.row}:</strong> {f.error}</li>
                   ))}

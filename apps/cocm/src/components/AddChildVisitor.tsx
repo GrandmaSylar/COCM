@@ -156,17 +156,17 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
         >
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              status.complete && hasRequired ? 'bg-green-100 dark:bg-green-900' : 'bg-muted'
+              status.complete && hasRequired ? 'bg-success-soft' : 'bg-muted'
             }`}>
               {status.complete && hasRequired ? (
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <Check className="w-5 h-5 text-success-text" />
               ) : (
                 <Icon className="w-5 h-5 text-muted-foreground" />
               )}
             </div>
             <div className="text-left flex items-center gap-2">
               <h3 className="font-semibold">{title}</h3>
-              {hasRequired && <span className="text-xs text-red-500 font-medium">Required</span>}
+              {hasRequired && <span className="text-xs text-destructive font-medium">Required</span>}
               {hasRequired && status.total > 0 && (
                 <p className="text-xs text-muted-foreground ml-2">
                   {status.filled} of {status.total} filled
@@ -186,7 +186,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
   return (
     <div className="space-y-4 pt-32 lg:pt-36 animate-fade-in relative pb-24">
       <div className="fixed top-2 left-2 right-2 sm:left-4 sm:right-4 lg:left-[calc(16rem+1.5rem)] lg:right-6 z-50">
-        <Card className="border-2 border-primary/20 shadow-lg">
+        <Card className="border-2 border-primary/20 shadow-sm">
           <CardContent className="p-3 sm:p-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -195,7 +195,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                   {progressData.percentage}%
                 </span>
               </div>
-              <div className="relative h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="relative h-3 sm:h-4 bg-fill rounded-full overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -215,7 +215,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                     variant={field.filled ? 'default' : 'outline'}
                     className={`text-xs transition-all duration-300 ${
                       field.filled
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-300'
+                        ? 'bg-success-soft text-success-text border-success/30'
                         : 'text-muted-foreground'
                     }`}
                   >
@@ -271,7 +271,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                   <div className="space-y-2">
                     <Label htmlFor="dateOfBirth">Date of Birth</Label>
                     <Input id="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => handleInputChange('dateOfBirth', e.target.value)} />
-                    {ageError && <p className="text-sm text-red-500 mt-1">{ageError}</p>}
+                    {ageError && <p className="text-sm text-destructive mt-1">{ageError}</p>}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -326,7 +326,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
                           <div className="space-y-4">
                             <div className="flex justify-between items-center">
                               <Label>Guardian {index + 1}</Label>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => removeGuardian(guardian.id)} disabled={guardians.length === 1} className="text-red-500">
+                              <Button type="button" variant="ghost" size="sm" onClick={() => removeGuardian(guardian.id)} disabled={guardians.length === 1} className="text-destructive">
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </div>
@@ -387,7 +387,7 @@ export function AddChildVisitor({ onBack, onSave }: AddChildVisitorProps) {
           <div className="hidden sm:block">
             {!isValid && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
                 Complete all required fields to save
               </p>
             )}

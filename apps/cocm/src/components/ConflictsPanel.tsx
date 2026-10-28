@@ -120,33 +120,33 @@ export function ConflictsPanel({ onAllResolved }: ConflictsPanelProps) {
   return (
     <div className="mb-6 space-y-4">
       <div className="flex items-center gap-2 mb-4">
-        <AlertTriangle className="w-5 h-5 text-orange-500" />
-        <h2 className="text-lg font-semibold text-orange-900 dark:text-orange-200">
+        <AlertTriangle className="w-5 h-5 text-warning-text" />
+        <h2 className="text-lg font-semibold text-warning-text">
           Sync Conflicts ({conflicts.length})
         </h2>
       </div>
       
       <div className="space-y-4">
         {conflicts.map((conflict) => (
-          <div key={conflict.id} className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 shadow-sm animate-fade-in">
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-orange-200 dark:border-orange-800/50">
-              <h3 className="font-semibold text-orange-900 dark:text-orange-100 flex items-center gap-2">
-                <span className="uppercase text-xs font-bold bg-orange-200 dark:bg-orange-800 text-orange-800 dark:text-orange-200 px-2 py-0.5 rounded-full">
+          <div key={conflict.id} className="bg-warning-soft border border-warning/30 rounded-xl p-4 shadow-sm animate-fade-in">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-warning/30">
+              <h3 className="font-semibold text-warning-text flex items-center gap-2">
+                <span className="uppercase text-xs font-bold bg-warning-soft text-warning-text px-2 py-0.5 rounded-full">
                   {capitalize(conflict.module)}
                 </span>
                 {getRecordIdentifier(conflict)}
               </h3>
-              <span className="text-xs text-orange-700 dark:text-orange-400 font-medium">
+              <span className="text-xs text-warning-text font-medium">
                 {new Date(conflict.timestamp).toLocaleString()}
               </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               {/* Local Version */}
-              <div className="bg-white dark:bg-background border border-orange-100 dark:border-orange-900/50 rounded-lg p-3">
+              <div className="bg-card dark:bg-background border border-warning/30 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                    <Smartphone className="w-4 h-4 text-blue-500" />
+                    <Smartphone className="w-4 h-4 text-info-text" />
                     Your version (offline)
                   </span>
                 </div>
@@ -156,16 +156,16 @@ export function ConflictsPanel({ onAllResolved }: ConflictsPanelProps) {
               </div>
 
               {/* Server Version */}
-              <div className="bg-white dark:bg-background border border-orange-100 dark:border-orange-900/50 rounded-lg p-3">
+              <div className="bg-card dark:bg-background border border-warning/30 rounded-lg p-3">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                    <Server className="w-4 h-4 text-emerald-500" />
+                    <Server className="w-4 h-4 text-success-text" />
                     Server version
                   </span>
                 </div>
                 <div className={`p-2 rounded line-clamp-3 font-mono text-xs ${
                   (conflict.serverPayload as any)?.deleted 
-                    ? "text-red-600 bg-red-50 dark:bg-red-950/30 italic" 
+                    ? "text-destructive bg-destructive/10 italic" 
                     : "text-muted-foreground bg-muted/50"
                 }`}>
                   {getDiffSummary(conflict.serverPayload)}
@@ -173,11 +173,11 @@ export function ConflictsPanel({ onAllResolved }: ConflictsPanelProps) {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 justify-end pt-2 border-t border-orange-200 dark:border-orange-800/50">
+            <div className="flex flex-col sm:flex-row gap-2 justify-end pt-2 border-t border-warning/30">
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-white dark:bg-background hover:bg-orange-100 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700"
+                className="bg-card dark:bg-background hover:bg-warning-soft text-warning-text border-warning/30"
                 disabled={resolving !== null}
                 onClick={() => handleResolve(conflict, 'keep-server')}
               >
@@ -187,7 +187,7 @@ export function ConflictsPanel({ onAllResolved }: ConflictsPanelProps) {
               <Button
                 variant="default"
                 size="sm"
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                className="bg-warning hover:bg-warning text-white"
                 disabled={resolving !== null}
                 onClick={() => handleResolve(conflict, 'keep-mine')}
               >

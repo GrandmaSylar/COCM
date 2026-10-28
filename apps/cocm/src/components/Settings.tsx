@@ -50,9 +50,9 @@ const roleLabels = {
 
 const roleColors = {
   dev: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-  admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-  pastor: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-  elder: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+  admin: 'bg-destructive/10 text-destructive ',
+  pastor: 'bg-info-soft text-info-text ',
+  elder: 'bg-success-soft text-success-text '
 };
 
 const allPermissions = [
@@ -734,7 +734,7 @@ export function Settings({ onAddUser }: SettingsProps) {
               </Badge>
             )}
             {isAdmin && !isDev && (
-              <Badge variant="outline" className="ml-1 sm:ml-2 bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+              <Badge variant="outline" className="ml-1 sm:ml-2 bg-destructive/10 text-destructive ">
                 Admin
               </Badge>
             )}
@@ -920,27 +920,27 @@ export function Settings({ onAddUser }: SettingsProps) {
           {pendingUsers.length > 0 && (
             <div>
               <h2 className="mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-orange-500" />
+                <Clock className="w-5 h-5 text-warning-text" />
                 Pending Account Approvals ({pendingUsers.length})
               </h2>
               <div className="space-y-3">
                 {pendingUsers.map((pendingUser) => (
-                  <Card key={pendingUser.id} className="border-orange-200 dark:border-orange-800">
+                  <Card key={pendingUser.id} className="border-warning/30">
                     <CardContent className="p-4">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                         <div className="flex items-start gap-3 sm:gap-4 flex-1">
-                          <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900/20 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                          <div className="w-12 h-12 bg-warning-soft rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-medium text-warning-text">
                               {pendingUser.name.split(' ').map((n: string) => n[0]).join('')}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{pendingUser.name}</h3>
-                              <Badge className={(roleColors as any)[pendingUser.role] || "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"}>
+                              <Badge className={(roleColors as any)[pendingUser.role] || "bg-info-soft text-info-text "}>
                                 {(roleLabels as any)[pendingUser.role] || pendingUser.role}
                               </Badge>
-                              <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                              <Badge variant="outline" className="bg-warning-soft text-warning-text ">
                                 Pending Approval
                               </Badge>
                             </div>
@@ -963,7 +963,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <Button
                             onClick={() => handleApproveUser(pendingUser.id)}
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                            className="bg-success hover:bg-success w-full sm:w-auto"
                           >
                             Approve
                           </Button>
@@ -971,7 +971,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                             onClick={() => handleRejectUser(pendingUser.id)}
                             variant="outline"
                             size="sm"
-                            className="text-red-600 hover:text-red-700 w-full sm:w-auto"
+                            className="text-destructive hover:text-destructive w-full sm:w-auto"
                           >
                             Reject
                           </Button>
@@ -1003,8 +1003,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Card className="min-w-0">
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center gap-2">
-                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-info-text" />
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{allSystemUsers.length}</p>
@@ -1031,8 +1031,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center gap-2">
-                      <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-destructive" />
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'admin').length}</p>
@@ -1045,8 +1045,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center gap-2">
-                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-info-text" />
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'pastor').length}</p>
@@ -1059,8 +1059,8 @@ export function Settings({ onAddUser }: SettingsProps) {
                 <Card>
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center gap-2">
-                      <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <div className="w-10 h-10 bg-success-soft rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-success-text" />
                       </div>
                       <div>
                         <p className="text-2xl font-bold">{allSystemUsers.filter(u => u.role === 'elder').length}</p>
@@ -1203,7 +1203,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                 const tempPerms = userTempPermissions[systemUser.id] || [];
                 
                 return (
-                  <Card key={systemUser.id} className="hover:shadow-md transition-shadow w-full min-w-0">
+                  <Card key={systemUser.id} className="transition-shadow w-full min-w-0">
                     <CardContent className="p-3 sm:p-4 overflow-hidden">
                       <div className="flex flex-col gap-3 w-full min-w-0">
                         <div className="flex items-start gap-3 sm:gap-4 flex-1">
@@ -1215,24 +1215,24 @@ export function Settings({ onAddUser }: SettingsProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
                               <h3 className="font-medium">{systemUser.name}</h3>
-                              <Badge className={(roleColors as any)[systemUser.role] || "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300"}>
+                              <Badge className={(roleColors as any)[systemUser.role] || "bg-info-soft text-info-text "}>
                                 {(roleLabels as any)[systemUser.role] || systemUser.role}
                               </Badge>
                               {systemUser.approvalStatus === 'pending' && (
-                                <Badge variant="outline" className="bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400">
+                                <Badge variant="outline" className="bg-warning-soft text-warning-text ">
                                   Pending
                                 </Badge>
                               )}
                               {systemUser.approvalStatus === 'rejected' && (
-                                <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                                <Badge variant="outline" className="bg-destructive/10 text-destructive ">
                                   Rejected
                                 </Badge>
                               )}
 
                               {/* Online/Offline indicator */}
                               {systemUser.approvalStatus === 'approved' && systemUser.isActive && (
-                                <div className={`flex items-center gap-1 text-xs ${isUserOnline(systemUser.lastLogin) ? 'text-green-600 dark:text-green-400' : 'text-gray-400'}`} title={systemUser.lastLogin ? `Last login: ${new Date(systemUser.lastLogin).toLocaleString()}` : 'Never logged in'}>
-                                  <Circle className={`w-2 h-2 ${isUserOnline(systemUser.lastLogin) ? 'fill-green-500 text-green-500' : 'fill-gray-400 text-gray-400'}`} />
+                                <div className={`flex items-center gap-1 text-xs ${isUserOnline(systemUser.lastLogin) ? 'text-success-text' : 'text-muted-foreground'}`} title={systemUser.lastLogin ? `Last login: ${new Date(systemUser.lastLogin).toLocaleString()}` : 'Never logged in'}>
+                                  <Circle className={`w-2 h-2 ${isUserOnline(systemUser.lastLogin) ? 'fill-green-500 text-success-text' : 'fill-gray-400 text-muted-foreground'}`} />
                                   {isUserOnline(systemUser.lastLogin) ? 'Online' : formatLastSeen(systemUser.lastLogin)}
                                 </div>
                               )}
@@ -1295,7 +1295,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         <Button
                                           size="sm"
                                           variant="ghost"
-                                          className="h-6 text-xs px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                                          className="h-6 text-xs px-2 text-warning-text hover:text-warning-text hover:bg-warning-soft "
                                           onClick={() => {
                                             setResetPasswordUserId(systemUser.id);
                                             setResetPasswordUserName(systemUser.name);
@@ -1335,7 +1335,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                             <SelectItem key={cr.id} value={cr.name}>
                                               <div className="flex items-center gap-2">
                                                 {cr.name}
-                                                <Badge className="bg-indigo-100 text-indigo-800 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300">Custom</Badge>
+                                                <Badge className="bg-info-soft text-info-text hover:bg-info-soft ">Custom</Badge>
                                               </div>
                                             </SelectItem>
                                           ))}
@@ -1349,17 +1349,17 @@ export function Settings({ onAddUser }: SettingsProps) {
 
                             {/* Temporary Permissions */}
                             {tempPerms.length > 0 && (
-                              <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg overflow-hidden">
+                              <div className="mt-3 p-3 bg-info-soft rounded-lg overflow-hidden">
                                 <div className="flex items-center gap-2 mb-2 min-w-0">
-                                  <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400 truncate">
+                                  <Clock className="w-4 h-4 text-info-text flex-shrink-0" />
+                                  <span className="text-sm font-medium text-info-text truncate">
                                     Temporary Permissions
                                   </span>
                                 </div>
                                 <div className="space-y-2 min-w-0">
                                   {tempPerms.map((tp) => (
                                     <div key={tp.permission} className="flex flex-col sm:flex-row items-start gap-2 text-sm min-w-0">
-                                      <span className="text-blue-700 dark:text-blue-300 truncate flex-shrink-0 sm:flex-shrink">
+                                      <span className="text-info-text truncate flex-shrink-0 sm:flex-shrink">
                                         {tp.permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                       </span>
                                       <div className="flex items-center gap-2 flex-shrink-0">
@@ -1389,14 +1389,14 @@ export function Settings({ onAddUser }: SettingsProps) {
                                   open={tabAccessOpen[systemUser.id] || false}
                                   onOpenChange={(open) => setTabAccessOpen(prev => ({ ...prev, [systemUser.id]: open }))}
                                 >
-                                  <div className="p-4 bg-gradient-to-r from-secondary/10 to-amber-500/10 dark:from-secondary/20 dark:to-amber-500/20 border border-secondary/30 rounded-xl w-full">
+                                  <div className="p-4 from-secondary/10 dark:from-secondary/20 border border-secondary/30 rounded-xl w-full">
                                     <CollapsibleTrigger asChild>
                                       <button type="button" className="flex items-center justify-between w-full">
                                         <div className="flex items-center gap-2">
                                           <div className="w-7 h-7 rounded-lg bg-secondary flex items-center justify-center">
                                             <Shield className="w-4 h-4 text-white" />
                                           </div>
-                                          <span className="text-sm font-semibold text-secondary dark:text-blue-300">
+                                          <span className="text-sm font-semibold text-secondary">
                                             Tab Access
                                           </span>
                                         </div>
@@ -1433,7 +1433,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                             }}
                                             className={`flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-lg border-2 text-xs font-medium transition-all min-w-0 ${
                                               hasAccess
-                                                ? 'bg-secondary text-white border-secondary shadow-sm shadow-secondary/25'
+                                                ? 'bg-secondary text-white border-secondary shadow-sm'
                                                 : 'bg-card text-muted-foreground border-border/50 hover:border-secondary/50 hover:bg-secondary/5'
                                             }`}
                                           >
@@ -1705,10 +1705,10 @@ export function Settings({ onAddUser }: SettingsProps) {
                                         }
                                       }}
                                     />
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-green-600" onClick={() => handleSaveOptionEdit(opt.id, cat.id)}>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-success-text" onClick={() => handleSaveOptionEdit(opt.id, cat.id)}>
                                       <CheckCircle className="h-4 w-4" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-red-600" onClick={() => {
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 flex-shrink-0 text-destructive" onClick={() => {
                                       setEditingOptionId(null);
                                       setEditingLabel('');
                                     }}>
@@ -1734,7 +1734,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                                           }}>
                                             <Edit className="h-3 w-3" />
                                           </Button>
-                                          <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title="Deactivate" onClick={() => handleDeactivateOption(opt.id)}>
+                                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" title="Deactivate" onClick={() => handleDeactivateOption(opt.id)}>
                                             <Trash2 className="h-3 w-3" />
                                           </Button>
                                         </>
@@ -1821,7 +1821,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                           toast.success(`${preset.name} preset loaded. Click Apply to save.`);
                         }}
                       >
-                        <div className="aspect-video rounded-lg border-2 mb-2 overflow-hidden relative shadow-sm transition-all group-hover:shadow-md group-hover:scale-105"
+                        <div className="aspect-video rounded-lg border-2 mb-2 overflow-hidden relative shadow-sm transition-all group-hover:shadow-sm"
                              style={{ borderColor: themeColorInputs.primary === preset.fullColors.primary ? 'var(--primary)' : 'transparent' }}>
                           <div className="absolute inset-0 flex">
                             <div className="w-1/3 h-full" style={{ backgroundColor: preset.colors.primary }} />
@@ -1871,7 +1871,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                 {/* Status Colors */}
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <div className="w-2 h-2 rounded-full bg-success" />
                     Status Colors
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1905,7 +1905,7 @@ export function Settings({ onAddUser }: SettingsProps) {
                 {/* UI Colors */}
                 <div>
                   <h3 className="text-sm font-semibold text-muted-foreground mb-4 flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400" />
+                    <div className="w-2 h-2 rounded-full bg-fill-strong" />
                     UI Colors
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2141,7 +2141,7 @@ export function Settings({ onAddUser }: SettingsProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-amber-500" />
+              <KeyRound className="h-5 w-5 text-warning-text" />
               Reset Password
             </DialogTitle>
             <DialogDescription>
@@ -2172,7 +2172,7 @@ export function Settings({ onAddUser }: SettingsProps) {
               />
             </div>
             {newPassword && confirmPassword && newPassword !== confirmPassword && (
-              <p className="text-sm text-red-500">Passwords do not match</p>
+              <p className="text-sm text-destructive">Passwords do not match</p>
             )}
           </div>
           <DialogFooter>
@@ -2187,7 +2187,7 @@ export function Settings({ onAddUser }: SettingsProps) {
             <Button
               onClick={handleResetPassword}
               disabled={isResettingPassword || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
-              className="bg-amber-600 hover:bg-amber-700"
+              className="bg-warning hover:bg-warning"
             >
               {isResettingPassword ? 'Resetting...' : 'Reset Password'}
             </Button>
@@ -2673,7 +2673,7 @@ function BackupRestore() {
                       Based on: {formatDate(lastFullBackup.createdAt)}
                     </p>
                   ) : (
-                    <p className="text-xs text-orange-500 mt-2">
+                    <p className="text-xs text-warning-text mt-2">
                       Requires a full backup first
                     </p>
                   )}
@@ -2799,26 +2799,26 @@ function BackupRestore() {
               <div
                 className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                   restoreMode === 'merge'
-                    ? 'border-green-500 bg-green-50 dark:bg-green-950/30 shadow-md'
-                    : 'border-border hover:border-green-300 hover:bg-green-50/50 dark:hover:bg-green-950/10'
+                    ? 'border-success/30 bg-success-soft shadow-sm'
+                    : 'border-border hover:border-success/30 hover:bg-success-soft/50'
                 }`}
                 onClick={() => setRestoreMode('merge')}
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    restoreMode === 'merge' ? 'border-green-500 bg-green-500' : 'border-muted-foreground'
+                    restoreMode === 'merge' ? 'border-success/30 bg-success' : 'border-muted-foreground'
                   }`}>
                     {restoreMode === 'merge' && <CheckCircle className="w-3 h-3 text-white" />}
                   </div>
                   <div>
                     <h4 className="font-semibold text-base flex items-center gap-2">
-                      <Plus className="w-4 h-4 text-green-600" />
+                      <Plus className="w-4 h-4 text-success-text" />
                       Merge
                     </h4>
                     <p className="text-sm text-muted-foreground mt-1">
                       Add new records only. Existing records are kept unchanged.
                     </p>
-                    <Badge variant="outline" className="mt-2 text-green-600 border-green-300">Safest Option</Badge>
+                    <Badge variant="outline" className="mt-2 text-success-text border-success/30">Safest Option</Badge>
                   </div>
                 </div>
               </div>
@@ -2827,26 +2827,26 @@ function BackupRestore() {
               <div
                 className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                   restoreMode === 'update'
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-md'
-                    : 'border-border hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-950/10'
+                    ? 'border-info/30 bg-info-soft shadow-sm'
+                    : 'border-border hover:border-info/30 hover:bg-info-soft/50'
                 }`}
                 onClick={() => setRestoreMode('update')}
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    restoreMode === 'update' ? 'border-blue-500 bg-blue-500' : 'border-muted-foreground'
+                    restoreMode === 'update' ? 'border-info/30 bg-info' : 'border-muted-foreground'
                   }`}>
                     {restoreMode === 'update' && <CheckCircle className="w-3 h-3 text-white" />}
                   </div>
                   <div>
                     <h4 className="font-semibold text-base flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 text-blue-600" />
+                      <RefreshCw className="w-4 h-4 text-info-text" />
                       Update
                     </h4>
                     <p className="text-sm text-muted-foreground mt-1">
                       Update existing records and add new ones.
                     </p>
-                    <Badge variant="outline" className="mt-2 text-blue-600 border-blue-300">Recommended</Badge>
+                    <Badge variant="outline" className="mt-2 text-info-text border-info/30">Recommended</Badge>
                   </div>
                 </div>
               </div>
@@ -2855,26 +2855,26 @@ function BackupRestore() {
               <div
                 className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                   restoreMode === 'replace'
-                    ? 'border-red-500 bg-red-50 dark:bg-red-950/30 shadow-md'
-                    : 'border-border hover:border-red-300 hover:bg-red-50/50 dark:hover:bg-red-950/10'
+                    ? 'border-destructive/30 bg-destructive/10 shadow-sm'
+                    : 'border-border hover:border-destructive/30 hover:bg-destructive/10'
                 }`}
                 onClick={() => setRestoreMode('replace')}
               >
                 <div className="flex items-start gap-3">
                   <div className={`w-5 h-5 mt-0.5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                    restoreMode === 'replace' ? 'border-red-500 bg-red-500' : 'border-muted-foreground'
+                    restoreMode === 'replace' ? 'border-destructive/30 bg-destructive' : 'border-muted-foreground'
                   }`}>
                     {restoreMode === 'replace' && <CheckCircle className="w-3 h-3 text-white" />}
                   </div>
                   <div>
                     <h4 className="font-semibold text-base flex items-center gap-2">
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-4 h-4 text-destructive" />
                       Replace
                     </h4>
                     <p className="text-sm text-muted-foreground mt-1">
                       Delete all existing data and import from backup.
                     </p>
-                    <Badge variant="outline" className="mt-2 text-red-600 border-red-300">
+                    <Badge variant="outline" className="mt-2 text-destructive border-destructive/30">
                       <AlertTriangle className="w-3 h-3 mr-1" />
                       Destructive
                     </Badge>
@@ -2892,7 +2892,7 @@ function BackupRestore() {
               <div
                 className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                   restoreFailureMode === 'partial'
-                    ? 'border-primary bg-primary/5 shadow-md'
+                    ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-border hover:border-primary/50'
                 }`}
                 onClick={() => setRestoreFailureMode('partial')}
@@ -2918,7 +2918,7 @@ function BackupRestore() {
               <div
                 className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
                   restoreFailureMode === 'atomic'
-                    ? 'border-primary bg-primary/5 shadow-md'
+                    ? 'border-primary bg-primary/5 shadow-sm'
                     : 'border-border hover:border-primary/50'
                 }`}
                 onClick={() => setRestoreFailureMode('atomic')}
@@ -3072,16 +3072,16 @@ function BackupRestore() {
                 <div key={backup.id} className="flex items-center justify-between p-3 border rounded-lg">
                   <div className="flex items-center gap-3">
                     {backup.type === 'full' ? (
-                      <Database className="w-5 h-5 text-blue-500" />
+                      <Database className="w-5 h-5 text-info-text" />
                     ) : (
-                      <FileJson className="w-5 h-5 text-green-500" />
+                      <FileJson className="w-5 h-5 text-success-text" />
                     )}
                     <div>
                       <p className="font-medium flex items-center gap-2">
                         {backup.type === 'full' ? 'Full Backup' : 'Differential Backup'}
-                        {backup.status === 'completed' && <CheckCircle className="w-4 h-4 text-green-500" />}
-                        {backup.status === 'failed' && <XCircle className="w-4 h-4 text-red-500" />}
-                        {backup.status === 'in_progress' && <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />}
+                        {backup.status === 'completed' && <CheckCircle className="w-4 h-4 text-success-text" />}
+                        {backup.status === 'failed' && <XCircle className="w-4 h-4 text-destructive" />}
+                        {backup.status === 'in_progress' && <RefreshCw className="w-4 h-4 text-info-text animate-spin" />}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDate(backup.createdAt)} • {formatFileSize(backup.fileSize)}
@@ -3102,7 +3102,7 @@ function BackupRestore() {
                       size="sm"
                       onClick={() => handleDeleteBackup(backup.id)}
                     >
-                      <Trash2 className="w-4 h-4 text-red-500" />
+                      <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
                 </div>
@@ -3536,7 +3536,7 @@ function SystemRoleCard({ role, label, permissions, users, isExpanded, onToggleE
             return (
               <div
                 key={permission}
-                className={`flex items-center space-x-2 p-2 rounded border min-w-0 ${isDev && !isDevRole ? 'cursor-pointer hover:bg-muted/50' : ''} ${hasPermission ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-gray-50 border-gray-200 dark:bg-gray-900/20 dark:border-gray-800'}`}
+                className={`flex items-center space-x-2 p-2 rounded border min-w-0 ${isDev && !isDevRole ? 'cursor-pointer hover:bg-muted/50' : ''} ${hasPermission ? 'bg-success-soft border-success/30 ' : 'bg-muted border-border '}`}
                 onClick={() => !isDevRole && isDev && onTogglePermission(permission)}
               >
                 {isDev && !isDevRole && (
@@ -3546,7 +3546,7 @@ function SystemRoleCard({ role, label, permissions, users, isExpanded, onToggleE
                     disabled={isDevRole}
                   />
                 )}
-                <span className={`text-xs truncate ${hasPermission ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}`}>
+                <span className={`text-xs truncate ${hasPermission ? 'text-success-text' : 'text-muted-foreground'}`}>
                   {permission.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                 </span>
                 {isDevRole && <Crown className="w-3 h-3 text-purple-600 dark:text-purple-400 ml-auto flex-shrink-0" />}
@@ -3583,36 +3583,36 @@ function CustomRoleCard({ role, isExpanded, onToggleExpand, onEdit, onDelete }: 
           {role.permissions?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {role.permissions.slice(0, 3).map((p: string) => (
-                <Badge key={p} className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px] px-1.5 py-0">
+                <Badge key={p} className="bg-success-soft text-success-text hover:bg-success-soft text-[10px] px-1.5 py-0">
                   {p.replace(/_/g, ' ')}
                 </Badge>
               ))}
               {role.permissions.length > 3 && (
-                <Badge className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0">+{role.permissions.length - 3}</Badge>
+                <Badge className="bg-success-soft text-success-text text-[10px] px-1.5 py-0">+{role.permissions.length - 3}</Badge>
               )}
             </div>
           )}
           {role.tabAccess?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {role.tabAccess.slice(0, 3).map((t: string) => (
-                <Badge key={t} className="bg-blue-100 text-blue-800 hover:bg-blue-100 text-[10px] px-1.5 py-0">
+                <Badge key={t} className="bg-info-soft text-info-text hover:bg-info-soft text-[10px] px-1.5 py-0">
                   {t}
                 </Badge>
               ))}
               {role.tabAccess.length > 3 && (
-                <Badge className="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0">+{role.tabAccess.length - 3}</Badge>
+                <Badge className="bg-info-soft text-info-text text-[10px] px-1.5 py-0">+{role.tabAccess.length - 3}</Badge>
               )}
             </div>
           )}
           {role.dashboardWidgets?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {role.dashboardWidgets.slice(0, 3).map((w: string) => (
-                <Badge key={w} className="bg-gray-100 text-gray-800 hover:bg-gray-100 text-[10px] px-1.5 py-0 dark:bg-gray-800 dark:text-gray-300">
+                <Badge key={w} className="bg-muted text-foreground hover:bg-muted text-[10px] px-1.5 py-0 ">
                   {w.replace(/-/g, ' ')}
                 </Badge>
               ))}
               {role.dashboardWidgets.length > 3 && (
-                <Badge className="bg-gray-100 text-gray-800 text-[10px] px-1.5 py-0">+{role.dashboardWidgets.length - 3}</Badge>
+                <Badge className="bg-muted text-foreground text-[10px] px-1.5 py-0">+{role.dashboardWidgets.length - 3}</Badge>
               )}
             </div>
           )}
@@ -3754,14 +3754,14 @@ function RoleFormSheet({ open, onOpenChange, editingRole, existingRoles, onSaved
         <div className="flex-1 overflow-y-auto px-4 space-y-6">
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label htmlFor="role-name">Role Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="role-name">Role Name <span className="text-destructive">*</span></Label>
               <Input 
                 id="role-name" 
                 value={name} 
                 onChange={e => { setName(e.target.value); setNameError(''); }}
                 placeholder="e.g. Finance Team"
               />
-              {nameError && <p className="text-xs text-red-500">{nameError}</p>}
+              {nameError && <p className="text-xs text-destructive">{nameError}</p>}
             </div>
             <div className="space-y-1">
               <Label htmlFor="role-desc">Description</Label>

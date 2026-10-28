@@ -709,8 +709,8 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                     Editable. Change Zone and leave this empty to auto-generate a number.
                   </p>
                   {conflictingMember && (
-                    <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium">
-                      <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-warning-soft text-warning-text border border-warning/30 text-xs font-medium">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-warning-text" />
                       <span>
                         <strong>Zone Number '{formData.zoneNumber}' is already assigned to {conflictingMember.firstName} {conflictingMember.lastName}</strong> ({conflictingMember.zone ? `Zone ${conflictingMember.zone}` : 'Member'}).
                       </span>
@@ -903,12 +903,12 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                       <span className="ml-2 text-sm text-muted-foreground">Loading options...</span>
                     </div>
                   ) : optionsError ? (
-                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 p-4 rounded-lg flex flex-col items-center justify-center space-y-3 border border-red-200 dark:border-red-900/30">
+                    <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex flex-col items-center justify-center space-y-3 border border-destructive/30">
                       <div className="flex items-center">
                         <AlertTriangle className="h-5 w-5 mr-2" />
                         <span className="text-sm font-medium">{optionsError}</span>
                       </div>
-                      <Button type="button" variant="outline" size="sm" onClick={fetchOptions} className="bg-white hover:bg-red-50 dark:bg-transparent dark:border-red-800 dark:text-red-300 dark:hover:bg-red-900/40">
+                      <Button type="button" variant="outline" size="sm" onClick={fetchOptions} className="bg-card hover:bg-destructive/10 dark:bg-transparent ">
                         Retry Loading Options
                       </Button>
                     </div>
@@ -938,7 +938,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                                       setSelectedMinistries(selectedMinistries.filter(m => m !== ministry));
                                     }
                                   }}
-                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                  className="h-4 w-4 rounded border-border"
                                 />
                                 <Label 
                                   htmlFor={`ministry-${ministry}`} 
@@ -989,7 +989,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                                       setSelectedPositionHeld(selectedPositionHeld.filter(p => p !== pos));
                                     }
                                   }}
-                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                  className="h-4 w-4 rounded border-border"
                                 />
                                 <Label 
                                   htmlFor={`position-${pos}`} 
@@ -1295,7 +1295,7 @@ export function EditMember({ member, onBack, onSave }: EditMemberProps) {
                 <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setPendingRemovalId(null)}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
-                    className="bg-red-500 hover:bg-red-600 text-white"
+                    className="bg-destructive hover:bg-destructive text-white"
                     onClick={() => {
                       if (pendingRemovalId) {
                         setFamilyMembers(familyMembers.filter(m => m.id !== pendingRemovalId));

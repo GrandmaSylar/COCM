@@ -445,11 +445,11 @@ export function Help() {
   const getRoleBadgeColor = (role: string) => {
     const colors = {
       dev: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-      admin: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
-      pastor: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-      elder: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+      admin: 'bg-destructive/10 text-destructive ',
+      pastor: 'bg-info-soft text-info-text ',
+      elder: 'bg-success-soft text-success-text '
     };
-    return colors[role as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+    return colors[role as keyof typeof colors] || 'bg-muted text-foreground';
   };
 
   const getRoleLabel = (role: string) => {
@@ -671,26 +671,26 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-info-soft rounded-lg border border-info/30">
               <div className="flex items-center gap-2 mb-2">
-                <Calendar className="w-4 h-4 text-blue-600" />
+                <Calendar className="w-4 h-4 text-info-text" />
                 <h4 className="font-medium text-sm">Attendance Records</h4>
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="bg-blue-100 text-blue-800">12 hours</Badge>
+                <Badge variant="outline" className="bg-info-soft text-info-text">12 hours</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
                 Attendance records can be edited within 12 hours of creation. After that, they lock to view-only. The remaining time is shown as a countdown badge on each record.
               </p>
             </div>
 
-            <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="p-4 bg-success-soft rounded-lg border border-success/30">
               <div className="flex items-center gap-2 mb-2">
-                <Banknote className="w-4 h-4 text-green-600" />
+                <Banknote className="w-4 h-4 text-success-text" />
                 <h4 className="font-medium text-sm">Giving Records</h4>
               </div>
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className="bg-green-100 text-green-800">3 hours</Badge>
+                <Badge variant="outline" className="bg-success-soft text-success-text">3 hours</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
                 Giving records can be edited within 3 hours of creation. After that, they lock to view-only. The remaining time is shown as a countdown badge on each record.
@@ -704,9 +704,9 @@ export function Help() {
               <div className="space-y-1">
                 <p className="text-sm"><strong>Badge Guide:</strong></p>
                 <div className="flex flex-wrap gap-3 mt-1">
-                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-green-600" /> Green badge = editable, shows countdown</span>
-                  <span className="flex items-center gap-1 text-xs"><Lock className="w-3 h-3 text-gray-500" /> Gray badge = locked, view-only</span>
-                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-blue-600" /> "Dev" badge = Dev override access</span>
+                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-success-text" /> Green badge = editable, shows countdown</span>
+                  <span className="flex items-center gap-1 text-xs"><Lock className="w-3 h-3 text-muted-foreground" /> Gray badge = locked, view-only</span>
+                  <span className="flex items-center gap-1 text-xs"><Unlock className="w-3 h-3 text-info-text" /> "Dev" badge = Dev override access</span>
                 </div>
               </div>
             </AlertDescription>
@@ -727,9 +727,9 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 bg-orange-50 dark:bg-orange-950 rounded-lg border border-orange-200 dark:border-orange-800">
+            <div className="p-4 bg-warning-soft rounded-lg border border-warning/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-orange-100 text-orange-800">Individual</Badge>
+                <Badge className="bg-warning-soft text-warning-text">Individual</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
                 Mark each member as Present or Absent by name. This is the attendance that:
@@ -741,9 +741,9 @@ export function Help() {
               </ul>
             </div>
 
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-info-soft rounded-lg border border-info/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-blue-100 text-blue-800">Head Count</Badge>
+                <Badge className="bg-info-soft text-info-text">Head Count</Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-2">
                 Record the total number of people present. This attendance:
@@ -778,12 +778,12 @@ export function Help() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-info-soft rounded-lg border border-info/30">
               <div className="flex items-center gap-2 mb-2">
                 <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300">
                   Developer
                 </Badge>
-                <Shield className="w-4 h-4 text-blue-600" />
+                <Shield className="w-4 h-4 text-info-text" />
               </div>
               <p className="text-sm">
                 Supreme access to all features. Can create custom roles, modify base permissions,
@@ -791,9 +791,9 @@ export function Help() {
               </p>
             </div>
 
-            <div className="p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800">
+            <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
+                <Badge className="bg-destructive/10 text-destructive ">
                   Administrator
                 </Badge>
               </div>
@@ -803,9 +803,9 @@ export function Help() {
               </p>
             </div>
 
-            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="p-4 bg-info-soft rounded-lg border border-info/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                <Badge className="bg-info-soft text-info-text ">
                   Pastor
                 </Badge>
               </div>
@@ -815,9 +815,9 @@ export function Help() {
               </p>
             </div>
 
-            <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+            <div className="p-4 bg-success-soft rounded-lg border border-success/30">
               <div className="flex items-center gap-2 mb-2">
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                <Badge className="bg-success-soft text-success-text ">
                   Elder
                 </Badge>
               </div>

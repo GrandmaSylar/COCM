@@ -236,7 +236,7 @@ export function AbsenteeReview({
         <div>
           <h1 className="flex items-center gap-2">
             Absentee Review
-            <Badge className="bg-blue-600 text-white text-[10px]">LIVE</Badge>
+            <Badge className="bg-info text-white text-[10px]">LIVE</Badge>
           </h1>
           <p className="text-muted-foreground text-sm">
             Session by <strong>{sessionCreatorName || 'Loading...'}</strong> — Changes sync in real time.
@@ -248,19 +248,19 @@ export function AbsenteeReview({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{absentees.length}</div>
+            <div className="text-2xl font-bold text-destructive">{absentees.length}</div>
             <p className="text-sm text-muted-foreground">Total Absent</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{withPermission}</div>
+            <div className="text-2xl font-bold text-info-text">{withPermission}</div>
             <p className="text-sm text-muted-foreground">With Permission</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-orange-600">{absentees.length - withPermission}</div>
+            <div className="text-2xl font-bold text-warning-text">{absentees.length - withPermission}</div>
             <p className="text-sm text-muted-foreground">Without Permission</p>
           </CardContent>
         </Card>
@@ -318,8 +318,8 @@ export function AbsenteeReview({
                   <div key={member.id} className="p-4 border rounded-lg space-y-3">
                     {/* Member Info */}
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-red-600">
+                      <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-medium text-destructive">
                           {member.firstName[0]}{member.lastName[0]}
                         </span>
                       </div>
@@ -333,7 +333,7 @@ export function AbsenteeReview({
                           <span>{member.phone}</span>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="bg-red-100 text-red-800">Absent</Badge>
+                      <Badge variant="secondary" className="bg-destructive/10 text-destructive">Absent</Badge>
                     </div>
 
                     {/* Absentee Form */}

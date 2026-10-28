@@ -122,7 +122,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
           </Button>
 
           {onSave && (
-            <Button onClick={onSave} disabled={isSubmitting} className="bg-green-600 hover:bg-green-700 text-white gap-2">
+            <Button onClick={onSave} disabled={isSubmitting} className="bg-success hover:bg-success text-white gap-2">
               <Save className="w-4 h-4" />
               <span className="hidden sm:inline">{isSubmitting ? 'Saving...' : 'Save Requisition'}</span>
             </Button>
@@ -135,7 +135,7 @@ export function ExpenseReceipt({ expenseId, expenseData, onBack, onEdit, onSave,
         {previewPdfUrl ? (
           <iframe 
             src={previewPdfUrl} 
-            className="w-full h-full rounded border bg-white shadow-sm" 
+            className="w-full h-full rounded border bg-card shadow-sm" 
             title="Expense Requisition PDF"
           />
         ) : (
