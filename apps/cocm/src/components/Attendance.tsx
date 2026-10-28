@@ -8,6 +8,10 @@ import { Checkbox } from './ui/checkbox';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Calendar, Users, Plus, TrendingUp, Search, Clock, Edit, Trash2, X, Settings, ArrowLeft, UserCheck, Lock, Unlock, RefreshCw, WifiOff } from 'lucide-react';
+import { EmptyState, Group, GroupRow, IconTile, LargeTitle, SearchField, StatusNotice } from './ui/ios';
+import { PullToRefresh, SwipeRow } from './ui/ios-gestures';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { ChevronRight, Eye, MoreHorizontal } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { Member } from './Members';
 import { api } from '../services/api';
@@ -290,298 +294,211 @@ export function Attendance({ onRecordAttendance, onMarkAttendance, onViewRecord 
     />;
   }
 
+  const activeCustomServices = customServices.filter(s => s.isActive).length;
+
   return (
-    <div className="space-y-6 relative">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Attendance</h1>
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title={
+          <span className="flex items-center gap-2">
+            Attendance
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
+              <Badge variant="outline" className="bg-warning-soft text-warning-text border-0">
                 <WifiOff className="w-3 h-3 mr-1" />
-                Cached Data
+                Cached
               </Badge>
             )}
-          </div>
-          <p className="text-muted-foreground">
-            Track and manage service attendance
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 sm:mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          {canManageServices && (
-            <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => setShowServiceManager(true)}>
-              <Settings className="w-4 h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Manage Services</span>
-              <span className="sm:hidden">Services</span>
-            </Button>
-          )}
-          {canRecordAttendance && (
-            <>
-              <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => onMarkAttendance()}>
-                <UserCheck className="w-4 h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Mark Individual</span>
-                <span className="sm:hidden">Individual</span>
-              </Button>
-              <Button size="sm" className="text-xs sm:text-sm" onClick={onRecordAttendance}>
+          </span>
+        }
+        subtitle="Track and manage service attendance"
+        actions={
+          <>
+            {canRecordAttendance && (
+              <Button onClick={onRecordAttendance}>
                 <Plus className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Record Head Count</span>
-                <span className="sm:hidden">Head Count</span>
+                <span className="sr-only sm:hidden">Record Head Count</span>
               </Button>
-            </>
-          )}
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {canRecordAttendance && (
+                  <DropdownMenuItem onClick={() => onMarkAttendance()}>
+                    <UserCheck className="w-4 h-4" />
+                    Mark Individual
+                  </DropdownMenuItem>
+                )}
+                {canManageServices && (
+                  <DropdownMenuItem onClick={() => setShowServiceManager(true)}>
+                    <Settings className="w-4 h-4" />
+                    Manage Services
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+
+      <StatusNotice icon={Clock}>
+        <strong className="font-semibold">Sunday Main Service:</strong> every Sunday, 8:00 AM to 1:00 PM (permanent).
+        {activeCustomServices > 0 && <> {activeCustomServices} custom {activeCustomServices === 1 ? 'service' : 'services'} active.</>}
+      </StatusNotice>
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { icon: Calendar, tone: 'info' as const, value: totalServices, label: 'Services' },
+          { icon: Users, tone: 'success' as const, value: averageAttendance, label: 'Average' },
+          { icon: TrendingUp, tone: 'warning' as const, value: thisWeekAttendance, label: 'This Week' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-3 sm:p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 text-2xl font-bold leading-none tracking-tight tabular-nums sm:text-[28px]">{stat.value}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground sm:text-[15px]">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <SearchField className="flex-1" value={searchTerm} onChange={setSearchTerm} placeholder="Search by service type" />
+        <div className="flex gap-2">
+          <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
+            <SelectTrigger className="flex-1 sm:w-44 sm:flex-none">
+              <SelectValue placeholder="Filter by service" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Services</SelectItem>
+              {allServiceTypes.map((type) => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedAttendanceType} onValueChange={setSelectedAttendanceType}>
+            <SelectTrigger className="flex-1 sm:w-40 sm:flex-none">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="individual">Individual</SelectItem>
+              <SelectItem value="general">Head Count</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      {/* Service Info Alert */}
-      <Alert>
-        <Clock className="h-4 w-4" />
-        <AlertDescription>
-          <strong>Sunday Main Service:</strong> Every Sunday, 8:00 AM - 1:00 PM (Permanent service)
-          {customServices.filter(s => s.isActive).length > 0 && (
-            <span className="block mt-1">
-              <strong>Custom Services:</strong> {customServices.filter(s => s.isActive).length} active
-            </span>
-          )}
-        </AlertDescription>
-      </Alert>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-20 h-20 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{totalServices}</div>
-            <div className="text-sm font-medium text-muted-foreground">Total Services</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Users className="w-20 h-20 text-success-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-success/40 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
-              <Users className="w-5 h-5" />
-            </div>
-            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{averageAttendance}</div>
-            <div className="text-sm font-medium text-muted-foreground">Average Attendance</div>
-          </div>
-        </div>
-
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
-          <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-info-text" />
-          </div>
-          <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-            <div className="text-4xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{thisWeekAttendance}</div>
-            <div className="text-sm font-medium text-muted-foreground">This Week</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by service type..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <Select value={selectedServiceType} onValueChange={setSelectedServiceType}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by service" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Services</SelectItem>
-            {allServiceTypes.map((type) => (
-              <SelectItem key={type} value={type}>{type}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={selectedAttendanceType} onValueChange={setSelectedAttendanceType}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="individual">Individual</SelectItem>
-            <SelectItem value="general">Head Count</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Live Session Banner */}
+      {/* Live sessions volunteers can join */}
       {liveSessions.length > 0 && canRecordAttendance && (
-        <div className="space-y-3">
+        <Group title="Live now">
           {liveSessions.map((session: any) => (
-            <Card key={session.id} className="border-success/30 bg-success-soft">
-              <CardContent className="p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-success/20 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-success-text" />
-                      </div>
-                      <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-success rounded-full animate-pulse" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
-                        {session.serviceType}
-                        <Badge className="bg-success text-white text-[10px]">LIVE</Badge>
-                      </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        {session.attendees?.length || 0} marked present so far
-                      </p>
-                    </div>
-                  </div>
-                  <Button size="sm" className="bg-success hover:bg-success w-full sm:w-auto" onClick={() => onMarkAttendance({ date: session.date, serviceType: session.serviceType })}>
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Join Session
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+            <GroupRow
+              key={session.id}
+              icon={Users}
+              iconTone="success"
+              title={
+                <span className="flex items-center gap-2">
+                  {session.serviceType}
+                  <Badge className="border-0 bg-success px-1.5 text-[10px] text-white">LIVE</Badge>
+                </span>
+              }
+              subtitle={`${session.attendees?.length || 0} marked present so far`}
+              trailing={
+                <Button size="sm" onClick={(e) => { e.stopPropagation(); onMarkAttendance({ date: session.date, serviceType: session.serviceType }); }}>
+                  Join
+                </Button>
+              }
+            />
           ))}
-        </div>
+        </Group>
       )}
 
-      {/* Attendance Records */}
-      <div className="space-y-4">
-        <h2>Recent Services</h2>
-        {records.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Calendar className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">No Attendance Records Yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start tracking attendance for your church services. Sunday Main Service is available by default.
-                </p>
-                {canRecordAttendance && (
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button variant="outline" onClick={() => onMarkAttendance()}>
-                      <UserCheck className="w-4 h-4 mr-2" />
-                      Mark Individual Attendance
-                    </Button>
-                    <Button onClick={onRecordAttendance}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Record Group Attendance
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ) : filteredRecords.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">No attendance records found matching your filters.</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredRecords.map((record) => (
-            <Card key={record.id} className="transition-shadow overflow-hidden">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 icon-bg-pink rounded-full flex items-center justify-center flex-shrink-0">
-                      <Calendar className="w-5 h-5 sm:w-6 sm:h-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-sm sm:text-base truncate">{record.serviceType}</h3>
-                      <div className="flex flex-wrap items-center gap-1 mt-1">
-                        {record.attendanceType === 'general' ? (
-                          <Badge variant="outline" className="text-[10px] sm:text-xs badge-info">Head Count</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] sm:text-xs badge-warning">Individual</Badge>
-                        )}
-                        {record.isCustomService && (
-                          <Badge variant="outline" className="text-[10px] sm:text-xs">Custom</Badge>
-                        )}
-                        {!record.isCustomService && (
-                          <Badge variant="default" className="text-[10px] sm:text-xs badge-success border-none">Permanent</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                        {formatDate(record.date)}
-                        {record.startTime && record.endTime && (
-                          <span className="ml-1 sm:ml-2">
-                            {formatTime(record.startTime)} - {formatTime(record.endTime)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-left sm:text-right flex sm:block items-center gap-2 ml-13 sm:ml-0">
-                    <div className="text-xl sm:text-2xl font-bold text-primary">
-                      {record.totalCount}
-                    </div>
-                    <p className="text-xs text-muted-foreground">attendees</p>
-                  </div>
+      {/* Attendance records */}
+      {records.length === 0 ? (
+        <Group>
+          <EmptyState
+            icon={Calendar}
+            title="No Attendance Records Yet"
+            description="Start tracking attendance for your church services. Sunday Main Service is available by default."
+            action={
+              canRecordAttendance ? (
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button variant="soft" onClick={() => onMarkAttendance()}>
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    Mark Individual
+                  </Button>
+                  <Button onClick={onRecordAttendance}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Record Group Attendance
+                  </Button>
                 </div>
-                
-                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                      {record.attendanceType === 'individual'
-                        ? `Recorded members: ${record.attendees.length}`
-                        : 'Head count record'}
-                    </p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {(() => {
-                        const editInfo = getEditWindowInfo(record.createdAt);
-                        return (
-                          <>
-                            {(editInfo.canEdit || isDev) ? (
-                              <Badge variant="outline" className="text-[10px] sm:text-xs badge-success">
-                                <Unlock className="w-3 h-3 mr-1" />
-                                {isDev && !editInfo.canEdit ? 'Dev' : editInfo.label}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] sm:text-xs badge-muted">
-                                <Lock className="w-3 h-3 mr-1" />
-                                {editInfo.label}
-                              </Badge>
-                            )}
-                            <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => onViewRecord(record.id)}>
-                              {(editInfo.canEdit || isDev) && canRecordAttendance ? (
-                                <><Edit className="w-3 h-3 mr-1" /> Edit</>
-                              ) : (
-                                <>View</>
-                              )}
-                            </Button>
-                          </>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
+              ) : undefined
+            }
+          />
+        </Group>
+      ) : filteredRecords.length === 0 ? (
+        <Group>
+          <EmptyState icon={Search} title="No results" description="No attendance records match your filters." />
+        </Group>
+      ) : (
+        <Group title="Recent Services">
+          {filteredRecords.map((record) => {
+            const editInfo = getEditWindowInfo(record.createdAt);
+            const editable = editInfo.canEdit || isDev;
+            return (
+              <SwipeRow
+                key={record.id}
+                className="last:[&_button]:after:hidden"
+                actions={[{ label: editable && canRecordAttendance ? 'Edit' : 'View', icon: editable && canRecordAttendance ? Edit : Eye, tone: 'info', onClick: () => onViewRecord(record.id) }]}
+              >
+                <button
+                  type="button"
+                  onClick={() => onViewRecord(record.id)}
+                  className="relative flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/60 active:bg-accent after:absolute after:bottom-0 after:left-[3.25rem] after:right-0 after:h-px after:bg-separator"
+                >
+                  <IconTile icon={Calendar} tone="primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[17px] leading-snug lg:text-[15px]">{record.serviceType}</span>
+                    <span className="block truncate text-[13px] text-muted-foreground">
+                      {formatDate(record.date)}
+                      {record.startTime && record.endTime && <> · {formatTime(record.startTime)} to {formatTime(record.endTime)}</>}
+                    </span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <Badge variant="secondary" className={`border-0 ${record.attendanceType === 'general' ? 'bg-info-soft text-info-text' : 'bg-warning-soft text-warning-text'}`}>
+                        {record.attendanceType === 'general' ? 'Head Count' : 'Individual'}
+                      </Badge>
+                      <Badge variant="secondary" className="border-0 bg-fill text-foreground">
+                        {record.isCustomService ? 'Custom' : 'Permanent'}
+                      </Badge>
+                      <span className="inline-flex items-center gap-1">
+                        {editable ? <Unlock className="size-3" /> : <Lock className="size-3" />}
+                        {isDev && !editInfo.canEdit ? 'Dev' : editInfo.label}
+                      </span>
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-xl font-bold leading-none tabular-nums text-primary-text">{record.totalCount}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {record.attendanceType === 'individual' ? `${record.attendees.length} recorded` : 'attendees'}
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/60" />
+                </button>
+              </SwipeRow>
+            );
+          })}
+        </Group>
+      )}
     </div>
+    </PullToRefresh>
   );
 }
 
