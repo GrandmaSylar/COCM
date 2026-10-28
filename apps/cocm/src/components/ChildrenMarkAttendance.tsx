@@ -170,9 +170,9 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
 
   const getStatusColor = (status: 'present' | 'absent' | 'unmarked') => {
     switch (status) {
-      case 'present': return 'bg-green-100 text-green-800 border-green-200';
-      case 'absent': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'present': return 'bg-success-soft text-success-text border-success/30';
+      case 'absent': return 'bg-destructive/10 text-destructive border-destructive/30';
+      default: return 'bg-muted text-foreground border-border';
     }
   };
 
@@ -230,19 +230,19 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{totalPresent}</div>
+            <div className="text-2xl font-bold text-success-text">{totalPresent}</div>
             <p className="text-sm text-muted-foreground">Present</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{totalAbsent}</div>
+            <div className="text-2xl font-bold text-destructive">{totalAbsent}</div>
             <p className="text-sm text-muted-foreground">Absent</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-gray-600">{totalUnmarked}</div>
+            <div className="text-2xl font-bold text-muted-foreground">{totalUnmarked}</div>
             <p className="text-sm text-muted-foreground">Unmarked</p>
           </CardContent>
         </Card>
@@ -370,7 +370,7 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
                           variant={status === 'present' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => handleAttendanceToggle(child.id, 'present')}
-                          className={status === 'present' ? 'bg-green-600 hover:bg-green-700' : ''}
+                          className={status === 'present' ? 'bg-success hover:bg-success' : ''}
                         >
                           <Check className="w-4 h-4" />
                         </Button>
@@ -378,7 +378,7 @@ export function ChildrenMarkAttendance({ onBack, onSave }: ChildrenMarkAttendanc
                           variant={status === 'absent' ? 'default' : 'outline'}
                           size="sm"
                           onClick={() => handleAttendanceToggle(child.id, 'absent')}
-                          className={status === 'absent' ? 'bg-red-600 hover:bg-red-700' : ''}
+                          className={status === 'absent' ? 'bg-destructive hover:bg-destructive' : ''}
                         >
                           <X className="w-4 h-4" />
                         </Button>

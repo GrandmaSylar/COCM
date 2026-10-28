@@ -469,10 +469,10 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
         >
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-              status.complete && hasRequired ? 'bg-green-100 dark:bg-green-900' : 'bg-muted'
+              status.complete && hasRequired ? 'bg-success-soft' : 'bg-muted'
             }`}>
               {status.complete && hasRequired ? (
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                <Check className="w-5 h-5 text-success-text" />
               ) : (
                 <Icon className="w-5 h-5 text-muted-foreground" />
               )}
@@ -499,7 +499,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
     <div className="space-y-4 pt-32 lg:pt-36">
       {/* Floating Progress Bar at Top */}
       <div className="fixed top-2 left-2 right-2 sm:left-4 sm:right-4 lg:left-[calc(16rem+1.5rem)] lg:right-6 z-50">
-        <Card className="border-2 border-primary/20 shadow-lg">
+        <Card className="border-2 border-primary/20 shadow-sm">
           <CardContent className="p-3 sm:p-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -510,7 +510,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
               </div>
 
               {/* Progress bar track and fill */}
-              <div className="relative h-3 sm:h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="relative h-3 sm:h-4 bg-fill rounded-full overflow-hidden">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out"
                   style={{
@@ -535,7 +535,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                     variant={field.filled ? 'default' : 'outline'}
                     className={`text-xs transition-all duration-300 ${
                       field.filled
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300 border-green-300'
+                        ? 'bg-success-soft text-success-text border-success/30'
                         : 'text-muted-foreground'
                     }`}
                   >
@@ -639,7 +639,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       onChange={(e) => handleInputChange('firstName', e.target.value)}
                       placeholder="Enter first name"
                       required
-                      className={formData.firstName ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.firstName ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -659,7 +659,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       onChange={(e) => handleInputChange('lastName', e.target.value)}
                       placeholder="Enter last name"
                       required
-                      className={formData.lastName ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.lastName ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                 </div>
@@ -668,7 +668,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                   <div className="space-y-2">
                     <Label htmlFor="gender">Gender *</Label>
                     <Select value={formData.gender} onValueChange={(value: string) => handleInputChange('gender', value)}>
-                      <SelectTrigger className={formData.gender ? 'border-green-500' : ''}>
+                      <SelectTrigger className={formData.gender ? 'border-success/30' : ''}>
                         <SelectValue placeholder="Select gender" />
                       </SelectTrigger>
                       <SelectContent>
@@ -699,7 +699,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       value={formData.dateOfBirth}
                       onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
                       required
-                      className={formData.dateOfBirth ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.dateOfBirth ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                 </div>
@@ -745,7 +745,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       placeholder="+233 24 123 4567"
                       required
-                      className={formData.phone ? 'border-green-500 focus:border-green-500' : ''}
+                      className={formData.phone ? 'border-success/30 focus:border-success/30' : ''}
                     />
                   </div>
                   <div className="space-y-2">
@@ -789,7 +789,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                     onChange={(e) => handleInputChange('residenceLocation', e.target.value)}
                     placeholder="Enter specific residence location"
                     required
-                    className={formData.residenceLocation ? 'border-green-500 focus:border-green-500' : ''}
+                    className={formData.residenceLocation ? 'border-success/30 focus:border-success/30' : ''}
                   />
                 </div>
 
@@ -810,7 +810,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                   <div className="space-y-2">
                     <Label htmlFor="zone">Zone *</Label>
                     <Select value={formData.zone} onValueChange={(value: string) => handleInputChange('zone', value)}>
-                      <SelectTrigger className={formData.zone ? 'border-green-500' : ''}>
+                      <SelectTrigger className={formData.zone ? 'border-success/30' : ''}>
                         <SelectValue placeholder="Select zone" />
                       </SelectTrigger>
                       <SelectContent>
@@ -829,11 +829,11 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       value={formData.zoneNumber}
                       onChange={(e) => handleInputChange('zoneNumber', e.target.value)}
                       placeholder="Auto-generated — editable"
-                      className={conflictingMember ? "border-amber-500 focus-visible:ring-amber-500" : ""}
+                      className={conflictingMember ? "border-warning/30 focus-visible:ring-warning/30" : ""}
                     />
                     {conflictingMember && (
-                      <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 text-xs font-medium">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                      <div className="flex items-center gap-1.5 mt-1.5 p-2.5 rounded-md bg-warning-soft text-warning-text border border-warning/30 text-xs font-medium">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-warning-text" />
                         <span>
                           <strong>Zone Number '{formData.zoneNumber}' is already assigned to {conflictingMember.firstName} {conflictingMember.lastName}</strong> ({conflictingMember.zone ? `Zone ${conflictingMember.zone}` : 'Member'}).
                         </span>
@@ -1030,12 +1030,12 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                       <span className="ml-2 text-sm text-muted-foreground">Loading options...</span>
                     </div>
                   ) : optionsError ? (
-                    <div className="bg-red-50 dark:bg-red-900/20 text-red-600 p-4 rounded-lg flex flex-col items-center justify-center space-y-3 border border-red-200 dark:border-red-900/30">
+                    <div className="bg-destructive/10 text-destructive p-4 rounded-lg flex flex-col items-center justify-center space-y-3 border border-destructive/30">
                       <div className="flex items-center">
                         <AlertTriangle className="h-5 w-5 mr-2" />
                         <span className="text-sm font-medium">{optionsError}</span>
                       </div>
-                      <Button variant="outline" size="sm" onClick={fetchOptions} className="bg-white hover:bg-red-50 dark:bg-transparent dark:border-red-800 dark:text-red-300 dark:hover:bg-red-900/40">
+                      <Button variant="outline" size="sm" onClick={fetchOptions} className="bg-card hover:bg-destructive/10 dark:bg-transparent ">
                         Retry Loading Options
                       </Button>
                     </div>
@@ -1065,7 +1065,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                                       setSelectedMinistries(selectedMinistries.filter(m => m !== ministry));
                                     }
                                   }}
-                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                  className="h-4 w-4 rounded border-border"
                                 />
                                 <Label
                                   htmlFor={`ministry-${ministry}`}
@@ -1116,7 +1116,7 @@ export function AddMember({ onBack, onSave, visitorData, childData }: AddMemberP
                                       setSelectedPositionHeld(selectedPositionHeld.filter(p => p !== pos));
                                     }
                                   }}
-                                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+                                  className="h-4 w-4 rounded border-border"
                                 />
                                 <Label 
                                   htmlFor={`position-${pos}`} 

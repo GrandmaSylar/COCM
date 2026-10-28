@@ -92,10 +92,10 @@ export function OtpVerification({ userId, tempToken, method, destination, onVeri
   return (
     <div className="min-h-dvh flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
       <div className="w-full max-w-md space-y-6">
-        <Card className="shadow-lg">
+        <Card className="shadow-sm">
           <CardHeader className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-lg">
+              <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-sm">
                 <ChurchIcon className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>

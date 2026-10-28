@@ -92,21 +92,21 @@ export function DemoGuide() {
     },
     {
       role: 'Administrator',
-      color: 'bg-red-100 text-red-800',
+      color: 'bg-destructive/10 text-destructive',
       icon: Shield,
       description: 'Full access - Can grant temporary permissions',
       permissions: ['Manage Users', 'Manage Members', 'Record Attendance', 'Manage Giving', 'Grant Temporary Permissions', 'View Reports', 'System Settings']
     },
     {
       role: 'Pastor',
-      color: 'bg-blue-100 text-blue-800',
+      color: 'bg-info-soft text-info-text',
       icon: UserCheck,
       description: 'View-only by default - Admin can grant temporary write access',
       permissions: ['View Members', 'View Attendance', 'View Giving', 'View Reports', 'Manage Giving Types (with permission)']
     },
     {
       role: 'Elder',
-      color: 'bg-green-100 text-green-800',
+      color: 'bg-success-soft text-success-text',
       icon: UserCheck,
       description: 'View-only by default - Admin can grant limited temporary access',
       permissions: ['View Members', 'View Attendance', 'View Giving', 'View Reports']
@@ -180,9 +180,9 @@ export function DemoGuide() {
                                 key={role} 
                                 variant="outline" 
                                 className={`text-xs ${
-                                  role === 'admin' ? 'bg-red-50 text-red-700' :
-                                  role === 'pastor' ? 'bg-blue-50 text-blue-700' :
-                                  'bg-green-50 text-green-700'
+                                  role === 'admin' ? 'bg-destructive/10 text-destructive' :
+                                  role === 'pastor' ? 'bg-info-soft text-info-text' :
+                                  'bg-success-soft text-success-text'
                                 }`}
                               >
                                 {role === 'admin' ? 'Admin' : role === 'pastor' ? 'Pastor' : 'Finance'}

@@ -70,11 +70,11 @@ const serviceTypeLabels: Record<string, string> = {
 };
 
 const serviceTypeColors: Record<string, string> = {
-  sunday_morning: 'bg-blue-100 text-blue-800',
+  sunday_morning: 'bg-info-soft text-info-text',
   sunday_evening: 'bg-purple-100 text-purple-800',
-  midweek: 'bg-green-100 text-green-800',
-  special: 'bg-orange-100 text-orange-800',
-  other: 'bg-gray-100 text-gray-800'
+  midweek: 'bg-success-soft text-success-text',
+  special: 'bg-warning-soft text-warning-text',
+  other: 'bg-muted text-foreground'
 };
 
 type PresetRange = 'this-month' | 'last-3-months' | 'last-6-months' | 'this-year' | 'last-year' | 'all-time';
@@ -277,8 +277,8 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
         <Card className="min-w-0">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-5 h-5 text-info-text" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold truncate">{summary.totalServices}</p>
@@ -291,8 +291,8 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
         <Card className="min-w-0">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 bg-success-soft rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-success-text" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold truncate">{summary.totalPresent}</p>
@@ -305,8 +305,8 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
         <Card className="min-w-0">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <XCircle className="w-5 h-5 text-red-600" />
+              <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center flex-shrink-0">
+                <XCircle className="w-5 h-5 text-destructive" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold truncate">{summary.totalAbsent}</p>
@@ -319,8 +319,8 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
         <Card className="min-w-0">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center flex-shrink-0">
+                <BarChart3 className="w-5 h-5 text-info-text" />
               </div>
               <div className="min-w-0">
                 <p className="text-2xl font-bold truncate">{summary.percentage}%</p>
@@ -423,7 +423,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
               return (
                 <Card
                   key={recordKey}
-                  className={`transition-shadow w-full ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer hover:shadow-md' : ''}`}
+                  className={`transition-shadow w-full ${record.status === 'absent' && hasAbsenceInfo ? 'cursor-pointer' : ''}`}
                   onClick={() => {
                     if (record.status === 'absent' && hasAbsenceInfo) {
                       setExpandedRecord(isExpanded ? null : recordKey);
@@ -434,18 +434,18 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
                       <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
                         {record.status === 'present' ? (
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <div className="w-8 h-8 bg-success-soft rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <CheckCircle2 className="w-4 h-4 text-success-text" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <XCircle className="w-4 h-4 text-red-600" />
+                          <div className="w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <XCircle className="w-4 h-4 text-destructive" />
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium">{formatDate(record.date)}</span>
-                            <Badge className={`text-xs ${serviceTypeColors[record.serviceType] || 'bg-gray-100 text-gray-800'}`}>
+                            <Badge className={`text-xs ${serviceTypeColors[record.serviceType] || 'bg-muted text-foreground'}`}>
                               {serviceTypeLabels[record.serviceType] || record.serviceType}
                             </Badge>
                           </div>
@@ -460,7 +460,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                           {record.status === 'present' ? 'Present' : 'Absent'}
                         </Badge>
                         {record.status === 'absent' && record.absenceInfo?.requestedPermission && (
-                          <Badge variant="outline" className="bg-yellow-50 text-yellow-800 text-xs">
+                          <Badge variant="outline" className="bg-warning-soft text-warning-text text-xs">
                             <Shield className="w-3 h-3 mr-1" />
                             Permission
                           </Badge>
@@ -476,7 +476,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
                       <div className="mt-3 pt-3 border-t space-y-2 ml-6 sm:ml-11 min-w-0">
                         {record.absenceInfo.requestedPermission && (
                           <div className="flex items-center gap-2 text-sm">
-                            <Shield className="w-4 h-4 text-yellow-600" />
+                            <Shield className="w-4 h-4 text-warning-text" />
                             <span className="font-medium">Permission was requested before absence</span>
                           </div>
                         )}

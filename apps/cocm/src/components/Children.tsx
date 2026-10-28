@@ -297,11 +297,11 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-green-500/5 border-green-500/20">
+        <Card className="bg-success/5 border-success/30">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-500/20 rounded-full">
-                <CheckCircle className="w-6 h-6 text-green-500" />
+              <div className="p-3 bg-success/20 rounded-full">
+                <CheckCircle className="w-6 h-6 text-success-text" />
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Active</p>
@@ -310,11 +310,11 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-blue-500/5 border-blue-500/20">
+        <Card className="bg-info/5 border-info/30">
           <CardContent className="p-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/20 rounded-full">
-                <UserPlus className="w-6 h-6 text-blue-500" />
+              <div className="p-3 bg-info/20 rounded-full">
+                <UserPlus className="w-6 h-6 text-info-text" />
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">New This Month</p>
@@ -373,7 +373,7 @@ function ChildMembersList({ refreshKey, onAddChild, onViewChild, onRefresh }: { 
       ) : (
         <div className="space-y-4">
           {filteredChildren.map(child => (
-            <Card key={child.id} className="hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5">
+            <Card key={child.id} className="hover:bg-accent/5 transition-all">
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden shadow-inner">
@@ -559,7 +559,7 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh, onConvertVisit
       ) : (
         <div className="space-y-4">
           {filteredVisitors.map(visitor => (
-            <Card key={visitor.id} className={`hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5 ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
+            <Card key={visitor.id} className={`hover:bg-accent/5 transition-all ${visitor.convertedToMember ? 'opacity-60 bg-muted/30' : ''}`}>
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center font-bold text-secondary-foreground shrink-0 shadow-inner">
@@ -594,7 +594,7 @@ function ChildVisitorsList({ refreshKey, onAddVisitor, onRefresh, onConvertVisit
                       variant="default"
                       size="sm"
                       onClick={() => onConvertVisitor(visitor)}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-success hover:bg-success"
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
                       Convert
@@ -708,7 +708,7 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance, onRefresh }: { r
       ) : (
         <div className="space-y-4">
           {records.map(record => (
-            <Card key={record.id} className="hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5">
+            <Card key={record.id} className="hover:bg-accent/5 transition-all">
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary shrink-0">
@@ -725,7 +725,7 @@ function ChildrenAttendanceList({ refreshKey, onMarkAttendance, onRefresh }: { r
                 <div className="flex items-center gap-6 w-full sm:w-auto">
                   <div className="text-center">
                     <p className="text-xs text-muted-foreground uppercase font-semibold">Present</p>
-                    <p className="text-lg font-bold text-green-600">{record.totalCount}</p>
+                    <p className="text-lg font-bold text-success-text">{record.totalCount}</p>
                   </div>
                 </div>
               </CardContent>
@@ -908,10 +908,10 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
       ) : (
         <div className="space-y-4">
           {records.map(record => (
-            <Card key={record.id} className="hover:bg-accent/5 transition-all hover:shadow-md hover:-translate-y-0.5">
+            <Card key={record.id} className="hover:bg-accent/5 transition-all">
               <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600 shrink-0">
+                  <div className="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center text-success-text shrink-0">
                     <Banknote className="w-6 h-6" />
                   </div>
                   <div>
@@ -925,7 +925,7 @@ function ChildrenGivingList({ refreshKey, onRefresh }: { refreshKey: number, onR
                 <div className="flex items-center gap-4 w-full sm:w-auto">
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground uppercase font-semibold">Total Amount</p>
-                    <p className="text-xl font-bold text-emerald-600">GH₵ {record.totalAmount.toFixed(2)}</p>
+                    <p className="text-xl font-bold text-success-text">GH₵ {record.totalAmount.toFixed(2)}</p>
                   </div>
                   {canEdit && (
                     <Button variant="ghost" size="sm" onClick={() => openEditDialog(record)}>
@@ -1054,17 +1054,17 @@ export function Children({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {[
-          { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-blue-100 text-blue-600' },
-          { id: 'visitors', title: 'Visitors', label: 'New & visiting children', icon: UserPlus, color: 'bg-amber-100 text-amber-600' },
-          { id: 'attendance', title: 'Attendance', label: 'Service attendance records', icon: Calendar, color: 'bg-green-100 text-green-600' },
-          { id: 'giving', title: 'Giving', label: "Children's giving records", icon: Banknote, color: 'bg-emerald-100 text-emerald-600' },
-          { id: 'analytics', title: 'Analytics', label: "Children's insights", icon: BarChart3, color: 'bg-blue-100 text-blue-600' },
+          { id: 'members', title: 'Members', label: 'Registered children', icon: Users, color: 'bg-info-soft text-info-text' },
+          { id: 'visitors', title: 'Visitors', label: 'New & visiting children', icon: UserPlus, color: 'bg-warning-soft text-warning-text' },
+          { id: 'attendance', title: 'Attendance', label: 'Service attendance records', icon: Calendar, color: 'bg-success-soft text-success-text' },
+          { id: 'giving', title: 'Giving', label: "Children's giving records", icon: Banknote, color: 'bg-success-soft text-success-text' },
+          { id: 'analytics', title: 'Analytics', label: "Children's insights", icon: BarChart3, color: 'bg-info-soft text-info-text' },
         ].map((tab) => (
           <button
             key={tab.id}
             className={`rounded-xl p-3 flex items-center gap-3 w-full text-left transition-all ${
               currentTab === tab.id
-                ? 'bg-primary text-primary-foreground shadow-md'
+                ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'bg-card border hover:bg-accent/50'
             }`}
             onClick={() => handleTabChange(tab.id as 'members' | 'visitors' | 'attendance' | 'giving' | 'analytics')}

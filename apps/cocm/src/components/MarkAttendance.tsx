@@ -225,9 +225,9 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
 
   const getStatusColor = (status: 'present' | 'absent' | 'unmarked') => {
     switch (status) {
-      case 'present': return 'bg-green-100 text-green-800 border-green-200';
-      case 'absent': return 'bg-red-100 text-red-800 border-red-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'present': return 'bg-success-soft text-success-text border-success/30';
+      case 'absent': return 'bg-destructive/10 text-destructive border-destructive/30';
+      default: return 'bg-muted text-foreground border-border';
     }
   };
 
@@ -273,7 +273,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
           <div>
             <h1 className="flex items-center gap-2">
               Mark Attendance
-              <Badge className="bg-green-600 text-white text-[10px]">LIVE</Badge>
+              <Badge className="bg-success text-white text-[10px]">LIVE</Badge>
             </h1>
             <p className="text-muted-foreground text-sm">
               Session by <strong>{sessionCreatorName || 'Loading...'}</strong>
@@ -349,19 +349,19 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{totalPresent}</div>
+            <div className="text-2xl font-bold text-success-text">{totalPresent}</div>
             <p className="text-sm text-muted-foreground">Present</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-red-600">{totalAbsent}</div>
+            <div className="text-2xl font-bold text-destructive">{totalAbsent}</div>
             <p className="text-sm text-muted-foreground">Absent</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-gray-600">{totalUnmarked}</div>
+            <div className="text-2xl font-bold text-muted-foreground">{totalUnmarked}</div>
             <p className="text-sm text-muted-foreground">Unmarked</p>
           </CardContent>
         </Card>
@@ -455,7 +455,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Badge className={`hidden sm:flex ${isPresent ? 'bg-green-100 text-green-800 border-green-200' : 'bg-gray-100 text-gray-800 border-gray-200'}`}>
+                      <Badge className={`hidden sm:flex ${isPresent ? 'bg-success-soft text-success-text border-success/30' : 'bg-muted text-foreground border-border'}`}>
                         {isPresent && <Check className="w-3 h-3 mr-1" />}
                         {isPresent ? 'Present' : 'Not Present'}
                       </Badge>
@@ -464,7 +464,7 @@ export function MarkAttendance({ onBack, onSave, initialDate, initialServiceType
                         variant={isPresent ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleMember(member.id)}
-                        className={isPresent ? 'bg-green-600 hover:bg-green-700' : ''}
+                        className={isPresent ? 'bg-success hover:bg-success' : ''}
                       >
                         {isPresent ? <Check className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                       </Button>

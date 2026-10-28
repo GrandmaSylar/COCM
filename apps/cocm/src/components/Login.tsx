@@ -81,7 +81,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
       </div>
 
       <div className="w-full max-w-md p-6 relative z-10 animate-fade-in-up">
-        <div className="glass-card rounded-3xl p-8 sm:p-10 shadow-2xl border-white/20 dark:border-white/10 bg-card/80 backdrop-blur-xl">
+        <div className="glass-card rounded-3xl p-8 sm:p-10 shadow-sm border-white/20 dark:border-white/10 bg-card/80 backdrop-blur-xl">
           <div className="flex flex-col items-center mb-8 space-y-2 text-center">
             <img src="/newlogo.png" alt="Church of Christ, Mataheko" className="w-24 h-24 object-contain mb-2" />
             <h1 className="text-2xl font-bold tracking-tight">Welcome Back</h1>
@@ -92,7 +92,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
 
           <form onSubmit={handleLogin} className="space-y-5">
             {error && (
-              <div className="p-3 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 animate-shake">
+              <div className="p-3 text-sm text-destructive bg-destructive/10 border border-destructive/30 rounded-lg flex items-center gap-2 animate-shake">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 {error}
               </div>
@@ -175,7 +175,7 @@ export function Login({ onForgotPassword, onSignUp, onRequires2FA }: LoginProps)
 
             <Button
               type="submit"
-              className="w-full h-11 rounded-xl text-base font-medium shadow-lg hover:-translate-y-0.5 transition-all duration-300 border-0 text-primary-foreground"
+              className="w-full h-11 rounded-xl text-base font-medium shadow-sm transition-all duration-300 border-0 text-primary-foreground"
               style={{ background: 'linear-gradient(135deg, var(--primary), var(--primary-gradient-end))' }}
               disabled={isLoading}
             >

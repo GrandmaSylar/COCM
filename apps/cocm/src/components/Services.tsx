@@ -66,12 +66,12 @@ interface ServicesProps {
 }
 
 function getServiceTypeBadgeClass(serviceType: string): string {
-  if (!serviceType) return 'bg-blue-100 text-blue-700 hover:bg-blue-100 border-none';
+  if (!serviceType) return 'bg-info-soft text-info-text hover:bg-info-soft border-none';
   const t = serviceType.toLowerCase();
   if (t.includes('sunday')) return 'bg-purple-100 text-purple-700 hover:bg-purple-100 border-none';
-  if (t.includes('midweek')) return 'bg-amber-100 text-amber-700 hover:bg-amber-100 border-none';
-  if (t.includes('prayer')) return 'bg-green-100 text-green-700 hover:bg-green-100 border-none';
-  return 'bg-blue-100 text-blue-700 hover:bg-blue-100 border-none';
+  if (t.includes('midweek')) return 'bg-warning-soft text-warning-text hover:bg-warning-soft border-none';
+  if (t.includes('prayer')) return 'bg-success-soft text-success-text hover:bg-success-soft border-none';
+  return 'bg-info-soft text-info-text hover:bg-info-soft border-none';
 }
 
 function QuickNav({ hasChildren, hasSetup, activeSection, onPillClick }: { hasChildren: boolean, hasSetup: boolean, activeSection: string, onPillClick: (id: string) => void }) {
@@ -201,17 +201,17 @@ function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
               style={{ strokeDasharray: circumference, strokeDashoffset }} 
             />
           </svg>
-          <span className="absolute text-[10px] font-bold text-blue-700">{attendanceRate}%</span>
+          <span className="absolute text-[10px] font-bold text-info-text">{attendanceRate}%</span>
         </div>
       </div>
 
       {/* Total Giving Card */}
       <div className="bg-card rounded-xl p-4 shadow-sm border">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+          <div className="w-2 h-2 rounded-full bg-success"></div>
           <div className="text-muted-foreground font-medium text-xs uppercase tracking-wider">Total Giving</div>
         </div>
-        <div className="text-2xl font-bold text-emerald-600">{formatGhanaCedis(sr.totalGivingAmount)}</div>
+        <div className="text-2xl font-bold text-success-text">{formatGhanaCedis(sr.totalGivingAmount)}</div>
         <div className="text-xs text-muted-foreground mt-1">GH₵ {perHead.toFixed(2)} per head</div>
       </div>
 
@@ -230,13 +230,13 @@ function OverviewSection({ sr }: { sr: ServiceDateDetail }) {
       {/* Absentees Card */}
       <div className="bg-card rounded-xl p-4 shadow-sm border">
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+          <div className="w-2 h-2 rounded-full bg-warning"></div>
           <div className="text-muted-foreground font-medium text-xs uppercase tracking-wider">Absentees</div>
         </div>
         <div className="text-2xl font-bold">{sr.absentees?.length ?? 0}</div>
         <div className="flex gap-1 mt-1 flex-wrap">
-          {noReasonCount > 0 && <Badge variant="outline" className="text-[10px] bg-red-50 text-red-700 border-red-200">{noReasonCount} no reason</Badge>}
-          {withPermissionCount > 0 && <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">{withPermissionCount} with permission</Badge>}
+          {noReasonCount > 0 && <Badge variant="outline" className="text-[10px] bg-destructive/10 text-destructive border-destructive/30">{noReasonCount} no reason</Badge>}
+          {withPermissionCount > 0 && <Badge variant="outline" className="text-[10px] bg-warning-soft text-warning-text border-warning/30">{withPermissionCount} with permission</Badge>}
         </div>
       </div>
 
@@ -285,17 +285,17 @@ function GivingChart({ sr }: { sr: ServiceDateDetail }) {
     const pct = (diff / sr.previousServiceGiving.totalGivingAmount * 100).toFixed(1);
     const isUp = diff >= 0;
     trendBadge = (
-      <Badge variant="outline" className={isUp ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"}>
+      <Badge variant="outline" className={isUp ? "bg-success-soft text-success-text border-success/30" : "bg-destructive/10 text-destructive border-destructive/30"}>
         {isUp ? '↑' : '↓'} {Math.abs(Number(pct))}%
       </Badge>
     );
   }
 
   const categories = [
-    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-blue-600', fill: '#2563eb' },
-    { key: 'donation', label: 'Donation', amount: donation, color: 'bg-emerald-500', fill: '#10b981' },
-    { key: 'thanksgiving', label: 'Thanksgiving', amount: thanksgiving, color: 'bg-amber-500', fill: '#f59e0b' },
-    { key: 'cash', label: 'Cash', amount: cash, color: 'bg-blue-500', fill: '#3b82f6' }
+    { key: 'offering', label: 'Offering', amount: offering, color: 'bg-info', fill: '#2563eb' },
+    { key: 'donation', label: 'Donation', amount: donation, color: 'bg-success', fill: '#10b981' },
+    { key: 'thanksgiving', label: 'Thanksgiving', amount: thanksgiving, color: 'bg-warning', fill: '#f59e0b' },
+    { key: 'cash', label: 'Cash', amount: cash, color: 'bg-info', fill: '#3b82f6' }
   ].filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
 
   return (
@@ -381,7 +381,7 @@ function ExpenseList({ expenses }: { expenses: any[] }) {
           ))}
           <div className="p-4 bg-secondary/10 rounded-b-xl flex justify-between items-center border-t border-secondary/20">
             <span className="text-secondary/80 font-medium text-sm">Total Expenses</span>
-            <span className="font-bold text-orange-600 dark:text-orange-400">{formatGhanaCedis(total)}</span>
+            <span className="font-bold text-warning-text">{formatGhanaCedis(total)}</span>
           </div>
         </div>
       </CardContent>
@@ -484,7 +484,7 @@ function PersonList({
             if (type === 'absentee') {
               const nameParts = (item.memberName || '').split(' ');
               initials = ((nameParts[0]?.[0] || '') + (nameParts[1]?.[0] || '')).toUpperCase() || 'AB';
-              avatarClass = item.requestedPermission ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700';
+              avatarClass = item.requestedPermission ? 'bg-success-soft text-success-text' : 'bg-warning-soft text-warning-text';
               
               nameContent = onViewMember && id ? (
                 <button onClick={() => onViewMember(id)} className="text-left font-medium hover:text-primary hover:underline transition-colors truncate">
@@ -499,7 +499,7 @@ function PersonList({
               nameContent = <span className="font-medium truncate">{item.firstName} {item.lastName}</span>;
             } else if (type === 'member') {
               initials = `${item.firstName?.[0] || ''}${item.lastName?.[0] || ''}`.toUpperCase() || 'M';
-              avatarClass = 'bg-blue-100 text-blue-700';
+              avatarClass = 'bg-info-soft text-info-text';
               nameContent = <span className="font-medium truncate">{item.firstName} {item.lastName}</span>;
             }
 
@@ -528,17 +528,17 @@ function PersonList({
 
                 <div className="flex items-center gap-2 shrink-0">
                   {type === 'absentee' && (
-                    <Badge variant="outline" className={item.requestedPermission ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}>
+                    <Badge variant="outline" className={item.requestedPermission ? 'bg-success-soft text-success-text border-success/30' : 'bg-destructive/10 text-destructive border-destructive/30'}>
                       {item.reason || 'No reason'}{item.requestedPermission ? ' (permission)' : ''}
                     </Badge>
                   )}
                   {type === 'absentee' && item.zone && (
-                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                    <Badge variant="outline" className="bg-info-soft text-info-text border-info/30">
                       Zone {item.zone}
                     </Badge>
                   )}
                   {type === 'member' && item.zone && (
-                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                    <Badge variant="outline" className="bg-info-soft text-info-text border-info/30">
                       Zone {item.zone}
                     </Badge>
                   )}
@@ -638,8 +638,8 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
   
   const givingCategories = [
     { key: 'offering', label: 'Offering', amount: offering, color: 'bg-purple-600' },
-    { key: 'cash', label: 'Cash', amount: cash, color: 'bg-emerald-500' },
-    { key: 'mobileMoney', label: 'Mobile Money', amount: mobileMoney, color: 'bg-blue-500' }
+    { key: 'cash', label: 'Cash', amount: cash, color: 'bg-success' },
+    { key: 'mobileMoney', label: 'Mobile Money', amount: mobileMoney, color: 'bg-info' }
   ].filter(c => c.amount > 0).sort((a, b) => b.amount - a.amount);
 
   return (
@@ -653,9 +653,9 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
           <div className="text-sm font-bold text-teal-700">{formatGhanaCedis(childrenGivingTotal)}</div>
           <div className="text-[10px] text-teal-600/80 uppercase font-semibold">Giving</div>
         </div>
-        <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-100">
-          <div className="text-sm font-bold text-amber-700">{childrenVisitorsCount}</div>
-          <div className="text-[10px] text-amber-600/80 uppercase font-semibold">Visitors</div>
+        <div className="bg-warning-soft rounded-lg p-3 text-center border border-warning/30">
+          <div className="text-sm font-bold text-warning-text">{childrenVisitorsCount}</div>
+          <div className="text-[10px] text-warning-text uppercase font-semibold">Visitors</div>
         </div>
       </div>
 
@@ -723,7 +723,7 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
             <div className="space-y-2">
               {sr.childrenVisitors!.map((v: any) => (
                 <div key={v.id} className="flex items-center gap-3 py-1 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-warning-soft text-warning-text flex items-center justify-center text-[10px] font-bold shrink-0">
                     {v.firstName?.charAt(0)}{v.lastName?.charAt(0)}
                   </div>
                   <span>{v.firstName} {v.lastName}</span>
@@ -741,7 +741,7 @@ function ChildrenSection({ sr }: { sr: ServiceDateDetail }) {
             <div className="space-y-2">
               {sr.newChildMembers!.map((m: any) => (
                 <div key={m.id} className="flex items-center gap-3 py-1 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-success-soft text-success-text flex items-center justify-center text-[10px] font-bold shrink-0">
                     {m.firstName?.charAt(0)}{m.lastName?.charAt(0)}
                   </div>
                   <span>{m.firstName} {m.lastName}</span>
@@ -902,7 +902,7 @@ function StatsBar({ records, totalServices, loading }: { records: ServiceDateSum
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Average Attendance</div>
       </div>
       <div className="bg-card border rounded-xl p-4 flex flex-col justify-center shadow-sm">
-        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{formatGhanaCedis(stats.totalGiving)}</div>
+        <div className="text-2xl font-bold text-success-text">{formatGhanaCedis(stats.totalGiving)}</div>
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-0.5">Total Giving</div>
       </div>
     </div>
@@ -915,7 +915,7 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
   const expenses = sr.expensesTotal || 0;
   
   return (
-    <div onClick={onClick} className="bg-card cursor-pointer hover:shadow-lg transition-all border-l-4 border-l-secondary rounded-xl border-y border-r shadow-sm overflow-hidden">
+    <div onClick={onClick} className="bg-card cursor-pointer transition-all border-l-4 border-l-secondary rounded-xl border-y border-r shadow-sm overflow-hidden">
       <div className="p-4">
         <div className="flex justify-between items-start mb-4">
           <div className="font-medium text-foreground">{formatDate(sr.serviceDate)}</div>
@@ -929,11 +929,11 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
             <span className="text-xs">&middot; {attendanceRate}%</span>
           </div>
           <div className="flex items-center gap-2">
-            <Banknote className="w-4 h-4 text-emerald-500 shrink-0" />
+            <Banknote className="w-4 h-4 text-success-text shrink-0" />
             <span className="font-medium text-foreground">{formatGhanaCedis(sr.totalGiving)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <UserMinus className="w-4 h-4 text-amber-500 shrink-0" />
+            <UserMinus className="w-4 h-4 text-warning-text shrink-0" />
             <span className="font-medium text-foreground">{sr.absenteesCount}</span>
             <span className="text-xs">absent</span>
           </div>
@@ -944,7 +944,7 @@ function FeaturedCard({ sr, onClick }: { sr: ServiceDateSummary, onClick: () => 
           </div>
           {expenses > 0 && (
             <div className="flex items-center gap-2">
-              <Banknote className="w-4 h-4 text-rose-500 shrink-0" />
+              <Banknote className="w-4 h-4 text-destructive shrink-0" />
               <span className="font-medium text-foreground">{formatGhanaCedis(expenses)}</span>
             </div>
           )}
@@ -1023,7 +1023,7 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
                   <div className="flex sm:flex-1 w-full justify-between items-center text-sm text-muted-foreground">
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-secondary" /><span className="font-medium text-foreground">{sr.totalAttendance}</span></span>
-                      <span className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5 text-emerald-500" /><span className="font-medium text-foreground">{formatGhanaCedis(sr.totalGiving)}</span></span>
+                      <span className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5 text-success-text" /><span className="font-medium text-foreground">{formatGhanaCedis(sr.totalGiving)}</span></span>
                     </div>
                     <ChevronRight className="w-4 h-4" />
                   </div>
@@ -1037,7 +1037,7 @@ function TimelineGroup({ records, onSelect, onLoadMore, hasMore, loadingMore }: 
       {hasMore && (
         <div className="flex justify-center mt-6 pb-4">
           <Button variant="outline" className="rounded-full px-8 shadow-sm" onClick={onLoadMore} disabled={loadingMore}>
-            {loadingMore && <RefreshCw className="w-4 h-4 mr-2 animate-spin text-orange-500" />}
+            {loadingMore && <RefreshCw className="w-4 h-4 mr-2 animate-spin text-warning-text" />}
             {loadingMore ? 'Loading...' : 'Load more'}
           </Button>
         </div>
@@ -1217,7 +1217,7 @@ export function Services({ onViewRecord, onViewMember, onConvertVisitor }: Servi
             Service Setup
           </Button>
           <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-orange-500' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin text-warning-text' : ''}`} />
             Refresh
           </Button>
         </div>

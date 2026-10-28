@@ -369,7 +369,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           <div className="flex items-center gap-2">
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Giving</h1>
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
                 <WifiOff className="w-3 h-3 mr-1" />
                 Cached Data
               </Badge>
@@ -426,12 +426,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-success-soft border border-success/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Banknote className="w-20 h-20 text-emerald-600" />
+            <Banknote className="w-20 h-20 text-success-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-success/40 flex items-center justify-center mb-4 text-success-text transition-transform duration-300">
               <Banknote className="w-5 h-5" />
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(totalGiving)}</div>
@@ -439,12 +439,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-20 h-20 text-blue-600" />
+            <Calendar className="w-20 h-20 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
               <Calendar className="w-5 h-5" />
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisMonthGiving)}</div>
@@ -452,12 +452,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-20 h-20 text-blue-600" />
+            <TrendingUp className="w-20 h-20 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-blue-500/40 flex items-center justify-center mb-4 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-info/40 flex items-center justify-center mb-4 text-info-text transition-transform duration-300">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(thisWeekGiving)}</div>
@@ -465,12 +465,12 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-6 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-6 bg-warning-soft border border-warning/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-4 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingDown className="w-20 h-20 text-amber-600" />
+            <TrendingDown className="w-20 h-20 text-warning-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-11 h-11 rounded-xl bg-amber-500/40 flex items-center justify-center mb-4 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-11 h-11 rounded-xl bg-warning/40 flex items-center justify-center mb-4 text-warning-text transition-transform duration-300">
               <TrendingDown className="w-5 h-5" />
             </div>
             <div className="text-3xl font-bold tracking-tighter text-foreground mb-1 group-hover:translate-x-1 transition-transform">{formatAmount(netGiving)}</div>
@@ -535,7 +535,7 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
           </Card>
         ) : (
           filteredRecords.map((record) => (
-            <Card key={record.id} className="hover:shadow-md transition-shadow overflow-hidden">
+            <Card key={record.id} className="transition-shadow overflow-hidden">
               <CardContent className="p-3 sm:p-4">
                 <div className="space-y-3 sm:space-y-4">
                   {/* Header */}
@@ -604,11 +604,11 @@ export function Giving({ onRecordGiving, onViewRecord, initialShowTypeManager = 
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-xs text-muted-foreground">Total Expenses</span>
-                          <span className="text-sm font-medium text-red-500">−{formatAmount(recordExpenses)}</span>
+                          <span className="text-sm font-medium text-destructive">−{formatAmount(recordExpenses)}</span>
                         </div>
                         <div className="flex justify-between items-center border-t pt-1">
                           <span className="text-xs font-semibold">Net Giving</span>
-                          <span className="text-sm font-bold text-emerald-600">{formatAmount(record.totalAmount - recordExpenses)}</span>
+                          <span className="text-sm font-bold text-success-text">{formatAmount(record.totalAmount - recordExpenses)}</span>
                         </div>
                       </div>
                     );
@@ -1256,13 +1256,13 @@ export function RecordGiving({ onBack, onSave, onManageTypes }: RecordGivingProp
                 </div>
               </div>
 
-              <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-100/50 dark:bg-green-900/20' : 'bg-red-100/50 dark:bg-red-900/20'}`}>
+              <div className={`p-3 rounded-lg ${isBalanced ? 'bg-success-soft/50' : 'bg-destructive/10'}`}>
                 <div className="flex justify-between items-center">
-                  <span className={`font-medium ${isBalanced ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>Payment Total:</span>
-                  <span className={`text-xl font-bold ${isBalanced ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{formatGhanaCedis(paymentTotal)}</span>
+                  <span className={`font-medium ${isBalanced ? 'text-success-text' : 'text-destructive'}`}>Payment Total:</span>
+                  <span className={`text-xl font-bold ${isBalanced ? 'text-success-text' : 'text-destructive'}`}>{formatGhanaCedis(paymentTotal)}</span>
                 </div>
                 {!isBalanced && total > 0 && (
-                  <p className="text-sm text-destructive dark:text-red-400 mt-1">
+                  <p className="text-sm text-destructive mt-1">
                     Payment total must match giving total ({formatGhanaCedis(total)})
                   </p>
                 )}
@@ -1708,13 +1708,13 @@ export function GivingDetail({ recordId, onBack, onSaved }: GivingDetailProps) {
               </div>
             </div>
 
-            <div className={`p-3 rounded-lg ${isBalanced ? 'bg-green-100/50 dark:bg-green-900/20' : 'bg-red-100/50 dark:bg-red-900/20'}`}>
+            <div className={`p-3 rounded-lg ${isBalanced ? 'bg-success-soft/50' : 'bg-destructive/10'}`}>
               <div className="flex justify-between items-center">
-                <span className={`font-medium ${isBalanced ? 'text-green-800 dark:text-green-300' : 'text-red-800 dark:text-red-300'}`}>Payment Total:</span>
-                <span className={`text-xl font-bold ${isBalanced ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>{formatGhanaCedis(paymentTotal)}</span>
+                <span className={`font-medium ${isBalanced ? 'text-success-text' : 'text-destructive'}`}>Payment Total:</span>
+                <span className={`text-xl font-bold ${isBalanced ? 'text-success-text' : 'text-destructive'}`}>{formatGhanaCedis(paymentTotal)}</span>
               </div>
               {!isBalanced && total > 0 && (
-                <p className="text-sm text-destructive dark:text-red-400 mt-1">
+                <p className="text-sm text-destructive mt-1">
                   Payment total must match giving total ({formatGhanaCedis(total)})
                 </p>
               )}

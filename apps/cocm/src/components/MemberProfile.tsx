@@ -217,14 +217,14 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
 
   const statusColorMap: Record<string, string> = {
     new: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300',
-    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-    'semi-active': 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300',
-    inactive: 'bg-neutral-100 text-neutral-800 dark:bg-neutral-900/40 dark:text-neutral-300',
+    active: 'bg-success-soft text-success-text ',
+    'semi-active': 'bg-info-soft text-info-text ',
+    inactive: 'bg-muted text-foreground ',
     sick: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     traveled: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     schooling: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
-    'not baptised': 'bg-slate-100 text-slate-800 dark:bg-slate-900/40 dark:text-slate-300',
-    blacklisted: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
+    'not baptised': 'bg-muted text-foreground ',
+    blacklisted: 'bg-destructive/10 text-destructive ',
   };
 
   const memberPdfColumns = [
@@ -246,7 +246,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
     <div className="space-y-6">
       {/* Hero Header */}
       <Card className="overflow-hidden shadow-sm">
-        <div className="bg-gradient-to-r from-secondary/15 via-secondary/5 to-transparent p-6">
+        <div className="from-secondary/15 via-secondary/5 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-white/50 dark:hover:bg-black/20">
               <ArrowLeft className="w-4 h-4" />
@@ -254,7 +254,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
             <span className="text-sm text-muted-foreground">Member Profile</span>
           </div>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-          <div className="w-32 h-32 md:w-40 md:h-40 bg-white dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-lg ring-4 ring-white/50 dark:ring-card/50 shrink-0">
+          <div className="w-32 h-32 md:w-40 md:h-40 bg-card dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-sm ring-4 ring-white/50 dark:ring-card/50 shrink-0">
             {member.photo ? (
               <Dialog>
                 <DialogTrigger asChild>
@@ -273,7 +273,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                     <img 
                       src={getCloudinaryUrl(member.photo, 'original') ?? ''} 
                       alt={`${member.firstName} ${member.lastName}`} 
-                      className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" 
+                      className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm" 
                     />
                   </div>
                 </DialogContent>
@@ -547,10 +547,10 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                             onClick={() => isFamilyMemberClickable(parent) && handleFamilyMemberClick(parent)}
                           >
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                              parent.relationship === 'father' ? 'bg-blue-100 dark:bg-blue-900' : 'bg-pink-100 dark:bg-pink-900'
+                              parent.relationship === 'father' ? 'bg-info-soft' : 'bg-pink-100 dark:bg-pink-900'
                             } ${parent.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                               <span className={`text-lg font-medium ${
-                                parent.relationship === 'father' ? 'text-blue-600 dark:text-blue-400' : 'text-pink-600 dark:text-pink-400'
+                                parent.relationship === 'father' ? 'text-info-text' : 'text-pink-600 dark:text-pink-400'
                               }`}>
                                 {parent.firstName[0]}{parent.lastName[0]}
                               </span>
@@ -584,8 +584,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                         className={`text-center ${isFamilyMemberClickable(sibling) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                         onClick={() => isFamilyMemberClickable(sibling) && handleFamilyMemberClick(sibling)}
                       >
-                        <div className={`w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto mb-1 ${sibling.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        <div className={`w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-1 ${sibling.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+                          <span className="text-sm font-medium text-muted-foreground">
                             {sibling.firstName[0]}{sibling.lastName[0]}
                           </span>
                         </div>
@@ -622,9 +622,9 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                     {/* Connector line to spouse */}
                     {member.familyMembers.filter(f => f.relationship === 'spouse').length > 0 && (
                       <>
-                        <div className="h-0.5 w-8 bg-red-400"></div>
-                        <span className="text-red-400 text-xs">married</span>
-                        <div className="h-0.5 w-8 bg-red-400"></div>
+                        <div className="h-0.5 w-8 bg-destructive"></div>
+                        <span className="text-destructive text-xs">married</span>
+                        <div className="h-0.5 w-8 bg-destructive"></div>
                       </>
                     )}
 
@@ -638,10 +638,10 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                           onClick={() => isFamilyMemberClickable(spouse) && handleFamilyMemberClick(spouse)}
                         >
                           <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2 ${
-                            member.gender === 'male' ? 'bg-pink-100 dark:bg-pink-900' : 'bg-blue-100 dark:bg-blue-900'
+                            member.gender === 'male' ? 'bg-pink-100 dark:bg-pink-900' : 'bg-info-soft'
                           } ${spouse.isLinked ? 'ring-2 ring-primary ring-offset-2' : ''}`}>
                             <span className={`text-lg font-medium ${
-                              member.gender === 'male' ? 'text-pink-600 dark:text-pink-400' : 'text-blue-600 dark:text-blue-400'
+                              member.gender === 'male' ? 'text-pink-600 dark:text-pink-400' : 'text-info-text'
                             }`}>
                               {spouse.firstName[0]}{spouse.lastName[0]}
                             </span>
@@ -676,8 +676,8 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
                             className={`text-center ${isFamilyMemberClickable(child) ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                             onClick={() => isFamilyMemberClickable(child) && handleFamilyMemberClick(child)}
                           >
-                            <div className={`w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-1 ${child.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
-                              <span className="text-sm font-medium text-green-600 dark:text-green-400">
+                            <div className={`w-12 h-12 rounded-full bg-success-soft flex items-center justify-center mx-auto mb-1 ${child.isLinked ? 'ring-2 ring-primary ring-offset-1' : ''}`}>
+                              <span className="text-sm font-medium text-success-text">
                                 {child.firstName[0]}{child.lastName[0]}
                               </span>
                             </div>
@@ -807,7 +807,7 @@ export function MemberProfile({ member: initialMember, onBack, onEdit, onDelete,
         <div className="space-y-6">
           {/* Attendance Stats */}
           <Card
-            className={`shadow-sm ${onViewAttendanceHistory ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group' : ''}`}
+            className={`shadow-sm ${onViewAttendanceHistory ? 'cursor-pointer transition-all group' : ''}`}
             onClick={onViewAttendanceHistory}
           >
             <CardHeader>

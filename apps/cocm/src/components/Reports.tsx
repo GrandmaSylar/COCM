@@ -58,7 +58,7 @@ const MARITAL_COLORS: Record<string, string> = {
 const CustomTooltip = ({ active, payload, label, prefix, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm">
+    <div className="bg-background border border-border rounded-lg shadow-sm p-3 text-sm">
       <p className="font-medium mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
@@ -77,7 +77,7 @@ const PieTooltip = ({ active, payload, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
   const entry = payload[0];
   return (
-    <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm">
+    <div className="bg-background border border-border rounded-lg shadow-sm p-3 text-sm">
       <div className="flex items-center gap-2">
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.payload.fill }} />
         <span className="font-medium">{entry.name}:</span>
@@ -470,7 +470,7 @@ export function Reports() {
             Church statistics and trends — {periodLabel}
           </p>
           {selectedScope !== 'main' && (
-            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
+            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-info-soft text-info-text">
               Viewing: {selectedScope === 'all' ? 'Merged (All)' : "Children's Data"}
             </span>
           )}
@@ -589,17 +589,17 @@ export function Reports() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 stagger-children">
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Users className="w-16 h-16 text-blue-600" />
+            <Users className="w-16 h-16 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
               <Users className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalMembers}</div>
             <div className="text-xs font-medium text-muted-foreground">Total Members</div>
-            {summary.activeMembers > 0 && <div className="text-xs text-emerald-600 mt-0.5">{summary.activeMembers} active</div>}
+            {summary.activeMembers > 0 && <div className="text-xs text-success-text mt-0.5">{summary.activeMembers} active</div>}
             {selectedScope === 'all' && (
               <div className="text-xs text-muted-foreground mt-0.5">
                 Main: {summary.mainTotalMembers} &middot; Children: {summary.childrenTotalMembers}
@@ -608,12 +608,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-emerald-500/50 via-emerald-500/40 to-transparent border border-emerald-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-success-soft border border-success/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Calendar className="w-16 h-16 text-emerald-600" />
+            <Calendar className="w-16 h-16 text-success-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/40 flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-success/40 flex items-center justify-center mb-3 text-success-text transition-transform duration-300">
               <Calendar className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.avgAttendance}</div>
@@ -627,12 +627,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-blue-500/50 via-blue-500/40 to-transparent border border-blue-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-info-soft border border-info/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <Banknote className="w-16 h-16 text-blue-600" />
+            <Banknote className="w-16 h-16 text-info-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/40 flex items-center justify-center mb-3 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-info/40 flex items-center justify-center mb-3 text-info-text transition-transform duration-300">
               <Banknote className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving)}</div>
@@ -646,12 +646,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-amber-500/50 via-amber-500/40 to-transparent border border-amber-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-amber-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 bg-warning-soft border border-warning/30 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
-            <TrendingUp className="w-16 h-16 text-amber-600" />
+            <TrendingUp className="w-16 h-16 text-warning-text" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/40 flex items-center justify-center mb-3 text-amber-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-warning/40 flex items-center justify-center mb-3 text-warning-text transition-transform duration-300">
               <TrendingUp className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.growthRate > 0 ? '+' : ''}{summary.growthRate.toFixed(1)}%</div>
@@ -660,12 +660,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-cyan-500/50 via-cyan-500/40 to-transparent border border-cyan-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 from-cyan-500/50 via-cyan-500/40 border border-cyan-500/50 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
             <Smile className="w-16 h-16 text-cyan-600" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-cyan-500/40 flex items-center justify-center mb-3 text-cyan-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-cyan-500/40 flex items-center justify-center mb-3 text-cyan-600 transition-transform duration-300">
               <Smile className="w-5 h-5" />
             </div>
             <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform">{summary.totalVisitors || 0}</div>
@@ -679,12 +679,12 @@ export function Reports() {
           </div>
         </div>
 
-        <div className="group relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br from-teal-500/50 via-teal-500/40 to-transparent border border-teal-500/50 transition-all duration-300 hover:shadow-lg hover:shadow-teal-500/50 hover:-translate-y-1">
+        <div className="group relative overflow-hidden rounded-2xl p-5 from-teal-500/50 via-teal-500/40 border border-teal-500/50 transition-all duration-300 ">
           <div className="absolute top-0 right-0 p-3 opacity-15 group-hover:opacity-30 transition-opacity">
             <Receipt className="w-16 h-16 text-teal-600" />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-10 rounded-xl bg-teal-500/40 flex items-center justify-center mb-3 text-teal-600 group-hover:scale-110 transition-transform duration-300">
+            <div className="w-10 h-10 rounded-xl bg-teal-500/40 flex items-center justify-center mb-3 text-teal-600 transition-transform duration-300">
               <Receipt className="w-5 h-5" />
             </div>
             {expensesLoading ? (
@@ -698,13 +698,13 @@ export function Reports() {
               <>
                 <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(summary.totalGiving || 0)}</div>
                 <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-                <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
+                <div className="text-xs bg-warning-soft text-warning-text rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
               </>
             ) : (
               <>
                 <div className="text-2xl font-bold tracking-tighter text-foreground mb-0.5 group-hover:translate-x-1 transition-transform truncate">{formatGhanaCedis(netGiving)}</div>
                 <div className="text-xs font-medium text-muted-foreground">Net Giving</div>
-                {scopeTotalExpenses > 0 && <div className="text-xs text-red-500 mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
+                {scopeTotalExpenses > 0 && <div className="text-xs text-destructive mt-0.5">{formatGhanaCedis(scopeTotalExpenses)} expenses</div>}
               </>
             )}
           </div>
@@ -824,7 +824,7 @@ export function Reports() {
               </ComposedChart>
             </ResponsiveContainer>
             {expensesError && (
-              <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable — net giving line not shown</div>
+              <div className="text-xs bg-warning-soft text-warning-text rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable — net giving line not shown</div>
             )}
           </CardContent>
         </Card>
@@ -1147,7 +1147,7 @@ export function Reports() {
             {expensesLoading ? (
               <Skeleton className="h-64 w-full" />
             ) : expensesError ? (
-              <div className="text-xs bg-yellow-50 text-yellow-700 rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
+              <div className="text-xs bg-warning-soft text-warning-text rounded px-1.5 py-0.5 mt-1 inline-flex items-center gap-1">⚠ Expense data unavailable</div>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={expensesByServiceType} layout="vertical" margin={{ left: 0, right: 10 }}>
@@ -1248,7 +1248,7 @@ export function Reports() {
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="h-2.5 rounded-full bg-blue-500 transition-all duration-700"
+                  className="h-2.5 rounded-full bg-info transition-all duration-700"
                   style={{ width: `${Math.min(summary.attendanceRate, 100)}%` }}
                 />
               </div>
@@ -1261,7 +1261,7 @@ export function Reports() {
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="h-2.5 rounded-full bg-green-500 transition-all duration-700"
+                  className="h-2.5 rounded-full bg-success transition-all duration-700"
                   style={{ width: `${Math.min(summary.memberRetention, 100)}%` }}
                 />
               </div>
@@ -1274,7 +1274,7 @@ export function Reports() {
               </div>
               <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="h-2.5 rounded-full bg-orange-500 transition-all duration-700"
+                  className="h-2.5 rounded-full bg-warning transition-all duration-700"
                   style={{ width: `${Math.min(Math.abs(summary.growthRate), 100)}%` }}
                 />
               </div>

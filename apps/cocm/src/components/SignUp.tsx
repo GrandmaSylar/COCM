@@ -120,7 +120,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
   return (
     <div className="min-h-dvh flex items-center justify-center bg-background/95 backdrop-blur-sm p-4">
       <div className="w-full max-w-md">
-        <Card className="shadow-lg">
+        <Card className="shadow-sm">
           <CardHeader className="text-center space-y-4">
             <div className="flex items-center justify-center gap-4">
               <Button
@@ -151,7 +151,7 @@ export function SignUp({ onBackToLogin }: SignUpProps) {
 
             {success && (
               <Alert>
-                <AlertDescription className="text-green-700 dark:text-green-400">
+                <AlertDescription className="text-success-text">
                   {success}
                 </AlertDescription>
               </Alert>

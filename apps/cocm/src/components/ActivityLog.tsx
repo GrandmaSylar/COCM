@@ -36,15 +36,15 @@ const actionIcons: Record<string, any> = {
 };
 
 const actionColors: Record<string, string> = {
-  create: 'text-green-500',
-  update: 'text-blue-500',
-  delete: 'text-red-500',
-  login: 'text-emerald-500',
-  logout: 'text-gray-500',
-  approve: 'text-green-600',
-  reject: 'text-red-600',
-  grant: 'text-blue-500',
-  revoke: 'text-orange-500',
+  create: 'text-success-text',
+  update: 'text-info-text',
+  delete: 'text-destructive',
+  login: 'text-success-text',
+  logout: 'text-muted-foreground',
+  approve: 'text-success-text',
+  reject: 'text-destructive',
+  grant: 'text-info-text',
+  revoke: 'text-warning-text',
 };
 
 export function ActivityLog() {
@@ -165,8 +165,8 @@ export function ActivityLog() {
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-            <ClipboardList className="w-5 h-5 text-amber-500" />
+          <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+            <ClipboardList className="w-5 h-5 text-warning-text" />
           </div>
           <h1>Activity Log</h1>
         </div>
@@ -254,7 +254,7 @@ export function ActivityLog() {
           <CardContent className="p-0 divide-y">
             {logs.map((log) => {
               const IconComp = actionIcons[log.action] || Plus;
-              const iconColor = actionColors[log.action] || 'text-gray-500';
+              const iconColor = actionColors[log.action] || 'text-muted-foreground';
               return (
                 <div key={log.id} className="flex items-start gap-3 p-3 hover:bg-muted/30 transition-colors">
                   <div className={`mt-0.5 ${iconColor}`}>
@@ -271,11 +271,11 @@ export function ActivityLog() {
                     </div>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${
-                    log.action === 'create' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                    log.action === 'update' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                    log.action === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                    log.action === 'login' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
-                    'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                    log.action === 'create' ? 'bg-success-soft text-success-text ' :
+                    log.action === 'update' ? 'bg-info-soft text-info-text ' :
+                    log.action === 'delete' ? 'bg-destructive/10 text-destructive ' :
+                    log.action === 'login' ? 'bg-success-soft text-success-text ' :
+                    'bg-muted text-muted-foreground '
                   }`}>
                     {log.action}
                   </span>

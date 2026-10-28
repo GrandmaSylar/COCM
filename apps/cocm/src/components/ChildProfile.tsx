@@ -82,8 +82,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
   };
 
   const statusColorMap: Record<string, string> = {
-    active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-    inactive: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+    active: 'bg-success-soft text-success-text ',
+    inactive: 'bg-muted text-foreground '
   };
 
   const serviceTypeLabels: Record<string, string> = {
@@ -95,11 +95,11 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
   };
 
   const serviceTypeColors: Record<string, string> = {
-    sunday_morning: 'bg-blue-100 text-blue-800',
+    sunday_morning: 'bg-info-soft text-info-text',
     sunday_evening: 'bg-purple-100 text-purple-800',
-    midweek: 'bg-green-100 text-green-800',
-    special: 'bg-orange-100 text-orange-800',
-    other: 'bg-gray-100 text-gray-800'
+    midweek: 'bg-success-soft text-success-text',
+    special: 'bg-warning-soft text-warning-text',
+    other: 'bg-muted text-foreground'
   };
 
   const childPdfColumns = [
@@ -124,7 +124,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden shadow-sm">
-        <div className="bg-gradient-to-r from-secondary/15 via-secondary/5 to-transparent p-6">
+        <div className="from-secondary/15 via-secondary/5 p-6">
           <div className="flex items-center gap-3 mb-4">
             <Button variant="ghost" size="sm" onClick={onBack} className="hover:bg-white/50 dark:hover:bg-black/20">
               <ArrowLeft className="w-4 h-4" />
@@ -132,7 +132,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <span className="text-sm text-muted-foreground">Child Profile</span>
           </div>
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <div className="w-32 h-32 md:w-40 md:h-40 bg-white dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-lg ring-4 ring-white/50 dark:ring-card/50 shrink-0">
+            <div className="w-32 h-32 md:w-40 md:h-40 bg-card dark:bg-card rounded-full flex items-center justify-center overflow-hidden shadow-sm ring-4 ring-white/50 dark:ring-card/50 shrink-0">
               {child.photo ? (
                 <Dialog>
                   <DialogTrigger asChild>
@@ -141,7 +141,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                   <DialogContent className="max-w-4xl w-full p-0 overflow-hidden bg-transparent border-none shadow-none">
                     <DialogTitle className="sr-only">Profile Picture</DialogTitle>
                     <DialogDescription className="sr-only">Full size profile picture of {child.firstName} {child.lastName}</DialogDescription>
-                    <img src={getCloudinaryUrl(child.photo, 'original') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+                    <img src={getCloudinaryUrl(child.photo, 'original') ?? ''} alt={`${child.firstName} ${child.lastName}`} className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-sm" />
                   </DialogContent>
                 </Dialog>
               ) : (
@@ -176,7 +176,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                   </Button>
                 )}
                 {canAccess('manage_members') && (
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onPromoteToMember(child)}>
+                  <Button size="sm" className="bg-info hover:bg-info text-white" onClick={() => onPromoteToMember(child)}>
                     <UserCheck className="w-3.5 h-3.5 mr-1.5" />
                     Promote to Main Member
                   </Button>
@@ -278,7 +278,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                           {parent.isLinked && parent.linkedMemberId ? (
                             <Badge 
                               variant="secondary" 
-                              className="bg-green-100 text-green-800 hover:bg-green-200 cursor-pointer gap-1"
+                              className="bg-success-soft text-success-text hover:bg-success-soft cursor-pointer gap-1"
                               onClick={() => onViewMember(parent.linkedMemberId!)}
                             >
                               Linked Member
@@ -287,7 +287,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                           ) : parent.isLinked && parent.linkedChildMemberId && onViewChild ? (
                             <Badge 
                               variant="secondary" 
-                              className="bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer gap-1"
+                              className="bg-info-soft text-info-text hover:bg-info-soft cursor-pointer gap-1"
                               onClick={() => onViewChild(parent.linkedChildMemberId!)}
                             >
                               Linked Sibling
@@ -313,8 +313,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <Card className="min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Calendar className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center flex-shrink-0">
+                    <Calendar className="w-5 h-5 text-info-text" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-2xl font-bold truncate">{attendanceData?.summary.totalServices || 0}</p>
@@ -327,8 +327,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <Card className="min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  <div className="w-10 h-10 bg-success-soft rounded-full flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-success-text" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-2xl font-bold truncate">{attendanceData?.summary.totalPresent || 0}</p>
@@ -341,8 +341,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <Card className="min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <XCircle className="w-5 h-5 text-red-600" />
+                  <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <XCircle className="w-5 h-5 text-destructive" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-2xl font-bold truncate">{attendanceData?.summary.totalAbsent || 0}</p>
@@ -355,8 +355,8 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
             <Card className="min-w-0">
               <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-info-soft rounded-full flex items-center justify-center flex-shrink-0">
+                    <BarChart3 className="w-5 h-5 text-info-text" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-2xl font-bold truncate">{attendanceData?.summary.percentage || 0}%</p>
@@ -392,17 +392,17 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
                     <CardContent className="p-3 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
                         {record.status === 'present' ? (
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
+                          <div className="w-8 h-8 bg-success-soft rounded-full flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 className="w-4 h-4 text-success-text" />
                           </div>
                         ) : (
-                          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <XCircle className="w-4 h-4 text-red-600" />
+                          <div className="w-8 h-8 bg-destructive/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <XCircle className="w-4 h-4 text-destructive" />
                           </div>
                         )}
                         <div>
                           <p className="font-medium text-sm">{formatDate(record.date)}</p>
-                          <Badge className={`text-xs mt-1 ${serviceTypeColors[record.serviceType] || 'bg-gray-100 text-gray-800'}`}>
+                          <Badge className={`text-xs mt-1 ${serviceTypeColors[record.serviceType] || 'bg-muted text-foreground'}`}>
                             {serviceTypeLabels[record.serviceType] || record.serviceType}
                           </Badge>
                         </div>
@@ -430,7 +430,7 @@ export function ChildProfile({ child: initialChild, onBack, onEdit, onDelete, on
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive hover:bg-destructive"
               onClick={() => {
                 setDeleteDialogOpen(false);
                 onDelete(child);

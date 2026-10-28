@@ -21,7 +21,7 @@ const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'];
 const CustomTooltip = ({ active, payload, label, prefix, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm z-50">
+    <div className="bg-background border border-border rounded-lg shadow-sm p-3 text-sm z-50">
       <p className="font-medium mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <div key={i} className="flex items-center gap-2">
@@ -40,7 +40,7 @@ const PieTooltip = ({ active, payload, isCurrency }: any) => {
   if (!active || !payload?.length) return null;
   const entry = payload[0];
   return (
-    <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm z-50">
+    <div className="bg-background border border-border rounded-lg shadow-sm p-3 text-sm z-50">
       <div className="flex items-center gap-2">
         <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.payload.fill }} />
         <span className="font-medium">{entry.name}:</span>
@@ -266,33 +266,33 @@ export function ChildrenAnalytics() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-white">
+        <Card className="bg-info-soft to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
-            <Users className="w-6 h-6 text-blue-500 mb-2" />
+            <Users className="w-6 h-6 text-info-text mb-2" />
             <div className="text-2xl font-bold">{summary.totalMembers}</div>
             <div className="text-xs text-muted-foreground font-medium">Total Members</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-50 to-white">
+        <Card className="bg-success-soft to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
-            <CheckCircle className="w-6 h-6 text-emerald-500 mb-2" />
+            <CheckCircle className="w-6 h-6 text-success-text mb-2" />
             <div className="text-2xl font-bold">{summary.activeMembers}</div>
             <div className="text-xs text-muted-foreground font-medium">Active Members</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-50 to-white">
+        <Card className="bg-info-soft to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
-            <UserPlus className="w-6 h-6 text-blue-500 mb-2" />
+            <UserPlus className="w-6 h-6 text-info-text mb-2" />
             <div className="text-2xl font-bold">{summary.visitorCount}</div>
             <div className="text-xs text-muted-foreground font-medium">Total Visitors</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-amber-50 to-white">
+        <Card className="bg-warning-soft to-white">
           <CardContent className="p-4 flex flex-col items-center text-center">
-            <Banknote className="w-6 h-6 text-amber-500 mb-2" />
+            <Banknote className="w-6 h-6 text-warning-text mb-2" />
             <div className="text-2xl font-bold">{formatGhanaCedis(summary.totalGiving)}</div>
             <div className="text-xs text-muted-foreground font-medium">Total Giving</div>
           </CardContent>
@@ -303,17 +303,17 @@ export function ChildrenAnalytics() {
 
       {/* Age-Out Alerts */}
       {activeAlerts.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-2 text-amber-800 font-semibold mb-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+        <div className="bg-warning-soft border border-warning/30 rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2 text-warning-text font-semibold mb-2">
+            <AlertTriangle className="w-5 h-5 text-warning-text" />
             Children turning 18 in the next 90 days
           </div>
           <div className="space-y-2">
             {activeAlerts.map((alert: any) => (
-              <div key={alert.id} className="flex items-center justify-between bg-white rounded border border-amber-100 p-2 text-sm shadow-sm">
+              <div key={alert.id} className="flex items-center justify-between bg-card rounded border border-warning/30 p-2 text-sm shadow-sm">
                 <div className="flex items-center gap-3">
                   <span className="font-medium">{alert.firstName} {alert.lastName}</span>
-                  <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-200">
+                  <Badge variant="outline" className="text-warning-text bg-warning-soft border-warning/30">
                     Turns 18 on: {new Date(alert.turnsEighteenOn).toLocaleDateString()}
                   </Badge>
                 </div>

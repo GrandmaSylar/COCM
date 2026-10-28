@@ -67,7 +67,7 @@ function MemberCombobox({ label, value, onChange, members }: { label: string, va
       </div>
 
       {showDropdown && searchTerm && filteredMembers.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-popover text-popover-foreground border rounded-md shadow-md animate-in fade-in-80 zoom-in-95">
+        <ul className="absolute z-10 w-full mt-1 max-h-60 overflow-auto bg-popover text-popover-foreground border rounded-md shadow-sm animate-in fade-in-80 zoom-in-95">
           {filteredMembers.map(m => {
             const fullName = `${m.firstName} ${m.lastName}`;
             return (
@@ -87,7 +87,7 @@ function MemberCombobox({ label, value, onChange, members }: { label: string, va
         </ul>
       )}
       {showDropdown && searchTerm && filteredMembers.length === 0 && (
-        <div className="absolute z-10 w-full mt-1 p-3 text-sm text-muted-foreground text-center bg-popover border rounded-md shadow-md animate-in fade-in-80">
+        <div className="absolute z-10 w-full mt-1 p-3 text-sm text-muted-foreground text-center bg-popover border rounded-md shadow-sm animate-in fade-in-80">
           No members found.
         </div>
       )}
@@ -267,16 +267,16 @@ export function EditExpense({ expenseId, onBack, onSaved }: EditExpenseProps) {
                     setFormIdError('');
                   }}
                   disabled={!canEditFormId}
-                  className={formIdError ? 'border-red-500 focus-visible:ring-red-500' : (!canEditFormId ? 'bg-muted' : '')}
+                  className={formIdError ? 'border-destructive/30 focus-visible:ring-destructive/30' : (!canEditFormId ? 'bg-muted' : '')}
                   required
                 />
-                {formIdError && <p className="text-sm text-red-500 mt-1 font-medium">{formIdError}</p>}
+                {formIdError && <p className="text-sm text-destructive mt-1 font-medium">{formIdError}</p>}
               </div>
 
               <div className="space-y-2">
                 <Label>Status</Label>
                 <div>
-                  <Badge className="bg-green-500 hover:bg-green-600 text-white shadow-sm mt-1">✓ Approved</Badge>
+                  <Badge className="bg-success hover:bg-success text-white shadow-sm mt-1">✓ Approved</Badge>
                 </div>
               </div>
 

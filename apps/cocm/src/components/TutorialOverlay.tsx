@@ -227,7 +227,7 @@ function TutorialOverlayContent({ activeTutorial }: { activeTutorial: Tutorial }
 
       {/* Tutorial Card */}
       <Card 
-        className={cn("shadow-2xl border-primary/20")}
+        className={cn("shadow-sm border-primary/20")}
         style={getCardStyle()}
       >
         <div className="absolute top-2 right-2">

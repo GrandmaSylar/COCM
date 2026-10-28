@@ -104,7 +104,7 @@ export function DevSettings() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                <ShieldAlert className="w-5 h-5 text-info-text" />
                 Notification Visibility
               </CardTitle>
               <CardDescription>Configure which roles receive specific notification types.</CardDescription>
@@ -150,7 +150,7 @@ export function DevSettings() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-blue-500" />
+                <ShieldAlert className="w-5 h-5 text-info-text" />
                 Activity Log Visibility
               </CardTitle>
               <CardDescription>Configure which roles can view specific activity log entries.</CardDescription>
