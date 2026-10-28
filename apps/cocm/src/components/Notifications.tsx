@@ -40,7 +40,7 @@ const typeColors: Record<string, string> = {
   member_registered: 'text-success-text',
   giving_record: 'text-success-text',
   attendance_record: 'text-warning-text',
-  birthday: 'text-pink-500',
+  birthday: 'text-primary-text',
   system: 'text-secondary',
 };
 
@@ -49,7 +49,7 @@ const typeBgColors: Record<string, string> = {
   member_registered: 'bg-success/10',
   giving_record: 'bg-success/10',
   attendance_record: 'bg-warning/10',
-  birthday: 'bg-pink-500/10',
+  birthday: 'bg-primary',
   system: 'bg-secondary/10',
 };
 

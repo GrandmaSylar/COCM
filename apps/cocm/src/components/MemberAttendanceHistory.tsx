@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -71,7 +72,7 @@ const serviceTypeLabels: Record<string, string> = {
 
 const serviceTypeColors: Record<string, string> = {
   sunday_morning: 'bg-info-soft text-info-text',
-  sunday_evening: 'bg-purple-100 text-purple-800',
+  sunday_evening: 'bg-primary/10 text-primary-text',
   midweek: 'bg-success-soft text-success-text',
   special: 'bg-warning-soft text-warning-text',
   other: 'bg-muted text-foreground'
@@ -213,9 +214,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
     return (
       <div className="space-y-6 overflow-x-hidden w-full">
         <div className="flex items-center gap-4 overflow-hidden w-full min-w-0">
-          <Button variant="ghost" size="sm" onClick={onBack} className="flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} className="flex-shrink-0" aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div className="min-w-0">
             <h1 className="truncate">Attendance History</h1>
             <p className="text-muted-foreground truncate">{memberName}</p>
@@ -245,9 +244,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full overflow-hidden">
         <div className="flex items-center gap-4 min-w-0 flex-1">
-          <Button variant="ghost" size="sm" onClick={onBack} className="flex-shrink-0">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
+          <Button variant="soft" size="icon" onClick={onBack} className="flex-shrink-0" aria-label="Back"><ChevronLeft className="size-5" /></Button>
           <div className="min-w-0">
             <h1 className="truncate">Attendance History</h1>
             <p className="text-muted-foreground truncate">
@@ -258,7 +255,7 @@ export function MemberAttendanceHistory({ memberId, memberName, onBack }: Member
         {records.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="soft">
                 <Download className="w-4 h-4 mr-2" />
                 Export
               </Button>

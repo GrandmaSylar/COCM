@@ -180,8 +180,8 @@ export function ChildrenAnalytics() {
   const renderHeader = () => (
     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
-        <h1 className="text-2xl font-bold">Children's Analytics</h1>
-        <p className="text-muted-foreground">Insights and trends for the Children's Ministry</p>
+        <h2 className="text-[20px] font-semibold">Analytics</h2>
+        <p className="text-[13px] text-muted-foreground">Insights and trends for the Children's Ministry</p>
       </div>
       <div className="flex gap-2">
         <Select value={period} onValueChange={setPeriod}>
@@ -194,9 +194,8 @@ export function ChildrenAnalytics() {
             <SelectItem value="1y">Last Year</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+        <Button variant="soft" size="icon" aria-label="Refresh" onClick={handleRefresh} disabled={refreshing}>
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
         </Button>
       </div>
     </div>

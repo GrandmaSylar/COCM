@@ -146,7 +146,7 @@ export function AddUser({ onBack, onSave }: AddUserProps) {
                       >
                         <div className="flex items-center gap-2">
                           {label}
-                          {value === 'dev' && <Crown className="w-3 h-3 text-purple-600" />}
+                          {value === 'dev' && <Crown className="w-3 h-3 text-primary-text" />}
                         </div>
                       </SelectItem>
                     ))}

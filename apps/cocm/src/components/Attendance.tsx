@@ -1368,13 +1368,13 @@ export function AttendanceDetail({ recordId, onBack, onSaved }: AttendanceDetail
                     <div className="text-xl font-semibold text-info-text">{record.menCount || 0}</div>
                     <p className="text-xs text-info-text font-medium uppercase tracking-wider">Men</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-pink-50/50">
-                    <div className="text-xl font-semibold text-pink-700">{record.womenCount || 0}</div>
-                    <p className="text-xs text-pink-600/70 font-medium uppercase tracking-wider">Women</p>
+                  <div className="text-center p-3 rounded-lg bg-primary/10">
+                    <div className="text-xl font-semibold text-primary-text">{record.womenCount || 0}</div>
+                    <p className="text-xs text-primary-text font-medium uppercase tracking-wider">Women</p>
                   </div>
-                  <div className="text-center p-3 rounded-lg bg-purple-50/50">
-                    <div className="text-xl font-semibold text-purple-700">{record.childrenCount || 0}</div>
-                    <p className="text-xs text-purple-600/70 font-medium uppercase tracking-wider">Children</p>
+                  <div className="text-center p-3 rounded-lg bg-primary/10">
+                    <div className="text-xl font-semibold text-primary-text">{record.childrenCount || 0}</div>
+                    <p className="text-xs text-primary-text font-medium uppercase tracking-wider">Children</p>
                   </div>
                   <div className="text-center p-3 rounded-lg bg-warning-soft/50">
                     <div className="text-xl font-semibold text-warning-text">{record.visitorsCount || 0}</div>
