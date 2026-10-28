@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
+import { IconTile, LargeTitle } from './ui/ios';
+import { MoreHorizontal } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -166,60 +168,62 @@ export function Expenses({ onAddExpense, onViewReceipt, onEditExpense, onDeleted
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl lg:text-3xl font-bold tracking-tight mb-2">Finance &amp; Expenses</h1>
+    <div className="space-y-4">
+      <LargeTitle
+        title={
+          <span className="flex items-center gap-2">
+            Finance &amp; Expenses
             {!isOnline && (
-              <Badge variant="outline" className="mb-2 bg-warning-soft text-warning-text border-warning/30">
+              <Badge variant="outline" className="border-0 bg-warning-soft text-warning-text">
                 <WifiOff className="w-3 h-3 mr-1" />
-                Cached Data
+                Cached
               </Badge>
             )}
-          </div>
-          <p className="text-muted-foreground">Manage expenditure and payment authorisations</p>
-        </div>
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-          <Button variant="outline" size="sm" onClick={handleRefresh} className="flex-1 sm:flex-none">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          {isDevOrAdmin && (
-            <Button variant="outline" size="sm" onClick={() => setShowTypeManager(true)} className="flex-1 sm:flex-none">
-              <Settings className="w-4 h-4 mr-2" />
-              Payment Methods
+          </span>
+        }
+        subtitle="Manage expenditure and payment authorisations"
+        actions={
+          <>
+            <Button onClick={onAddExpense}>
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">New Requisition</span>
+              <span className="sr-only sm:hidden">New Requisition</span>
             </Button>
-          )}
-          <Button size="sm" onClick={onAddExpense} className="flex-1 sm:flex-none">
-            <Plus className="w-4 h-4 mr-2" />
-            New Requisition
-          </Button>
-        </div>
-      </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={handleRefresh}>
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </DropdownMenuItem>
+                {isDevOrAdmin && (
+                  <DropdownMenuItem onClick={() => setShowTypeManager(true)}>
+                    <Settings className="w-4 h-4" />
+                    Payment Methods
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-destructive/10 border-destructive/30">
-          <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Receipt className="w-16 h-16 text-destructive" /></div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (All Time)</p>
-            <p className="text-xl sm:text-3xl font-bold">GH₵ {totalAllTime.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-warning-soft border-warning/30">
-          <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Calendar className="w-16 h-16 text-warning-text" /></div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Expenses (This Month)</p>
-            <p className="text-xl sm:text-3xl font-bold">GH₵ {totalThisMonth.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-info-soft border-info/30">
-          <CardContent className="p-6 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><Banknote className="w-16 h-16 text-info-text" /></div>
-            <p className="text-sm font-medium text-muted-foreground mb-1">Total Requisitions</p>
-            <p className="text-xl sm:text-3xl font-bold">{expenses.length}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
+        {[
+          { icon: Receipt, tone: 'primary' as const, value: `GH₵ ${totalAllTime.toFixed(2)}`, label: 'Total Expenses (All Time)' },
+          { icon: Calendar, tone: 'warning' as const, value: `GH₵ ${totalThisMonth.toFixed(2)}`, label: 'Total Expenses (This Month)' },
+          { icon: Banknote, tone: 'info' as const, value: String(expenses.length), label: 'Total Requisitions' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 truncate text-2xl font-bold leading-none tracking-tight tabular-nums">{stat.value}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
       <Card>

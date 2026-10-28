@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from './ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { EmptyState, Group, IconTile, LargeTitle } from './ui/ios';
+import { PullToRefresh } from './ui/ios-gestures';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
-import { Bell, CheckCheck, Users, Calendar, Banknote, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, Bell, CheckCheck, Users, Calendar, Banknote, Cake, AlertCircle, Eye, ChevronRight, UserPlus, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { supabase } from '@cms/shared';
 import { ConflictsPanel } from './ConflictsPanel';
@@ -49,6 +51,15 @@ const typeBgColors: Record<string, string> = {
   attendance_record: 'bg-warning/10',
   birthday: 'bg-pink-500/10',
   system: 'bg-secondary/10',
+};
+
+const typeTones: Record<string, 'primary' | 'gray' | 'success' | 'warning' | 'info'> = {
+  member_status_change: 'info',
+  member_registered: 'success',
+  giving_record: 'success',
+  attendance_record: 'warning',
+  birthday: 'primary',
+  system: 'gray',
 };
 
 export function Notifications({ onNotificationClick }: NotificationsProps) {
@@ -143,97 +154,91 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
 
   return (
     <OfflineOverlay>
-    <div className="space-y-6 relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl from-secondary/20 to-secondary/5 flex items-center justify-center shadow-sm">
-            <Bell className="w-5 h-5 text-secondary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-semibold">Notifications</h1>
-            {total > 0 && <p className="text-sm text-muted-foreground">{unreadCount} unread</p>}
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button
-            variant={showUnreadOnly ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setShowUnreadOnly(!showUnreadOnly); setPage(1); }}
-          >
-            {showUnreadOnly ? 'Show All' : 'Unread Only'}
-          </Button>
-          {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={markAllAsRead}>
-              <CheckCheck className="w-3 h-3 mr-1" /> Mark All Read
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title="Notifications"
+        subtitle={total > 0 ? `${unreadCount} unread` : undefined}
+        actions={
+          <>
+            <Button variant={showUnreadOnly ? 'default' : 'soft'} size="sm" onClick={() => { setShowUnreadOnly(!showUnreadOnly); setPage(1); }}>
+              {showUnreadOnly ? 'Show All' : 'Unread Only'}
             </Button>
-          )}
-        </div>
-      </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="soft" size="icon" aria-label="More actions">
+                  <MoreHorizontal className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                  <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </DropdownMenuItem>
+                {unreadCount > 0 && (
+                  <DropdownMenuItem onClick={markAllAsRead}>
+                    <CheckCheck className="w-4 h-4" />
+                    Mark All Read
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
 
       <ConflictsPanel onAllResolved={handleRefresh} />
 
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-20 rounded-xl" />
           ))}
         </div>
       ) : notifications.length === 0 ? (
-        <Card className="shadow-sm">
-          <CardContent className="p-12 text-center text-muted-foreground">
-            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <Bell className="w-8 h-8 opacity-40" />
-            </div>
-            <p className="font-medium">{showUnreadOnly ? 'No unread notifications' : 'No notifications yet'}</p>
-            <p className="text-sm mt-1">You're all caught up!</p>
-          </CardContent>
-        </Card>
+        <Group>
+          <EmptyState icon={Bell} title={showUnreadOnly ? 'No unread notifications' : 'No notifications yet'} description="You're all caught up!" />
+        </Group>
       ) : (
-        <div className="space-y-2 stagger-children">
+        <Group>
           {notifications.map((n) => {
             const IconComp = typeIcons[n.type] || Bell;
-            const iconColor = typeColors[n.type] || 'text-muted-foreground';
-            const iconBg = typeBgColors[n.type] || 'bg-fill-strong';
+            const tone = typeTones[n.type] || 'gray';
             const isClickable = !!onNotificationClick;
+            const content = (
+              <>
+                <span className={`size-2 shrink-0 rounded-full ${n.isRead ? 'bg-transparent' : 'bg-primary'}`} aria-label={n.isRead ? undefined : 'Unread'} />
+                <IconTile icon={IconComp} tone={tone} />
+                <span className="min-w-0 flex-1 text-left">
+                  <span className="flex items-start justify-between gap-2">
+                    <span className={`text-[15px] leading-snug ${n.isRead ? '' : 'font-semibold'}`}>{n.title}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{formatTime(n.createdAt)}</span>
+                  </span>
+                  <span className="mt-0.5 block text-[13px] text-muted-foreground">{n.message}</span>
+                  {n.tab && <span className="mt-1.5 inline-block rounded-full bg-fill px-2 py-0.5 text-xs capitalize text-muted-foreground">{n.tab}</span>}
+                </span>
+              </>
+            );
+            const rowClass = 'relative flex w-full items-start gap-3 px-4 py-3 after:absolute after:bottom-0 after:left-[3.75rem] after:right-0 after:h-px after:bg-separator last:after:hidden';
             return (
-              <Card
-                key={n.id}
-                className={`transition-all shadow-sm ${!n.isRead ? 'border-l-4 border-l-amber-500 bg-warning/5' : ''} ${isClickable ? 'cursor-pointer' : ''}`}
-                onClick={() => isClickable && handleNotificationClick(n)}
-              >
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
-                    <IconComp className={`w-4 h-4 ${iconColor}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="font-medium text-sm">{n.title}</div>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">{formatTime(n.createdAt)}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
-                    {n.tab && (
-                      <span className="inline-block mt-1.5 text-xs bg-muted px-2 py-0.5 rounded-full capitalize">{n.tab}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {!n.isRead && (
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => { e.stopPropagation(); markAsRead(n.id); }}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                    {isClickable && (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              <div key={n.id} className={`flex items-start ${isClickable ? '' : ''}`}>
+                {isClickable ? (
+                  <button type="button" onClick={() => handleNotificationClick(n)} className={`${rowClass} transition-colors hover:bg-accent/60 active:bg-accent`}>
+                    {content}
+                    <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground/60" />
+                  </button>
+                ) : (
+                  <div className={rowClass}>{content}</div>
+                )}
+                {!n.isRead && (
+                  <Button variant="ghost" size="icon" className="mr-1 mt-2 shrink-0" aria-label="Mark as read" onClick={() => markAsRead(n.id)}>
+                    <Eye className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
             );
           })}
-        </div>
+        </Group>
       )}
 
       {/* Pagination */}
@@ -245,6 +250,7 @@ export function Notifications({ onNotificationClick }: NotificationsProps) {
         </div>
       )}
     </div>
+    </PullToRefresh>
     </OfflineOverlay>
   );
 }

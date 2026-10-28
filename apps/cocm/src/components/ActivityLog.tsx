@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from './ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { EmptyState, Group, GroupRow, LargeTitle } from './ui/ios';
+import { PullToRefresh } from './ui/ios-gestures';
 import { Button } from './ui/button';
 import { Skeleton } from './ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
-import { Download, LogIn, LogOut, Plus, Pencil, Trash2, CheckCircle, XCircle, Shield, ShieldOff, ClipboardList, RefreshCw } from 'lucide-react';
+import { MoreHorizontal, Download, LogIn, LogOut, Plus, Pencil, Trash2, CheckCircle, XCircle, Shield, ShieldOff, ClipboardList, RefreshCw } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from './AuthContext';
 import { exportToCSV, exportToPDF, exportToXLSX } from '../utils/export';
@@ -45,6 +47,18 @@ const actionColors: Record<string, string> = {
   reject: 'text-destructive',
   grant: 'text-info-text',
   revoke: 'text-warning-text',
+};
+
+const actionTones: Record<string, 'primary' | 'gray' | 'success' | 'warning' | 'info'> = {
+  create: 'success',
+  update: 'info',
+  delete: 'primary',
+  login: 'success',
+  logout: 'gray',
+  approve: 'success',
+  reject: 'primary',
+  grant: 'info',
+  revoke: 'warning',
 };
 
 export function ActivityLog() {
@@ -162,31 +176,40 @@ export function ActivityLog() {
   };
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
-            <ClipboardList className="w-5 h-5 text-warning-text" />
-          </div>
-          <h1>Activity Log</h1>
-        </div>
-        {/* Refresh and Export buttons */}
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm" className="border-secondary/30 text-secondary hover:bg-secondary/10 hover:text-secondary" onClick={() => handleExport('csv')} disabled={exporting}>
-            <Download className="w-3 h-3 mr-1" />CSV
-          </Button>
-          <Button variant="outline" size="sm" className="border-secondary/30 text-secondary hover:bg-secondary/10 hover:text-secondary" onClick={() => handleExport('excel')} disabled={exporting}>
-            <Download className="w-3 h-3 mr-1" />Excel
-          </Button>
-          <Button variant="outline" size="sm" className="border-secondary/30 text-secondary hover:bg-secondary/10 hover:text-secondary" onClick={() => handleExport('pdf')} disabled={exporting}>
-            <Download className="w-3 h-3 mr-1" />PDF
-          </Button>
-        </div>
-      </div>
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div className="space-y-4 relative">
+      <LargeTitle
+        title="Activity Log"
+        subtitle={isDev ? 'Everything people have done in the system' : 'Your own recent activity'}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="soft" size="icon" aria-label="More actions">
+                <MoreHorizontal className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleExport('csv')} disabled={exporting}>
+                <Download className="w-4 h-4" />
+                Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('excel')} disabled={exporting}>
+                <Download className="w-4 h-4" />
+                Export as Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('pdf')} disabled={exporting}>
+                <Download className="w-4 h-4" />
+                Export as PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -244,46 +267,31 @@ export function ActivityLog() {
       {loading ? (
         <div className="space-y-2">
           {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-14" />
+            <Skeleton key={i} className="h-14 rounded-xl" />
           ))}
         </div>
       ) : logs.length === 0 ? (
-        <Card><CardContent className="p-6 text-center text-muted-foreground">No activity logs found.</CardContent></Card>
+        <Group>
+          <EmptyState icon={ClipboardList} title="No activity yet" description="No activity logs match these filters." />
+        </Group>
       ) : (
-        <Card className="animate-fade-in">
-          <CardContent className="p-0 divide-y">
-            {logs.map((log) => {
-              const IconComp = actionIcons[log.action] || Plus;
-              const iconColor = actionColors[log.action] || 'text-muted-foreground';
-              return (
-                <div key={log.id} className="flex items-start gap-3 p-3 hover:bg-muted/30 transition-colors">
-                  <div className={`mt-0.5 ${iconColor}`}>
-                    <IconComp className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm">{log.description}</p>
-                    <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
-                      <span>{log.userName}</span>
-                      <span>&middot;</span>
-                      <span className="capitalize">{log.userRole}</span>
-                      <span>&middot;</span>
-                      <span>{formatTime(log.createdAt)}</span>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-0.5 rounded-full capitalize ${
-                    log.action === 'create' ? 'bg-success-soft text-success-text ' :
-                    log.action === 'update' ? 'bg-info-soft text-info-text ' :
-                    log.action === 'delete' ? 'bg-destructive/10 text-destructive ' :
-                    log.action === 'login' ? 'bg-success-soft text-success-text ' :
-                    'bg-muted text-muted-foreground '
-                  }`}>
-                    {log.action}
-                  </span>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
+        <Group>
+          {logs.map((log) => {
+            const IconComp = actionIcons[log.action] || Plus;
+            const tone = actionTones[log.action] || 'gray';
+            return (
+              <GroupRow
+                key={log.id}
+                icon={IconComp}
+                iconTone={tone}
+                title={<span className="block whitespace-normal">{log.description}</span>}
+                subtitle={<>{log.userName} · <span className="capitalize">{log.userRole}</span> · {formatTime(log.createdAt)}</>}
+                trailing={<span className="shrink-0 rounded-full bg-fill px-2 py-0.5 text-xs capitalize text-muted-foreground">{log.action}</span>}
+                chevron={false}
+              />
+            );
+          })}
+        </Group>
       )}
 
       {/* Pagination */}
@@ -299,5 +307,6 @@ export function ActivityLog() {
         <p className="text-xs text-muted-foreground text-center">You are viewing your own activity. Developers can view all user activity.</p>
       )}
     </div>
+    </PullToRefresh>
   );
 }
