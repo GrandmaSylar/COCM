@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
-import { Map, Users, TrendingUp, HandHeart, Loader2, ArrowRight, Settings } from 'lucide-react';
+import { Map, Users, TrendingUp, HandHeart, Loader2, ArrowRight, Settings, Plus } from 'lucide-react';
 import { Button } from './ui/button';
+import { EmptyState, Group, GroupRow, IconTile, LargeTitle } from './ui/ios';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
@@ -150,24 +151,7 @@ export function Zones() {
     return parts.join(' ');
   };
 
-  // Modern gradients for cards
-  const gradients = [
-    'from-blue-500 to-indigo-600',
-    'from-emerald-400 to-teal-600',
-    'from-violet-500 to-purple-600',
-    'from-amber-400 to-orange-600',
-    'from-rose-400 to-red-600',
-    'from-cyan-400 to-blue-600',
-  ];
-
-  const lightGradients = [
-    'from-blue-500/10 to-indigo-600/10 text-info-text',
-    'from-emerald-400/10 to-teal-600/10 text-success-text',
-    'from-violet-500/10 to-purple-600/10 text-violet-600 dark:text-violet-400',
-    'from-amber-400/10 to-orange-600/10 text-warning-text',
-    'from-rose-400/10 to-red-600/10 text-destructive',
-    'from-cyan-400/10 to-blue-600/10 text-cyan-600 dark:text-cyan-400',
-  ];
+  const TONES = ['success', 'info', 'primary', 'warning', 'gray', 'info'] as const;
 
   const totalZonalMembers = zones.reduce((acc, curr) => acc + (curr.memberCount || 0), 0);
 
@@ -181,130 +165,56 @@ export function Zones() {
   }
 
   return (
-    <div className="space-y-6 w-full overflow-x-hidden p-1 pb-10">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-            <Map className="w-6 h-6 text-primary" />
-            Zones
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Manage geographic cell groups, home churches, and pastoral care zones.
-          </p>
-        </div>
-        <Button onClick={handleCreateZone} className="bg-primary text-primary-foreground shadow-sm rounded-xl px-5 h-10 hover:opacity-90 transition-all duration-200">
-          Add New Zone
-        </Button>
+    <div className="space-y-4 w-full overflow-x-hidden pb-6">
+      <LargeTitle
+        title="Zones"
+        subtitle="Geographic cell groups, home churches and pastoral care zones"
+        actions={
+          <Button onClick={handleCreateZone}>
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add New Zone</span>
+            <span className="sr-only sm:hidden">Add New Zone</span>
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { icon: Map, tone: 'success' as const, value: zones.length, label: 'Zones' },
+          { icon: Users, tone: 'info' as const, value: totalZonalMembers, label: 'Zonal Members' },
+          { icon: HandHeart, tone: 'warning' as const, value: '-', label: 'Avg Attendance' },
+        ].map((stat) => (
+          <div key={stat.label} className="rounded-xl bg-card p-3 sm:p-4">
+            <IconTile icon={stat.icon} tone={stat.tone} />
+            <div className="mt-2 text-2xl font-bold leading-none tracking-tight tabular-nums">{stat.value}</div>
+            <div className="mt-1 text-[13px] text-muted-foreground">{stat.label}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Analytics Overview */}
-      <div className="grid gap-6 md:grid-cols-3 pt-2">
-        <Card className="border border-border/80 shadow-sm bg-card rounded-2xl relative overflow-hidden group transition-shadow duration-300">
-          <div className="absolute top-0 left-0 w-full h-[4px] bg-success-soft to-teal-600" />
-          <CardHeader className="pb-2 pt-6">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Zones</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-6">
-            <div className="text-3xl font-extrabold tracking-tight">{zones.length}</div>
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
-              <span className="bg-success/10 text-success-text p-1 rounded-md">
-                <TrendingUp className="w-3.5 h-3.5" />
-              </span>
-              Active geographic cell groups
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border border-border/80 shadow-sm bg-card rounded-2xl relative overflow-hidden group transition-shadow duration-300">
-          <div className="absolute top-0 left-0 w-full h-[4px] bg-info-soft" />
-          <CardHeader className="pb-2 pt-6">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Zonal Members</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-6">
-            <div className="text-3xl font-extrabold tracking-tight">{totalZonalMembers}</div>
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
-              <span className="bg-info/10 text-info-text p-1 rounded-md">
-                <Users className="w-3.5 h-3.5" />
-              </span>
-              Members assigned to zones
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border border-border/80 shadow-sm bg-card rounded-2xl relative overflow-hidden group transition-shadow duration-300">
-          <div className="absolute top-0 left-0 w-full h-[4px] from-violet-500 to-purple-600" />
-          <CardHeader className="pb-2 pt-6">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent className="pb-6">
-            <div className="text-3xl font-extrabold tracking-tight">-</div>
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1.5">
-              <span className="bg-purple-500/10 text-purple-600 dark:text-purple-400 p-1 rounded-md">
-                <HandHeart className="w-3.5 h-3.5" />
-              </span>
-              Avg attendance this month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Zones Grid */}
       {zones.length === 0 ? (
-        <div className="text-center py-16 border border-dashed rounded-2xl border-border/80 bg-card shadow-sm">
-          <Map className="w-10 h-10 text-muted-foreground/60 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm font-medium">No zones created yet.</p>
-        </div>
+        <Group>
+          <EmptyState icon={Map} title="No zones yet" description="Zones you add will appear here." />
+        </Group>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pt-4">
-          {zones.map((zone, idx) => {
-            const gradClass = gradients[idx % gradients.length];
-            const lightGradClass = lightGradients[idx % lightGradients.length];
-            return (
-              <Card key={zone.id} className="relative overflow-hidden group transition-all duration-300 border border-border/80 rounded-2xl bg-card">
-                {/* Visual Accent Top Bar */}
-                <div className={`absolute top-0 left-0 w-full h-[5px] ${gradClass}`} />
-                
-                <CardHeader className="pb-4 pt-8 px-6">
-                  <div className="flex items-center justify-between">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${lightGradClass}`}>
-                      <Map className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <Badge variant="secondary" className="bg-muted text-foreground font-semibold rounded-full px-3 py-1 text-xs">
-                      {zone.memberCount} Members
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-xl font-bold mt-5 text-foreground group-hover:text-primary transition-colors">{zone.name}</CardTitle>
-                  <CardDescription className="text-sm mt-2 leading-relaxed text-muted-foreground font-medium min-h-[40px]">{zone.description || 'Geographic cell group for pastoral care.'}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="px-6 pb-6 pt-0">
-                  <div className="space-y-3 mt-2 bg-muted p-4 rounded-xl border border-border">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Leader</span>
-                      <span className="font-semibold text-foreground">{getLeaderName(zone)}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 mt-5">
-                    <Button 
-                      onClick={() => handleViewZoneDetails(zone)}
-                      variant="outline" 
-                      className="flex-1 rounded-xl h-10 text-sm font-semibold border-border hover:bg-muted flex items-center justify-center gap-1.5 transition-all duration-300"
-                    >
-                      Roster
-                    </Button>
-                    <Button 
-                      onClick={() => handleEditZone(zone)}
-                      variant="outline" 
-                      className="flex-1 rounded-xl h-10 text-sm font-semibold border-border hover:bg-muted flex items-center justify-center gap-1.5 transition-all duration-300 text-muted-foreground"
-                    >
-                      <Settings className="w-4 h-4 mr-1" />
-                      Manage
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <Group title="All zones" footer="Tap a zone to see its roster.">
+          {zones.map((zone, idx) => (
+            <div key={zone.id} className="flex items-stretch">
+              <GroupRow
+                className="flex-1"
+                icon={Map}
+                iconTone={TONES[idx % TONES.length]}
+                title={zone.name}
+                subtitle={getLeaderName(zone)}
+                value={`${zone.memberCount} ${zone.memberCount === 1 ? 'member' : 'members'}`}
+                onClick={() => handleViewZoneDetails(zone)}
+              />
+              <Button variant="ghost" size="icon" className="mr-1 self-center" aria-label={`Manage ${zone.name}`} onClick={() => handleEditZone(zone)}>
+                <Settings className="size-4" />
+              </Button>
+            </div>
+          ))}
+        </Group>
       )}
 
       {/* Zone Add/Edit Dialog */}
