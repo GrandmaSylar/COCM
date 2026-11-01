@@ -894,7 +894,7 @@ function StatsBar({ records, totalServices, loading }: { records: ServiceDateSum
   }
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-3">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
       <div className="rounded-xl bg-card p-4">
         <div className="text-2xl font-bold tabular-nums">{totalServices}</div>
         <div className="mt-0.5 text-[13px] text-muted-foreground">Total Services</div>
@@ -903,8 +903,8 @@ function StatsBar({ records, totalServices, loading }: { records: ServiceDateSum
         <div className="text-2xl font-bold tabular-nums">{stats.avgAttendance}</div>
         <div className="mt-0.5 text-[13px] text-muted-foreground">Average Attendance</div>
       </div>
-      <div className="rounded-xl bg-card p-4">
-        <div className="text-2xl font-bold tabular-nums">{formatGhanaCedis(stats.totalGiving)}</div>
+      <div className="col-span-2 min-w-0 rounded-xl bg-card p-4 sm:col-span-1">
+        <div className="truncate text-2xl font-bold tabular-nums" title={formatGhanaCedis(stats.totalGiving)}>{formatGhanaCedis(stats.totalGiving)}</div>
         <div className="mt-0.5 text-[13px] text-muted-foreground">Total Giving</div>
       </div>
     </div>
