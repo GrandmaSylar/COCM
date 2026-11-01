@@ -235,6 +235,33 @@ export const api = {
   // ============================================================================
   // SERVICES (Giving & Financial Records)
   // ============================================================================
+  serviceRecords: {
+    getAll: (params?: { page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return fetchApi(`/service-records${q ? '?' + q : ''}`);
+    },
+    getByDate: (date: string, serviceType?: string) =>
+      fetchApi(`/service-records/by-date/${date}${serviceType ? `?serviceType=${encodeURIComponent(serviceType)}` : ''}`),
+    getToday: () => fetchApi('/service-records/today'),
+  },
+
+  serviceSetups: {
+    getAll: (params?: { page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return fetchApi(`/service-setups${q ? '?' + q : ''}`);
+    },
+    getByDate: (date: string, serviceType?: string) =>
+      fetchApi(`/service-setups/by-date/${date}${serviceType ? `?serviceType=${encodeURIComponent(serviceType)}` : ''}`),
+    create: (data: any) => fetchApi('/service-setups', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => fetchApi(`/service-setups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  },
+
   services: {
     getAll: () => fetchApi('/services'),
     create: (data: any) => fetchApi('/services', { method: 'POST', body: JSON.stringify(data) }),

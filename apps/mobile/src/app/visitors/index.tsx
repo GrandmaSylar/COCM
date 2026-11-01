@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, FlatList, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { RefreshCw, SearchX, UserCheck, UserPlus } from '@tamagui/lucide-icons';
 import { getLocalVisitors } from '../../lib/db';
 import { syncVisitors } from '../../lib/syncEngine';
 import { useAppColors } from '../../context/ThemeContext';
 import { AppHeader } from '../../components/AppHeader';
 import { SkeletonList } from '../../components/Skeleton';
-import { Badge, EmptyState, IconButton, PersonRow, rowPosition, Screen, SearchField } from '../../components/ui';
+import { Badge, Button, EmptyState, IconButton, PersonRow, rowPosition, Screen, SearchField } from '../../components/ui';
+import { useAccess } from '../../lib/access';
 import { space } from '../../theme/tokens';
 
 interface Visitor {
@@ -17,11 +18,15 @@ interface Visitor {
   residence?: string;
   visit_date: string;
   status?: string;
+  converted: boolean;
 }
 
 export default function VisitorsScreen() {
   const router = useRouter();
   const c = useAppColors();
+  const { can } = useAccess();
+  // Converting creates a member, so it needs the same access as adding one (the web checks manage_members).
+  const canConvert = can('members');
   const [search, setSearch] = useState('');
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,10 +38,12 @@ export default function VisitorsScreen() {
       if (localRows) {
         const formatted = localRows.map((v) => {
           let residence = '';
+          let converted = (v.follow_up_status || '').toLowerCase() === 'converted';
           if (v.raw_json) {
             try {
               const parsed = JSON.parse(v.raw_json);
               residence = parsed.residence || '';
+              if (parsed.convertedToMember) converted = true;
             } catch (e) {}
           }
           return {
@@ -45,7 +52,8 @@ export default function VisitorsScreen() {
             phone: v.phone || undefined,
             residence: residence || (v.potential_zone ? `Zone ${v.potential_zone}` : undefined),
             visit_date: v.visit_date,
-            status: v.follow_up_status || 'New'
+            status: v.follow_up_status || 'New',
+            converted,
           };
         });
         setVisitors(formatted);
@@ -70,9 +78,15 @@ export default function VisitorsScreen() {
   };
 
   useEffect(() => {
-    loadLocalVisitors();
     fetchRemoteVisitors();
   }, []);
+
+  // Re-read SQLite whenever the screen is shown again, so a visitor converted on the next screen updates here.
+  useFocusEffect(
+    useCallback(() => {
+      loadLocalVisitors();
+    }, [])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -137,7 +151,26 @@ export default function VisitorsScreen() {
             <PersonRow
               name={item.name}
               position={rowPosition(index, shown.length)}
-              meta={<Badge label={item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'New'} tone={followUpTone(item.status)} />}
+              dimmed={item.converted}
+              meta={
+                item.converted ? (
+                  <Badge label="Converted to member" tone="neutral" icon={UserCheck} />
+                ) : (
+                  <Badge label={item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'New'} tone={followUpTone(item.status)} />
+                )
+              }
+              footer={
+                !item.converted && canConvert ? (
+                  <Button
+                    label="Convert to member"
+                    variant="secondary"
+                    size="sm"
+                    icon={UserPlus}
+                    accessibilityLabel={`Convert ${item.name} to a member`}
+                    onPress={() => router.push(`/members/add?fromVisitorId=${encodeURIComponent(item.id)}` as any)}
+                  />
+                ) : undefined
+              }
               subtitle={[`Visited ${formatVisit(item.visit_date)}`, item.residence].filter(Boolean).join(' · ')}
               phone={item.phone}
             />

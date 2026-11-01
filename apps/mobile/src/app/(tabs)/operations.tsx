@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
-import { CalendarCheck, ShieldCheck, MapPin } from '@tamagui/lucide-icons';
+import { CalendarCheck, Church, ShieldCheck, MapPin } from '@tamagui/lucide-icons';
 import { getLocalAttendanceRecords, getLocalDropdownOptions, getLocalZones } from '../../lib/db';
 import { HubScreen } from '../../components/HubScreen';
 
@@ -33,6 +33,12 @@ export default function OperationsScreen() {
       title="Operations"
       subtitle="Services, ministries and care zones."
       items={[
+        {
+          title: 'Services',
+          description: info.lastService ? `Latest service ${info.lastService}` : 'Attendance and giving by service',
+          icon: Church,
+          route: '/services',
+        },
         {
           title: 'Attendance',
           description: info.lastService ? `Last recorded ${info.lastService}` : 'Mark registers and head counts',

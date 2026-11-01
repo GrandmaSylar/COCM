@@ -409,6 +409,11 @@ const SCHEMA: Record<string, TableDef> = {
       ['absence_end_date', 'TEXT'], ['until_further_notice', 'INTEGER DEFAULT 0'], ['created_at', 'TEXT NOT NULL']],
     indexes: ['CREATE INDEX IF NOT EXISTS idx_absentee_rec ON absentee_records(attendance_record_id, member_id)'],
   },
+  // Server-computed read models (service summaries and details, service setups), cached so the
+  // Services screens open offline. Not a domain entity: it is replaced wholesale on each refresh.
+  read_cache: {
+    columns: [['key', 'TEXT PRIMARY KEY NOT NULL'], ['value', 'TEXT NOT NULL'], ['updated_at', 'TEXT NOT NULL']],
+  },
   sync_queue: {
     columns: [PK, ['action', 'TEXT NOT NULL'], ['endpoint', 'TEXT NOT NULL'], ['payload', 'TEXT NOT NULL'],
       ['status', "TEXT DEFAULT 'pending'"], ['created_at', 'TEXT NOT NULL'], ['attempts', 'INTEGER DEFAULT 0'],
@@ -1491,5 +1496,23 @@ export async function upsertLocalActivityLog(log: LocalActivityLog): Promise<voi
   );
 }
 
+/** Reads a cached server read model, or null when nothing has been cached under that key. */
+export async function getReadCache<T = unknown>(key: string): Promise<T | null> {
+  const db = await getLocalDb();
+  const row = await db.getFirstAsync<{ value: string }>('SELECT value FROM read_cache WHERE key = ?', [key]);
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value) as T;
+  } catch {
+    return null;
+  }
+}
 
-
+export async function setReadCache(key: string, value: unknown): Promise<void> {
+  const db = await getLocalDb();
+  await db.runAsync('INSERT OR REPLACE INTO read_cache (key, value, updated_at) VALUES (?, ?, ?)', [
+    key,
+    JSON.stringify(value),
+    new Date().toISOString(),
+  ]);
+}

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getLocalDb, LocalMember, upsertLocalMember, upsertLocalFamilyMember, getLocalChildById, deleteLocalChild } from '../../lib/db';
+import { api } from '../../lib/api';
+import { getLocalDb, LocalMember, upsertLocalMember, upsertLocalFamilyMember, getLocalChildById, deleteLocalChild, getLocalVisitors, upsertLocalVisitor } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { getDropdownOptions, getChurchZones, syncDropdownOptions, syncChurchZones } from '../../lib/options';
 import { generateUUID } from '../../lib/uuid';
@@ -29,8 +30,9 @@ export default function AddMemberScreen() {
   const router = useRouter();
   // Set when promoting a child (mirrors the web app: pre-filled Add Member form,
   // child record removed once the member is saved)
-  const { fromChildId } = useLocalSearchParams<{ fromChildId?: string }>();
+  const { fromChildId, fromVisitorId } = useLocalSearchParams<{ fromChildId?: string; fromVisitorId?: string }>();
   const [promotedChildName, setPromotedChildName] = useState<string | null>(null);
+  const [convertedVisitorName, setConvertedVisitorName] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const toast = useToast();
   const [errors, setErrors] = useState<MemberFormErrors>({});
@@ -99,7 +101,7 @@ export default function AddMemberScreen() {
         if (positions.length > 0) setPositionsList(positions);
         if (zones.length > 0) {
           setZonesList(zones);
-          if (!fromChildId) setZone(zones[0]);
+          if (!fromChildId && !fromVisitorId) setZone(zones[0]);
         }
 
         // Load adult member directory for family linking & duplicate zone check
@@ -172,6 +174,35 @@ export default function AddMemberScreen() {
       }
     })().catch(err => console.warn('Failed to pre-fill from child record:', err));
   }, [fromChildId]);
+
+  // Pre-fill from the visitor being converted (same fields the web AddMember copies)
+  useEffect(() => {
+    if (!fromVisitorId) return;
+    (async () => {
+      let visitor: any = null;
+      const row = (await getLocalVisitors()).find(v => v.id === fromVisitorId);
+      if (row) {
+        try { visitor = JSON.parse(row.raw_json || '{}'); } catch {}
+        visitor = { ...visitor, firstName: visitor?.firstName || row.name.split(' ')[0], lastName: visitor?.lastName || row.name.split(' ').slice(1).join(' '), phone: visitor?.phone || row.phone, email: visitor?.email || row.email, potentialZone: visitor?.potentialZone || row.potential_zone, notes: visitor?.notes ?? row.notes };
+      } else {
+        visitor = await api.visitors.getById(fromVisitorId);
+      }
+      if (!visitor) return;
+      setConvertedVisitorName(`${visitor.firstName || ''} ${visitor.lastName || ''}`.trim());
+      setFirstName(visitor.firstName || '');
+      setLastName(visitor.lastName || '');
+      setOtherNames(visitor.otherNames || '');
+      setEmail(visitor.email || '');
+      setPhone(visitor.phone || '');
+      setSecondPhone(visitor.secondPhone || '');
+      if (visitor.gender) setGender(visitor.gender);
+      setDateOfBirth((visitor.dateOfBirth || '').slice(0, 10));
+      setResidenceLocation(visitor.residenceLocation || '');
+      if (visitor.potentialZone) setZone(visitor.potentialZone);
+      setNotes(`Converted from visitor. Original notes: ${visitor.notes || ''}`);
+      setPreviousCongregation(visitor.church || '');
+    })().catch(err => console.warn('Failed to pre-fill from visitor record:', err));
+  }, [fromVisitorId]);
 
   // Compute next sequential zone number automatically
   useEffect(() => {
@@ -450,6 +481,33 @@ export default function AddMemberScreen() {
         return;
       }
 
+      // 4. Conversion: mark the visitor as converted and linked to the new member (web parity)
+      if (fromVisitorId) {
+        try {
+          const row = (await getLocalVisitors()).find(v => v.id === fromVisitorId);
+          let base: any = {};
+          try { base = JSON.parse(row?.raw_json || '{}'); } catch {}
+          const converted = {
+            firstName: row?.name.split(' ')[0],
+            lastName: row?.name.split(' ').slice(1).join(' '),
+            phone: row?.phone,
+            visitDate: row?.visit_date,
+            ...base,
+            id: fromVisitorId,
+            convertedToMember: true,
+            convertedMemberId: newId,
+          };
+          if (row) await upsertLocalVisitor({ ...row, follow_up_status: 'converted', raw_json: JSON.stringify(converted) });
+          await pushOrQueue('PUT', `/visitors/${fromVisitorId}`, converted);
+        } catch (visitorErr) {
+          console.warn('Failed to mark visitor as converted:', visitorErr);
+        }
+        toast.show({ title: 'Visitor converted to member', message: fullName });
+        if (router.canGoBack()) router.back();
+        else router.replace('/members' as any);
+        return;
+      }
+
       toast.show({ title: 'Member added', message: fullName });
       if (router.canGoBack()) {
         router.back();
@@ -495,8 +553,8 @@ export default function AddMemberScreen() {
   return (
     <Screen>
       <AppHeader
-        title={fromChildId ? 'Promote to member' : 'New member'}
-        subtitle={promotedChildName ? `Pre-filled from ${promotedChildName}'s child profile` : 'Register a congregation member'}
+        title={fromChildId ? 'Promote to member' : fromVisitorId ? 'Convert visitor to member' : 'New member'}
+        subtitle={promotedChildName ? `Pre-filled from ${promotedChildName}'s child profile` : convertedVisitorName ? `Register ${convertedVisitorName} as a new member` : 'Register a congregation member'}
         showBack
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -504,7 +562,7 @@ export default function AddMemberScreen() {
           <MemberForm form={form} errors={errors} requirePhone />
         </ScrollView>
         <SaveBar
-          label={submitting ? 'Saving…' : fromChildId ? 'Save & promote' : 'Save member'}
+          label={submitting ? 'Saving…' : fromChildId ? 'Save & promote' : fromVisitorId ? 'Save & convert' : 'Save member'}
           loading={submitting}
           onPress={handleSave}
           progress={formProgress}
