@@ -3,7 +3,7 @@
     "name": "CoC Mataheko",
     "slug": "cocm-mobile",
     "scheme": "cocm",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/app-icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.cocmataheko.mobile",
-      "versionCode": 1
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"

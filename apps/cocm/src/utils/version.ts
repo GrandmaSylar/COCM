@@ -8,11 +8,27 @@ export interface ChangelogEntry {
 declare const __BUILD_DATE__: string;
 declare const __GIT_HASH__: string;
 
-export const APP_VERSION = "0.7.2";
+export const APP_VERSION = "0.8.0";
 export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : new Date().toISOString();
 export const GIT_HASH = typeof __GIT_HASH__ !== 'undefined' ? __GIT_HASH__ : 'dev';
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: "0.8.0",
+    date: "2026-11-01",
+    changes: [
+      "Redesigned the whole app in an iOS style: grouped lists, large titles, soft buttons, filled inputs and a true-black dark mode",
+      "New app shell: a translucent sidebar and top bar on desktop, and on phones a bottom tab bar with a More sheet in place of the old drawer and floating button",
+      "Status messages now show one at a time (offline, syncing, conflicts, update, install) instead of up to seven stacked banners",
+      "Added swipe actions and pull to refresh on touch screens (Dashboard, Members, Attendance, Visitors, Children and more)",
+      "Rebuilt Dashboard, Members, Attendance, Giving, Reports, Settings, Services, Visitors, Children, Ministry, Zones, Expenses, Activity Log, Notifications and Help, and the member, child and visitor profile headers",
+      "Settings navigation is a grouped list on phones and a tab strip on desktop",
+      "Improved text contrast and added screen reader names to icon buttons",
+      "Fixed the save bar on Add Member and Add Child hiding behind the tab bar on phones",
+      "Fixed the Services total giving amount running off its tile on phones",
+      "Updated the installed app's launch and status bar colours",
+    ],
+  },
   {
     version: "0.7.2",
     date: "2026-07-19",
