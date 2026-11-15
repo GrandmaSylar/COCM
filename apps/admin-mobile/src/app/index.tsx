@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, ScrollView, View } from 'react-nativ
 import { LogOut, Moon, RefreshCw, Sun } from 'lucide-react-native';
 import { AppHeader, HeaderButton } from '../components/AppHeader';
 import { BackupSection } from '../components/BackupSection';
-import { ChecksSection, InfoSections, RecentFixesSection, SummaryTiles, ZoneFixSection } from '../components/DashboardSections';
+import { ChecksSection, InfoSections, MergeSection, RecentFixesSection, SummaryTiles, ZoneFixSection } from '../components/DashboardSections';
 import { AppText, Screen } from '../components/ui';
 import { useAdminData } from '../context/AdminDataContext';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +51,7 @@ export default function DashboardScreen() {
             <SummaryTiles report={report} />
             <BackupSection lastBackupAt={report.backups.find((b) => b.status === 'completed')?.completedAt ?? null} onDone={() => void reload()} />
             <ZoneFixSection report={report} />
+            <MergeSection report={report} />
             <RecentFixesSection refreshKey={version} />
             <ChecksSection report={report} />
             <InfoSections report={report} />

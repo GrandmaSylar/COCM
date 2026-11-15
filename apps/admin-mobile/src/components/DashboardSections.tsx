@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { timeAgo, zoneFixCandidates, type HealthCheck, type HealthReport, type RecentFix, type Severity } from '@cms/admin-core';
-import { AlertCircle, AlertTriangle, CheckCircle2, History, Info, Wrench } from 'lucide-react-native';
+import { duplicateGroups, timeAgo, zoneFixCandidates, type HealthCheck, type HealthReport, type RecentFix, type Severity } from '@cms/admin-core';
+import { AlertCircle, AlertTriangle, CheckCircle2, GitMerge, History, Info, Wrench } from 'lucide-react-native';
 import { useAppColors } from '../context/ThemeContext';
 import { adminApi } from '../lib/admin';
 import { AppText, Badge, Chip, DetailRow, EmptyState, ListRow, Section, StatTile, type Tone } from './ui';
@@ -56,6 +56,31 @@ export function ZoneFixSection({ report }: { report: HealthReport }) {
         ))
       ) : (
         <EmptyState icon={CheckCircle2} tone="success" title="No zone numbers need fixing" />
+      )}
+    </Section>
+  );
+}
+
+export function MergeSection({ report }: { report: HealthReport }) {
+  const router = useRouter();
+  const groups = useMemo(() => duplicateGroups(report), [report]);
+  return (
+    <Section
+      title="Duplicate members to merge"
+      footer="Pick the record to keep and the duplicate to remove. Attendance, family links, service roles and expenses move to the kept record, and a full copy of the deleted one is saved in the activity log. Back up first."
+    >
+      {groups.length > 0 ? (
+        groups.map((g) => (
+          <ListRow
+            key={g.key}
+            icon={GitMerge}
+            title={g.members[0].name}
+            subtitle={`${g.members.map((m) => m.zoneNumber || '(none)').join(' and ')} · same name and date of birth`}
+            onPress={() => router.push({ pathname: '/merge', params: { members: JSON.stringify(g.members) } })}
+          />
+        ))
+      ) : (
+        <EmptyState icon={CheckCircle2} tone="success" title="No duplicate members found" message="Looks for the same name and date of birth." />
       )}
     </Section>
   );

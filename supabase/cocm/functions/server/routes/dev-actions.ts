@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { supabase } from "../lib/supabase.ts";
 import { requireDev } from "../lib/dev-guard.ts";
+import { applyMemberMerge, previewMemberMerge } from "../lib/member-merge.ts";
 import { applyZoneNumberFix, previewZoneNumberFix, recentFixes } from "../lib/zone-fix.ts";
 
 const router = new Hono();
@@ -37,6 +38,40 @@ router.post('/dev/actions/zone-number/apply', async (c) => {
     return c.json(result.body, result.status as 200);
   } catch (e) {
     console.error('zone-number apply failed:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+router.post('/dev/actions/member-merge/preview', async (c) => {
+  const guard = await requireDev(c);
+  if ('error' in guard) return guard.error;
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const result = await previewMemberMerge(supabase, String(body.keepId ?? ''), String(body.dropId ?? ''));
+    return c.json(result.body, result.status as 200);
+  } catch (e) {
+    console.error('member-merge preview failed:', e);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+router.post('/dev/actions/member-merge/apply', async (c) => {
+  const guard = await requireDev(c);
+  if ('error' in guard) return guard.error;
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const result = await applyMemberMerge(supabase, guard.actor, {
+      keepId: String(body.keepId ?? ''),
+      dropId: String(body.dropId ?? ''),
+      expectedKeepUpdatedAt: body.expectedKeepUpdatedAt ?? null,
+      expectedDropUpdatedAt: body.expectedDropUpdatedAt ?? null,
+      fill: Array.isArray(body.fill) ? body.fill.map(String) : undefined,
+      reason: String(body.reason ?? ''),
+      confirm: String(body.confirm ?? ''),
+    });
+    return c.json(result.body, result.status as 200);
+  } catch (e) {
+    console.error('member-merge apply failed:', e);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
