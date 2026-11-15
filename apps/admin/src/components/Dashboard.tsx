@@ -7,6 +7,7 @@ import type { HealthCheck, HealthReport, Severity } from '../types';
 import { Badge, Chip, DetailRow, EmptyState, Header, IconButton, IconWell, ListRow, Page, Section, StatTile, Surface, type Tone } from '../ui';
 import { BackupCard } from './BackupCard';
 import { FixZoneNumbers } from './FixZoneNumbers';
+import { MergeDuplicates } from './MergeDuplicates';
 import { RecentFixes } from './RecentFixes';
 
 const SEVERITY: Record<Severity, { label: string; tone: Tone; icon: typeof Info }> = {
@@ -120,6 +121,7 @@ export function Dashboard({ email, onSignOut }: { email: string; onSignOut: (rea
 
             <BackupCard lastBackupAt={report.backups.find((b) => b.status === 'completed')?.completedAt ?? null} onDone={afterChange} />
             <FixZoneNumbers report={report} onChanged={afterChange} />
+            <MergeDuplicates report={report} onChanged={afterChange} />
             <RecentFixes refreshKey={fixCount} />
 
             <Section title="Data checks" action={<Chip label="Issues only" selected={issuesOnly} onClick={() => setIssuesOnly((v) => !v)} />}>

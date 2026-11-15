@@ -9,4 +9,4 @@ const api = createAdminApi({
   getToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
 });
 
-export const { getHealth, previewZoneFix, applyZoneFix, getRecentFixes, runBackup, getTheme } = api;
+export const { getHealth, previewZoneFix, applyZoneFix, previewMerge, applyMerge, getRecentFixes, runBackup, getTheme } = api;

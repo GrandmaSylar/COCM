@@ -62,3 +62,30 @@ export interface BackupResult {
   backup: { id: string; fileName: string; fileSize: number | null };
   data: unknown;
 }
+
+export interface MergeMemberSummary {
+  id: string;
+  name: string;
+  zone: string;
+  zoneNumber: string;
+  status: string;
+  phone: string;
+  dateOfBirth: string | null;
+  joinDate: string | null;
+  updatedAt: string | null;
+}
+
+export interface MergePreview {
+  keep: MergeMemberSummary;
+  drop: MergeMemberSummary;
+  /** Blank on the kept member, present on the duplicate: copied over unless unticked. */
+  fills: { field: string; value: unknown }[];
+  /** Present on both and different: the kept member's value stays. */
+  differences: { field: string; keep: unknown; drop: unknown }[];
+  /** What will be moved from the duplicate to the kept member. */
+  references: { label: string; count: number }[];
+  problems: string[];
+  warnings: string[];
+  canApply: boolean;
+  confirmPhrase: string;
+}

@@ -38,3 +38,15 @@ export function zoneFixCandidates(report: HealthReport): ZoneFixCandidate[] {
   }
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export interface DuplicateGroup {
+  key: string;
+  members: { id: string; name: string; zoneNumber: string; phone: string }[];
+}
+
+/** Groups of members with the same name and date of birth, from the health report. */
+export function duplicateGroups(report: HealthReport): DuplicateGroup[] {
+  const check = report.checks.find((c) => c.id === 'members_duplicate_identity');
+  if (!check) return [];
+  return (check.samples as unknown as DuplicateGroup[]).filter((g) => Array.isArray(g.members) && g.members.length > 1);
+}

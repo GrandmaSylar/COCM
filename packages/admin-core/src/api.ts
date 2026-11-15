@@ -2,7 +2,7 @@
 // It only needs a base URL, the public anon key and a way to get the signed-in
 // person's access token, so it has no dependency on a browser or React Native.
 import type { ThemeColors, ThemeModePreference } from '@cms/shared/theme';
-import type { BackupResult, HealthReport, RecentFix, ZoneFixPreview } from './types';
+import type { BackupResult, HealthReport, MergePreview, RecentFix, ZoneFixPreview } from './types';
 
 export class AdminApiError extends Error {
   constructor(
@@ -26,6 +26,17 @@ export interface ZoneFixInput {
   memberId: string;
   proposed: string;
   expectedCurrent: string;
+  reason: string;
+  confirm: string;
+}
+
+export interface MergeInput {
+  keepId: string;
+  dropId: string;
+  expectedKeepUpdatedAt: string | null;
+  expectedDropUpdatedAt: string | null;
+  /** Fields to copy from the duplicate; leave out to copy every blank the preview offered. */
+  fill?: string[];
   reason: string;
   confirm: string;
 }
@@ -59,6 +70,15 @@ export function createAdminApi(config: AdminApiConfig) {
 
     applyZoneFix: (input: ZoneFixInput) =>
       request<{ ok: true; name: string; before: string; after: string }>('/dev/actions/zone-number/apply', { method: 'POST', body: input }),
+
+    previewMerge: (keepId: string, dropId: string) =>
+      request<MergePreview>('/dev/actions/member-merge/preview', { method: 'POST', body: { keepId, dropId } }),
+
+    applyMerge: (input: MergeInput) =>
+      request<{ ok: true; keptId: string; deletedId: string; name: string; zoneNumber: string; moved: Record<string, number> }>(
+        '/dev/actions/member-merge/apply',
+        { method: 'POST', body: input },
+      ),
 
     getRecentFixes: () => request<RecentFix[]>('/dev/actions/recent'),
 

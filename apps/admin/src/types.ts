@@ -3,6 +3,7 @@ export type {
   HealthCheck,
   HealthReport,
   HealthUser,
+  MergePreview,
   RecentFix,
   Severity,
   ZoneFixPreview,
